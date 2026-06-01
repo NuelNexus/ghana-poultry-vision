@@ -29,7 +29,7 @@ export const Route = createFileRoute("/api/public/devices/ingest")({
           feed_level: num(body.feed_level),
           light: num(body.light),
           current_a: num(body.current),
-          payload: body,
+          payload: body as never,
         });
         if (insErr) {
           return new Response(JSON.stringify({ error: insErr.message }),
