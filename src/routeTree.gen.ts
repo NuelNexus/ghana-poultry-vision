@@ -16,6 +16,7 @@ import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppHousesRouteImport } from './routes/app.houses'
 import { Route as AppHealthRouteImport } from './routes/app.health'
 import { Route as AppHatcheryRouteImport } from './routes/app.hatchery'
+import { Route as AppCamerasRouteImport } from './routes/app.cameras'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -52,11 +53,17 @@ const AppHatcheryRoute = AppHatcheryRouteImport.update({
   path: '/hatchery',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCamerasRoute = AppCamerasRouteImport.update({
+  id: '/cameras',
+  path: '/cameras',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/cameras': typeof AppCamerasRoute
   '/app/hatchery': typeof AppHatcheryRoute
   '/app/health': typeof AppHealthRoute
   '/app/houses': typeof AppHousesRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/app/cameras': typeof AppCamerasRoute
   '/app/hatchery': typeof AppHatcheryRoute
   '/app/health': typeof AppHealthRoute
   '/app/houses': typeof AppHousesRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/cameras': typeof AppCamerasRoute
   '/app/hatchery': typeof AppHatcheryRoute
   '/app/health': typeof AppHealthRoute
   '/app/houses': typeof AppHousesRoute
@@ -86,17 +95,26 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/app/cameras'
     | '/app/hatchery'
     | '/app/health'
     | '/app/houses'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/app/hatchery' | '/app/health' | '/app/houses' | '/app'
+  to:
+    | '/'
+    | '/login'
+    | '/app/cameras'
+    | '/app/hatchery'
+    | '/app/health'
+    | '/app/houses'
+    | '/app'
   id:
     | '__root__'
     | '/'
     | '/app'
     | '/login'
+    | '/app/cameras'
     | '/app/hatchery'
     | '/app/health'
     | '/app/houses'
@@ -160,10 +178,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHatcheryRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/cameras': {
+      id: '/app/cameras'
+      path: '/cameras'
+      fullPath: '/app/cameras'
+      preLoaderRoute: typeof AppCamerasRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppCamerasRoute: typeof AppCamerasRoute
   AppHatcheryRoute: typeof AppHatcheryRoute
   AppHealthRoute: typeof AppHealthRoute
   AppHousesRoute: typeof AppHousesRoute
@@ -171,6 +197,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppCamerasRoute: AppCamerasRoute,
   AppHatcheryRoute: AppHatcheryRoute,
   AppHealthRoute: AppHealthRoute,
   AppHousesRoute: AppHousesRoute,
