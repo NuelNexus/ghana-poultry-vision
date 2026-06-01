@@ -14,16 +14,468 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alerts: {
+        Row: {
+          created_at: string
+          device_id: string | null
+          farm_id: string | null
+          house_id: string | null
+          id: string
+          message: string
+          resolved: boolean | null
+          severity: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string | null
+          farm_id?: string | null
+          house_id?: string | null
+          id?: string
+          message: string
+          resolved?: boolean | null
+          severity?: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string | null
+          farm_id?: string | null
+          house_id?: string | null
+          id?: string
+          message?: string
+          resolved?: boolean | null
+          severity?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "poultry_houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      biogas_records: {
+        Row: {
+          created_at: string
+          efficiency_pct: number | null
+          farm_id: string
+          fertilizer_kg: number | null
+          gas_m3: number | null
+          id: number
+          waste_kg: number | null
+        }
+        Insert: {
+          created_at?: string
+          efficiency_pct?: number | null
+          farm_id: string
+          fertilizer_kg?: number | null
+          gas_m3?: number | null
+          id?: number
+          waste_kg?: number | null
+        }
+        Update: {
+          created_at?: string
+          efficiency_pct?: number | null
+          farm_id?: string
+          fertilizer_kg?: number | null
+          gas_m3?: number | null
+          id?: number
+          waste_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biogas_records_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cameras: {
+        Row: {
+          created_at: string
+          farm_id: string | null
+          house_id: string | null
+          id: string
+          last_seen: string | null
+          name: string
+          status: string | null
+          stream_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          farm_id?: string | null
+          house_id?: string | null
+          id?: string
+          last_seen?: string | null
+          name: string
+          status?: string | null
+          stream_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          farm_id?: string | null
+          house_id?: string | null
+          id?: string
+          last_seen?: string | null
+          name?: string
+          status?: string | null
+          stream_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cameras_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cameras_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "poultry_houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      devices: {
+        Row: {
+          api_key: string
+          created_at: string
+          device_id: string
+          farm_id: string | null
+          firmware_version: string | null
+          house_id: string | null
+          id: string
+          last_seen: string | null
+          location: string | null
+          online: boolean | null
+          type: string
+        }
+        Insert: {
+          api_key: string
+          created_at?: string
+          device_id: string
+          farm_id?: string | null
+          firmware_version?: string | null
+          house_id?: string | null
+          id?: string
+          last_seen?: string | null
+          location?: string | null
+          online?: boolean | null
+          type?: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          device_id?: string
+          farm_id?: string | null
+          firmware_version?: string | null
+          house_id?: string | null
+          id?: string
+          last_seen?: string | null
+          location?: string | null
+          online?: boolean | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "poultry_houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      energy_records: {
+        Row: {
+          battery_pct: number | null
+          consumption_w: number | null
+          created_at: string
+          farm_id: string
+          id: number
+          solar_w: number | null
+        }
+        Insert: {
+          battery_pct?: number | null
+          consumption_w?: number | null
+          created_at?: string
+          farm_id: string
+          id?: number
+          solar_w?: number | null
+        }
+        Update: {
+          battery_pct?: number | null
+          consumption_w?: number | null
+          created_at?: string
+          farm_id?: string
+          id?: number
+          solar_w?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "energy_records_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      farms: {
+        Row: {
+          created_at: string
+          id: string
+          location: string | null
+          name: string
+          owner_id: string | null
+          region: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          name: string
+          owner_id?: string | null
+          region?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          name?: string
+          owner_id?: string | null
+          region?: string | null
+        }
+        Relationships: []
+      }
+      hatcheries: {
+        Row: {
+          created_at: string
+          egg_count: number | null
+          expected_hatch_at: string | null
+          farm_id: string
+          hatched_count: number | null
+          humidity: number | null
+          id: string
+          name: string
+          started_at: string | null
+          temperature: number | null
+        }
+        Insert: {
+          created_at?: string
+          egg_count?: number | null
+          expected_hatch_at?: string | null
+          farm_id: string
+          hatched_count?: number | null
+          humidity?: number | null
+          id?: string
+          name: string
+          started_at?: string | null
+          temperature?: number | null
+        }
+        Update: {
+          created_at?: string
+          egg_count?: number | null
+          expected_hatch_at?: string | null
+          farm_id?: string
+          hatched_count?: number | null
+          humidity?: number | null
+          id?: string
+          name?: string
+          started_at?: string | null
+          temperature?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hatcheries_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poultry_houses: {
+        Row: {
+          batch_name: string | null
+          bird_count: number | null
+          capacity: number | null
+          created_at: string
+          farm_id: string
+          id: string
+          name: string
+        }
+        Insert: {
+          batch_name?: string | null
+          bird_count?: number | null
+          capacity?: number | null
+          created_at?: string
+          farm_id: string
+          id?: string
+          name: string
+        }
+        Update: {
+          batch_name?: string | null
+          bird_count?: number | null
+          capacity?: number | null
+          created_at?: string
+          farm_id?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poultry_houses_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string | null
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id: string
+          phone?: string | null
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
+      sensor_readings: {
+        Row: {
+          air_quality: number | null
+          created_at: string
+          current_a: number | null
+          device_id: string
+          feed_level: number | null
+          house_id: string | null
+          humidity: number | null
+          id: number
+          light: number | null
+          payload: Json | null
+          temperature: number | null
+          water_level: number | null
+        }
+        Insert: {
+          air_quality?: number | null
+          created_at?: string
+          current_a?: number | null
+          device_id: string
+          feed_level?: number | null
+          house_id?: string | null
+          humidity?: number | null
+          id?: number
+          light?: number | null
+          payload?: Json | null
+          temperature?: number | null
+          water_level?: number | null
+        }
+        Update: {
+          air_quality?: number | null
+          created_at?: string
+          current_a?: number | null
+          device_id?: string
+          feed_level?: number | null
+          house_id?: string | null
+          humidity?: number | null
+          id?: number
+          light?: number | null
+          payload?: Json | null
+          temperature?: number | null
+          water_level?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sensor_readings_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sensor_readings_house_id_fkey"
+            columns: ["house_id"]
+            isOneToOne: false
+            referencedRelation: "poultry_houses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "manager" | "worker"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +602,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "manager", "worker"],
+    },
   },
 } as const
