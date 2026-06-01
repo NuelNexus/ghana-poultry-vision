@@ -17,6 +17,7 @@ import { Route as AppHousesRouteImport } from './routes/app.houses'
 import { Route as AppHealthRouteImport } from './routes/app.health'
 import { Route as AppHatcheryRouteImport } from './routes/app.hatchery'
 import { Route as AppCamerasRouteImport } from './routes/app.cameras'
+import { Route as AppAutomationRouteImport } from './routes/app.automation'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -58,11 +59,17 @@ const AppCamerasRoute = AppCamerasRouteImport.update({
   path: '/cameras',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAutomationRoute = AppAutomationRouteImport.update({
+  id: '/automation',
+  path: '/automation',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/automation': typeof AppAutomationRoute
   '/app/cameras': typeof AppCamerasRoute
   '/app/hatchery': typeof AppHatcheryRoute
   '/app/health': typeof AppHealthRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/app/automation': typeof AppAutomationRoute
   '/app/cameras': typeof AppCamerasRoute
   '/app/hatchery': typeof AppHatcheryRoute
   '/app/health': typeof AppHealthRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/automation': typeof AppAutomationRoute
   '/app/cameras': typeof AppCamerasRoute
   '/app/hatchery': typeof AppHatcheryRoute
   '/app/health': typeof AppHealthRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/app/automation'
     | '/app/cameras'
     | '/app/hatchery'
     | '/app/health'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/app/automation'
     | '/app/cameras'
     | '/app/hatchery'
     | '/app/health'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/app/automation'
     | '/app/cameras'
     | '/app/hatchery'
     | '/app/health'
@@ -185,10 +197,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCamerasRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/automation': {
+      id: '/app/automation'
+      path: '/automation'
+      fullPath: '/app/automation'
+      preLoaderRoute: typeof AppAutomationRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAutomationRoute: typeof AppAutomationRoute
   AppCamerasRoute: typeof AppCamerasRoute
   AppHatcheryRoute: typeof AppHatcheryRoute
   AppHealthRoute: typeof AppHealthRoute
@@ -197,6 +217,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAutomationRoute: AppAutomationRoute,
   AppCamerasRoute: AppCamerasRoute,
   AppHatcheryRoute: AppHatcheryRoute,
   AppHealthRoute: AppHealthRoute,
