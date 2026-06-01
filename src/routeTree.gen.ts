@@ -9,38 +9,225 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppReportsRouteImport } from './routes/app.reports'
+import { Route as AppHousesRouteImport } from './routes/app.houses'
+import { Route as AppHealthRouteImport } from './routes/app.health'
+import { Route as AppHatcheryRouteImport } from './routes/app.hatchery'
+import { Route as AppEnergyRouteImport } from './routes/app.energy'
+import { Route as AppDevicesRouteImport } from './routes/app.devices'
+import { Route as AppCamerasRouteImport } from './routes/app.cameras'
+import { Route as AppBiogasRouteImport } from './routes/app.biogas'
+import { Route as AppAutomationRouteImport } from './routes/app.automation'
+import { Route as AppAlertsRouteImport } from './routes/app.alerts'
+import { Route as ApiPublicDevicesIngestRouteImport } from './routes/api/public/devices/ingest'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHousesRoute = AppHousesRouteImport.update({
+  id: '/houses',
+  path: '/houses',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHealthRoute = AppHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHatcheryRoute = AppHatcheryRouteImport.update({
+  id: '/hatchery',
+  path: '/hatchery',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEnergyRoute = AppEnergyRouteImport.update({
+  id: '/energy',
+  path: '/energy',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDevicesRoute = AppDevicesRouteImport.update({
+  id: '/devices',
+  path: '/devices',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCamerasRoute = AppCamerasRouteImport.update({
+  id: '/cameras',
+  path: '/cameras',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBiogasRoute = AppBiogasRouteImport.update({
+  id: '/biogas',
+  path: '/biogas',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAutomationRoute = AppAutomationRouteImport.update({
+  id: '/automation',
+  path: '/automation',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAlertsRoute = AppAlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => AppRoute,
+} as any)
+const ApiPublicDevicesIngestRoute = ApiPublicDevicesIngestRouteImport.update({
+  id: '/api/public/devices/ingest',
+  path: '/api/public/devices/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
+  '/app/alerts': typeof AppAlertsRoute
+  '/app/automation': typeof AppAutomationRoute
+  '/app/biogas': typeof AppBiogasRoute
+  '/app/cameras': typeof AppCamerasRoute
+  '/app/devices': typeof AppDevicesRoute
+  '/app/energy': typeof AppEnergyRoute
+  '/app/hatchery': typeof AppHatcheryRoute
+  '/app/health': typeof AppHealthRoute
+  '/app/houses': typeof AppHousesRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/': typeof AppIndexRoute
+  '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/app/alerts': typeof AppAlertsRoute
+  '/app/automation': typeof AppAutomationRoute
+  '/app/biogas': typeof AppBiogasRoute
+  '/app/cameras': typeof AppCamerasRoute
+  '/app/devices': typeof AppDevicesRoute
+  '/app/energy': typeof AppEnergyRoute
+  '/app/hatchery': typeof AppHatcheryRoute
+  '/app/health': typeof AppHealthRoute
+  '/app/houses': typeof AppHousesRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app': typeof AppIndexRoute
+  '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
+  '/app/alerts': typeof AppAlertsRoute
+  '/app/automation': typeof AppAutomationRoute
+  '/app/biogas': typeof AppBiogasRoute
+  '/app/cameras': typeof AppCamerasRoute
+  '/app/devices': typeof AppDevicesRoute
+  '/app/energy': typeof AppEnergyRoute
+  '/app/hatchery': typeof AppHatcheryRoute
+  '/app/health': typeof AppHealthRoute
+  '/app/houses': typeof AppHousesRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/': typeof AppIndexRoute
+  '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/login'
+    | '/app/alerts'
+    | '/app/automation'
+    | '/app/biogas'
+    | '/app/cameras'
+    | '/app/devices'
+    | '/app/energy'
+    | '/app/hatchery'
+    | '/app/health'
+    | '/app/houses'
+    | '/app/reports'
+    | '/app/'
+    | '/api/public/devices/ingest'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/app/alerts'
+    | '/app/automation'
+    | '/app/biogas'
+    | '/app/cameras'
+    | '/app/devices'
+    | '/app/energy'
+    | '/app/hatchery'
+    | '/app/health'
+    | '/app/houses'
+    | '/app/reports'
+    | '/app'
+    | '/api/public/devices/ingest'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/login'
+    | '/app/alerts'
+    | '/app/automation'
+    | '/app/biogas'
+    | '/app/cameras'
+    | '/app/devices'
+    | '/app/energy'
+    | '/app/hatchery'
+    | '/app/health'
+    | '/app/houses'
+    | '/app/reports'
+    | '/app/'
+    | '/api/public/devices/ingest'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  ApiPublicDevicesIngestRoute: typeof ApiPublicDevicesIngestRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +235,129 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/reports': {
+      id: '/app/reports'
+      path: '/reports'
+      fullPath: '/app/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/houses': {
+      id: '/app/houses'
+      path: '/houses'
+      fullPath: '/app/houses'
+      preLoaderRoute: typeof AppHousesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/health': {
+      id: '/app/health'
+      path: '/health'
+      fullPath: '/app/health'
+      preLoaderRoute: typeof AppHealthRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/hatchery': {
+      id: '/app/hatchery'
+      path: '/hatchery'
+      fullPath: '/app/hatchery'
+      preLoaderRoute: typeof AppHatcheryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/energy': {
+      id: '/app/energy'
+      path: '/energy'
+      fullPath: '/app/energy'
+      preLoaderRoute: typeof AppEnergyRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/devices': {
+      id: '/app/devices'
+      path: '/devices'
+      fullPath: '/app/devices'
+      preLoaderRoute: typeof AppDevicesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/cameras': {
+      id: '/app/cameras'
+      path: '/cameras'
+      fullPath: '/app/cameras'
+      preLoaderRoute: typeof AppCamerasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/biogas': {
+      id: '/app/biogas'
+      path: '/biogas'
+      fullPath: '/app/biogas'
+      preLoaderRoute: typeof AppBiogasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/automation': {
+      id: '/app/automation'
+      path: '/automation'
+      fullPath: '/app/automation'
+      preLoaderRoute: typeof AppAutomationRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/alerts': {
+      id: '/app/alerts'
+      path: '/alerts'
+      fullPath: '/app/alerts'
+      preLoaderRoute: typeof AppAlertsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/api/public/devices/ingest': {
+      id: '/api/public/devices/ingest'
+      path: '/api/public/devices/ingest'
+      fullPath: '/api/public/devices/ingest'
+      preLoaderRoute: typeof ApiPublicDevicesIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppAlertsRoute: typeof AppAlertsRoute
+  AppAutomationRoute: typeof AppAutomationRoute
+  AppBiogasRoute: typeof AppBiogasRoute
+  AppCamerasRoute: typeof AppCamerasRoute
+  AppDevicesRoute: typeof AppDevicesRoute
+  AppEnergyRoute: typeof AppEnergyRoute
+  AppHatcheryRoute: typeof AppHatcheryRoute
+  AppHealthRoute: typeof AppHealthRoute
+  AppHousesRoute: typeof AppHousesRoute
+  AppReportsRoute: typeof AppReportsRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAlertsRoute: AppAlertsRoute,
+  AppAutomationRoute: AppAutomationRoute,
+  AppBiogasRoute: AppBiogasRoute,
+  AppCamerasRoute: AppCamerasRoute,
+  AppDevicesRoute: AppDevicesRoute,
+  AppEnergyRoute: AppEnergyRoute,
+  AppHatcheryRoute: AppHatcheryRoute,
+  AppHealthRoute: AppHealthRoute,
+  AppHousesRoute: AppHousesRoute,
+  AppReportsRoute: AppReportsRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
+  ApiPublicDevicesIngestRoute: ApiPublicDevicesIngestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
