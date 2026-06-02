@@ -15,7 +15,15 @@ export const Route = createFileRoute("/")({
       { property: "og:description", content: "Run your poultry farms with IoT sensors, AI insights and renewable energy." },
       { property: "og:url", content: "/" },
     ],
-    links: [{ rel: "canonical", href: "/" }],
+    links: [
+      { rel: "canonical", href: "/" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syncopate:wght@400;700&display=swap",
+      },
+    ],
   }),
   component: Landing,
 });
