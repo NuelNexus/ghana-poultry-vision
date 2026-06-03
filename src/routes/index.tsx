@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
-import Lenis from "lenis";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -12,7 +11,7 @@ export const Route = createFileRoute("/")({
           "IoT + AI platform for poultry farms in Ghana. Real-time monitoring, hatchery control, disease prediction, ESP32 cameras, solar and biogas tracking.",
       },
       { property: "og:title", content: "PoultryGrid AI — Smart Poultry Farm Management" },
-      { property: "og:description", content: "Run your poultry farms with IoT sensors, AI insights and renewable energy." },
+      { property: "og:description", content: "IoT mesh, AI health, solar & biogas, multi-farm RBAC." },
       { property: "og:url", content: "/" },
     ],
     links: [
@@ -21,290 +20,421 @@ export const Route = createFileRoute("/")({
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syncopate:wght@400;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400&display=swap",
       },
     ],
   }),
   component: Landing,
 });
 
-const CARDS = [
-  {
-    id: "001",
-    tag: "MONITOR",
-    title: "REAL-TIME SENSORS",
-    body: "Temperature, humidity, NH3, water and feed levels streamed live from ESP32 nodes across every house.",
-    meta: "ESP32 · MQTT · 1Hz",
-  },
-  {
-    id: "002",
-    tag: "HATCH",
-    title: "HATCHERY CONTROL",
-    body: "Incubator setpoints, turning cycles, candling logs and hatch-date prediction with success scoring.",
-    meta: "21-DAY CYCLE",
-  },
-  {
-    id: "003",
-    tag: "AI/HEALTH",
-    title: "DISEASE PREDICTION",
-    body: "Computer vision on flock behavior plus environmental anomaly detection to flag risk before outbreak.",
-    meta: "GEMINI 2.5 · CV",
-  },
-  {
-    id: "004",
-    tag: "VISION",
-    title: "ESP32-CAM FEEDS",
-    body: "Multi-camera live MJPEG with snapshots, motion events and per-house fullscreen review.",
-    meta: "MJPEG · 24/7",
-  },
-  {
-    id: "005",
-    tag: "POWER",
-    title: "SOLAR + BIOGAS",
-    body: "Track PV generation, battery state of charge and waste-to-energy conversion from manure digesters.",
-    meta: "kWh · m³ CH4",
-  },
-  {
-    id: "006",
-    tag: "AUTOMATE",
-    title: "FEED & VENT",
-    body: "Schedule feeders, control ventilation and trigger cooling when thresholds are breached. Hands-off.",
-    meta: "RULE ENGINE",
-  },
-  {
-    id: "007",
-    tag: "ALERT",
-    title: "INSTANT NOTIFY",
-    body: "Severity-routed alerts for offline devices, power loss, abnormal gas and predicted disease risk.",
-    meta: "SMS · PUSH",
-  },
-  {
-    id: "008",
-    tag: "REPORT",
-    title: "EXPORT ANALYTICS",
-    body: "Daily, weekly and monthly performance reports. PDF and Excel exports for owners and auditors.",
-    meta: "PDF · XLSX",
-  },
-  {
-    id: "009",
-    tag: "TEAM",
-    title: "MULTI-FARM RBAC",
-    body: "Operate many farms with admin, manager and worker roles. Permissions scoped per house and device.",
-    meta: "RLS · ROLES",
-  },
-];
-
-const BIG_TEXTS = ["POULTRY", "GRID", "GHANA", "SENSE", "PREDICT", "POWER", "FLOCK", "SCALE"];
-
-type Item =
-  | { el: HTMLDivElement; type: "card" | "text"; x: number; y: number; rot: number; baseZ: number }
-  | { el: HTMLDivElement; type: "star"; x: number; y: number; baseZ: number; rot?: number };
+const SCENES = ["FARM 01", "FARM 02", "FARM 03", "FARM 04", "FARM 05"];
 
 function Landing() {
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const worldRef = useRef<HTMLDivElement>(null);
-  const velRef = useRef<HTMLSpanElement>(null);
-  const fpsRef = useRef<HTMLSpanElement>(null);
-  const coordRef = useRef<HTMLSpanElement>(null);
-
   useEffect(() => {
-    const viewport = viewportRef.current!;
-    const world = worldRef.current!;
-
-    const CONFIG = {
-      starCount: 150,
-      zGap: 800,
-      camSpeed: 2.5,
-    };
-
-    // Build item list: alternate big-text and cards
-    const sequence: Array<{ kind: "text" | "card"; data: number }> = [];
-    let cardIdx = 0;
-    let textIdx = 0;
-    const totalSlots = CARDS.length + BIG_TEXTS.length;
-    for (let i = 0; i < totalSlots; i++) {
-      if (i % 3 === 0 && textIdx < BIG_TEXTS.length) {
-        sequence.push({ kind: "text", data: textIdx++ });
-      } else if (cardIdx < CARDS.length) {
-        sequence.push({ kind: "card", data: cardIdx++ });
-      } else if (textIdx < BIG_TEXTS.length) {
-        sequence.push({ kind: "text", data: textIdx++ });
-      }
-    }
-    const itemCount = sequence.length;
-    const loopSize = itemCount * CONFIG.zGap;
-
-    const items: Item[] = [];
-
-    sequence.forEach((slot, i) => {
-      const el = document.createElement("div");
-      el.className = "pg-item";
-      if (slot.kind === "text") {
-        const txt = document.createElement("div");
-        txt.className = "pg-big-text";
-        txt.innerText = BIG_TEXTS[slot.data];
-        el.appendChild(txt);
-        items.push({ el, type: "text", x: 0, y: 0, rot: 0, baseZ: -i * CONFIG.zGap });
-      } else {
-        const c = CARDS[slot.data];
-        const card = document.createElement("div");
-        card.className = "pg-card";
-        card.innerHTML = `
-          <div class="pg-card-header">
-            <span class="pg-card-id">ID-${c.id} // ${c.tag}</span>
-            <div class="pg-card-dot"></div>
-          </div>
-          <h2>${c.title}</h2>
-          <p class="pg-card-body">${c.body}</p>
-          <div class="pg-card-footer">
-            <span>${c.meta}</span>
-            <span>NODE_${(Math.random() * 9999).toFixed(0).padStart(4, "0")}</span>
-          </div>
-          <div class="pg-card-num">${c.id}</div>
-        `;
-        el.appendChild(card);
-        const angle = (i / itemCount) * Math.PI * 6;
-        const x = Math.cos(angle) * (window.innerWidth * 0.28);
-        const y = Math.sin(angle) * (window.innerHeight * 0.28);
-        const rot = (Math.random() - 0.5) * 24;
-        items.push({ el, type: "card", x, y, rot, baseZ: -i * CONFIG.zGap });
-      }
-      world.appendChild(el);
-    });
-
-    for (let i = 0; i < CONFIG.starCount; i++) {
-      const el = document.createElement("div");
-      el.className = "pg-star";
-      world.appendChild(el);
-      items.push({
-        el,
-        type: "star",
-        x: (Math.random() - 0.5) * 3000,
-        y: (Math.random() - 0.5) * 3000,
-        baseZ: -Math.random() * loopSize,
-      });
+    const canvas = document.getElementById("webgl-canvas") as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const gl = canvas.getContext("webgl", { alpha: false });
+    if (!gl) {
+      canvas.style.background = "#0a0a0f";
+      return;
     }
 
-    const state = { scroll: 0, velocity: 0, targetSpeed: 0, mouseX: 0, mouseY: 0 };
+    const vs = `attribute vec2 a; void main(){ gl_Position=vec4(a,0,1); }`;
+    const fs = `
+precision highp float;
+uniform vec2 uR;
+uniform float uT, uS, uSc, uBl;
+uniform vec3 uBg;
+#define TAU 6.2831853
+mat2 r2(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
+float sphere(vec3 p,float r){return length(p)-r;}
+float torus(vec3 p,vec2 t){vec2 q=vec2(length(p.xz)-t.x,p.y);return length(q)-t.y;}
+float box(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.);}
+float octa(vec3 p,float s){p=abs(p);return (p.x+p.y+p.z-s)*.5773;}
+float sdf(vec3 p){
+  float t=uT*.25,sc=uSc,bl=uBl;
+  float d0=sphere(p,.65+.05*sin(t*1.3));
+  vec3 p1=p; p1.xz=r2(t*.6)*p1.xz;
+  float d1=torus(p1,vec2(.55,.22));
+  vec3 p2=p; p2.xy=r2(t*.4)*p2.xy; p2.yz=r2(t*.3)*p2.yz;
+  float d2=box(p2,vec3(.42+.04*sin(t*2.)));
+  vec3 p3=p; p3.xy=r2(t*.5)*p3.xy;
+  float d3=octa(p3,.72+.04*sin(t*1.7));
+  vec3 p4=p; p4.xz=r2(t*.7)*p4.xz;
+  float d4a=torus(p4,vec2(.45,.15));
+  vec3 p5=p; p5.xy=r2(t*.5+1.2)*p5.xy;
+  float d4b=torus(p5,vec2(.35,.12));
+  float d4=min(d4a,d4b);
+  if(sc<1.)return mix(d0,d1,bl);
+  if(sc<2.)return mix(d1,d2,bl);
+  if(sc<3.)return mix(d2,d3,bl);
+  return mix(d3,d4,bl);
+}
+vec3 norm(vec3 p){float e=.001;return normalize(vec3(
+  sdf(p+vec3(e,0,0))-sdf(p-vec3(e,0,0)),
+  sdf(p+vec3(0,e,0))-sdf(p-vec3(0,e,0)),
+  sdf(p+vec3(0,0,e))-sdf(p-vec3(0,0,e))));}
+vec3 pal(float t){return .5+.5*cos(TAU*(.9*t+vec3(0.,.15,.25)));}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-uR*.5)/min(uR.x,uR.y);
+  vec3 ro=vec3(0,0,2.4);
+  vec3 rd=normalize(vec3(uv,-1.2));
+  float t=0.,hit=0.;
+  for(int i=0;i<96;i++){
+    float d=sdf(ro+rd*t);
+    if(d<.001){hit=1.;break;}
+    if(t>6.)break;
+    t+=d;
+  }
+  vec3 bg=uBg,col=bg;
+  if(hit>.5){
+    vec3 p=ro+rd*t;
+    vec3 n=norm(p);
+    vec3 bc=pal(uS);
+    vec3 l=normalize(vec3(.7,1.,.5));
+    float dif=clamp(dot(n,l),0.,1.);
+    float spe=pow(clamp(dot(reflect(-l,n),-rd),0.,1.),32.);
+    float fr=pow(1.-clamp(dot(-rd,n),0.,1.),3.5);
+    col=bc*(dif*.7+.3)+spe*.5+fr*vec3(.784,1.,.278)*.6;
+    col=mix(bg,col,exp(-t*.15));
+  }
+  col=mix(uBg,col,clamp(1.-dot(uv*.9,uv*.9),0.,1.));
+  col+=(fract(sin(dot(gl_FragCoord.xy,vec2(127.1,311.7)))*43758.5)-.5)*.025;
+  gl_FragColor=vec4(col,1.);
+}`;
 
-    const onMouse = (e: MouseEvent) => {
-      state.mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
-      state.mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+    const mkShader = (type: number, src: string) => {
+      const s = gl.createShader(type)!;
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(s));
+        gl.deleteShader(s);
+        return null;
+      }
+      return s;
     };
-    window.addEventListener("mousemove", onMouse);
 
-    const lenis = new Lenis({ lerp: 0.08, smoothWheel: true });
-    lenis.on("scroll", ({ scroll, velocity }: { scroll: number; velocity: number }) => {
-      state.scroll = scroll;
-      state.targetSpeed = velocity;
+    const prog = gl.createProgram()!;
+    gl.attachShader(prog, mkShader(gl.VERTEX_SHADER, vs)!);
+    gl.attachShader(prog, mkShader(gl.FRAGMENT_SHADER, fs)!);
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const ap = gl.getAttribLocation(prog, "a");
+    gl.enableVertexAttribArray(ap);
+    gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0);
+
+    const uR = gl.getUniformLocation(prog, "uR");
+    const uTi = gl.getUniformLocation(prog, "uT");
+    const uScroll = gl.getUniformLocation(prog, "uS");
+    const uScene = gl.getUniformLocation(prog, "uSc");
+    const uBlend = gl.getUniformLocation(prog, "uBl");
+    const uBg = gl.getUniformLocation(prog, "uBg");
+
+    let maxScroll = 1;
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio ?? 1, 2);
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.uniform2f(uR, canvas.width, canvas.height);
+      maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const N = 5;
+    let tgt = 0, smooth = 0, velocity = 0;
+    const ease = 0.1;
+
+    const onScroll = () => {
+      tgt = maxScroll > 0 ? window.scrollY / maxScroll : 0;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const linePx = 16, pagePx = window.innerHeight * 0.9;
+      const delta = e.deltaMode === 1 ? e.deltaY * linePx : e.deltaMode === 2 ? e.deltaY * pagePx : e.deltaY;
+      velocity += delta;
+      velocity = Math.max(-600, Math.min(600, velocity));
+    };
+    window.addEventListener("wheel", onWheel, { passive: false });
+
+    const progFill = document.getElementById("prog-fill")!;
+    const hudPct = document.getElementById("hud-pct")!;
+    const sceneName = document.getElementById("scene-name")!;
+    const dots = document.querySelectorAll(".scene-dot");
+
+    const updateHUD = (s: number) => {
+      const p = Math.round(s * 100);
+      hudPct.textContent = String(p).padStart(3, "0") + "%";
+      (progFill as HTMLElement).style.width = `${p}%`;
+      const si = Math.min(N - 1, Math.floor(s * N));
+      sceneName.textContent = SCENES[si];
+      dots.forEach((d, i) => d.classList.toggle("active", i === si));
+    };
+
+    const revealEls = Array.from(
+      document.querySelectorAll(".tag, h1, h2, .body-text, .stat-row, .cta, .h-line")
+    );
+    revealEls.forEach((el) => {
+      if ((el as HTMLElement).getBoundingClientRect().top < window.innerHeight * 0.92)
+        el.classList.add("visible");
     });
-
-    let lastTime = 0;
-    let rafId = 0;
-    const loop = (time: number) => {
-      lenis.raf(time);
-      const delta = time - lastTime;
-      lastTime = time;
-      if (fpsRef.current && time % 10 < 1) fpsRef.current.innerText = String(Math.round(1000 / delta));
-      state.velocity += (state.targetSpeed - state.velocity) * 0.1;
-      if (velRef.current) velRef.current.innerText = Math.abs(state.velocity).toFixed(2);
-      if (coordRef.current) coordRef.current.innerText = state.scroll.toFixed(0);
-
-      const tiltX = state.mouseY * 5 - state.velocity * 0.5;
-      const tiltY = state.mouseX * 5;
-      world.style.transform = `translate(-50%, -50%) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
-
-      const baseFov = 1000;
-      const fov = baseFov - Math.min(Math.abs(state.velocity) * 10, 600);
-      viewport.style.perspective = `${fov}px`;
-
-      const cameraZ = state.scroll * CONFIG.camSpeed;
-      const modC = loopSize;
-
-      items.forEach((item) => {
-        const relZ = item.baseZ + cameraZ;
-        let vizZ = ((relZ % modC) + modC) % modC;
-        if (vizZ > 500) vizZ -= modC;
-
-        let alpha = 1;
-        if (vizZ < -3000) alpha = 0;
-        else if (vizZ < -2000) alpha = (vizZ + 3000) / 1000;
-        if (vizZ > 100 && item.type !== "star") alpha = 1 - (vizZ - 100) / 400;
-        if (alpha < 0) alpha = 0;
-        item.el.style.opacity = String(alpha);
-
-        if (alpha > 0) {
-          let trans = `translate3d(${item.x}px, ${item.y}px, ${vizZ}px)`;
-          if (item.type === "star") {
-            const stretch = Math.max(1, Math.min(1 + Math.abs(state.velocity) * 0.1, 10));
-            trans += ` scale3d(1, 1, ${stretch})`;
-          } else if (item.type === "text") {
-            trans += ` rotateZ(${item.rot}deg)`;
-            if (Math.abs(state.velocity) > 1) {
-              const offset = state.velocity * 2;
-              item.el.style.textShadow = `${offset}px 0 #ff003c, ${-offset}px 0 #00f3ff`;
-            } else {
-              item.el.style.textShadow = "none";
-            }
-          } else {
-            const t = time * 0.001;
-            const float = Math.sin(t + item.x) * 8;
-            trans += ` rotateZ(${item.rot}deg) rotateY(${float}deg)`;
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add("visible");
+            io.unobserve(e.target);
           }
-          item.el.style.transform = trans;
-        }
-      });
+        }),
+      { threshold: 0.1 }
+    );
+    revealEls.forEach((el) => io.observe(el));
 
-      rafId = requestAnimationFrame(loop);
+    const hexToVec3 = (hex: string) => {
+      const n = parseInt(hex.replace("#", ""), 16);
+      return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255] as const;
     };
-    rafId = requestAnimationFrame(loop);
+    const bgColors: Record<string, string> = { dark: "#0a0a0f", light: "#f0ece3" };
+    const updateBg = (theme: string) => {
+      const [r, g, b] = hexToVec3(bgColors[theme] ?? bgColors.dark);
+      gl.uniform3f(uBg, r, g, b);
+    };
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = (theme: string) => {
+      document.documentElement.setAttribute("data-theme", theme);
+      (document.documentElement.style as any).colorScheme = theme;
+      updateBg(theme);
+    };
+    applyTheme(mq.matches ? "dark" : "light");
+    const onMq = (e: MediaQueryListEvent) => applyTheme(e.matches ? "dark" : "light");
+    mq.addEventListener("change", onMq);
+
+    const themeBtn = document.getElementById("theme-toggle")!;
+    const onThemeClick = () => {
+      const current = document.documentElement.getAttribute("data-theme") || (mq.matches ? "dark" : "light");
+      applyTheme(current === "dark" ? "light" : "dark");
+    };
+    themeBtn.addEventListener("click", onThemeClick);
+
+    let anchorAnim: number | null = null;
+    const stopAnchorAnim = () => {
+      if (anchorAnim) {
+        cancelAnimationFrame(anchorAnim);
+        anchorAnim = null;
+      }
+    };
+    const smoothScrollToY = (targetY: number, duration = 900) => {
+      stopAnchorAnim();
+      velocity = 0;
+      const startY = window.scrollY;
+      const diff = targetY - startY;
+      const start = performance.now();
+      const easeInOutCubic = (t: number) =>
+        t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      const tick = (now: number) => {
+        const p = Math.min(1, (now - start) / duration);
+        const eOut = easeInOutCubic(p);
+        window.scrollTo(0, startY + diff * eOut);
+        if (p < 1) anchorAnim = requestAnimationFrame(tick);
+        else anchorAnim = null;
+      };
+      anchorAnim = requestAnimationFrame(tick);
+    };
+    window.addEventListener("wheel", stopAnchorAnim, { passive: true });
+    window.addEventListener("touchstart", stopAnchorAnim, { passive: true });
+    window.addEventListener("mousedown", stopAnchorAnim, { passive: true });
+    window.addEventListener("keydown", stopAnchorAnim);
+
+    const anchors = document.querySelectorAll('a[href^="#s"]');
+    const anchorHandlers: Array<{ a: Element; fn: (e: Event) => void }> = [];
+    anchors.forEach((a) => {
+      const fn = (e: Event) => {
+        e.preventDefault();
+        const id = (a as HTMLAnchorElement).getAttribute("href")!;
+        const target = document.querySelector(id) as HTMLElement | null;
+        if (!target) return;
+        const y = Math.max(0, Math.min(target.offsetTop, maxScroll));
+        smoothScrollToY(y);
+      };
+      a.addEventListener("click", fn);
+      anchorHandlers.push({ a, fn });
+    });
+
+    const t0 = performance.now();
+    let lastNow = t0;
+    let rafId = 0;
+    const frame = (now: number) => {
+      rafId = requestAnimationFrame(frame);
+      const dt = Math.min((now - lastNow) / 1000, 0.05);
+      lastNow = now;
+      velocity *= Math.pow(0.85, dt * 60);
+      if (Math.abs(velocity) > 0.2) window.scrollBy({ top: velocity * ease, behavior: "auto" });
+      smooth += (tgt - smooth) * (1 - Math.exp(-dt * 8));
+      const raw = smooth * (N - 1);
+      const flr = Math.floor(raw);
+      const si = Math.min(flr, N - 2);
+      const bl = flr >= N - 1 ? 1.0 : raw - flr;
+      updateHUD(smooth);
+      gl.uniform1f(uTi, (now - t0) / 1000);
+      gl.uniform1f(uScroll, smooth);
+      gl.uniform1f(uScene, si);
+      gl.uniform1f(uBlend, bl);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    };
+    rafId = requestAnimationFrame(frame);
 
     return () => {
       cancelAnimationFrame(rafId);
-      lenis.destroy();
-      window.removeEventListener("mousemove", onMouse);
-      world.innerHTML = "";
+      stopAnchorAnim();
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("wheel", stopAnchorAnim);
+      window.removeEventListener("touchstart", stopAnchorAnim);
+      window.removeEventListener("mousedown", stopAnchorAnim);
+      window.removeEventListener("keydown", stopAnchorAnim);
+      mq.removeEventListener("change", onMq);
+      themeBtn.removeEventListener("click", onThemeClick);
+      anchorHandlers.forEach(({ a, fn }) => a.removeEventListener("click", fn));
+      io.disconnect();
+      document.documentElement.removeAttribute("data-theme");
     };
   }, []);
 
   return (
-    <div className="pg-root">
-      <div className="pg-scroll-proxy" />
+    <div className="pg-landing">
+      <canvas id="webgl-canvas" />
 
-      <div className="pg-viewport" ref={viewportRef}>
-        <div className="pg-world" ref={worldRef} />
+      <div id="hud">
+        <div id="hud-pct">000%</div>
+        <div className="progress-bar">
+          <div className="progress-fill" id="prog-fill" />
+        </div>
+        <div className="scene-label" id="scene-name">FARM 01</div>
       </div>
 
-      <div className="pg-scanlines" />
-      <div className="pg-vignette" />
-      <div className="pg-noise" />
+      <button id="theme-toggle" aria-label="Toggle light/dark mode">
+        <svg className="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+        </svg>
+        <svg className="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+        </svg>
+      </button>
 
-      <div className="pg-hud">
-        <div className="pg-hud-top">
-          <div className="pg-brand">
-            <span className="pg-brand-mark">◢◤</span> POULTRYGRID&nbsp;AI
+      <div id="scene-strip">
+        <div className="scene-dot active" />
+        <div className="scene-dot" />
+        <div className="scene-dot" />
+        <div className="scene-dot" />
+        <div className="scene-dot" />
+      </div>
+
+      <div id="scroll-container">
+        <section id="s0">
+          <div className="text-card">
+            <div className="tag">PoultryGrid AI — Smart Farming Ghana</div>
+            <h1>SMART<br />POULTRY<br />FOR GHANA</h1>
+            <p className="body-text">
+              An IoT and AI platform connecting your farms, hatcheries and people.
+              Scroll to explore real-time sensing, disease prediction and renewable power.
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1.75rem" }}>
+              <Link to="/login" search={{ mode: "signup" }} className="cta visible">
+                Deploy account
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M1 6h10M6 1l5 5-5 5" />
+                </svg>
+              </Link>
+              <Link to="/login" className="cta visible">
+                Sign in
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M1 6h10M6 1l5 5-5 5" />
+                </svg>
+              </Link>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="pg-center-info">
-          <h1 className="pg-hero-title">
-            SMART POULTRY<br />FOR GHANA
-          </h1>
-          <p className="pg-hero-sub">
-            IoT mesh · AI health · solar &amp; biogas · multi-farm RBAC.<br />
-            Scroll to engage the grid.
-          </p>
-          <div className="pg-cta-row">
-            <Link to="/login" search={{ mode: "signup" }} className="pg-cta pg-cta-primary">
-              [ DEPLOY ACCOUNT ]
-            </Link>
-            <Link to="/login" className="pg-cta pg-cta-ghost">
-              SIGN IN →
+        <section id="s1">
+          <div className="text-card right">
+            <div className="h-line" />
+            <div className="tag">01 — Sensing</div>
+            <h2>LIVE<br />FARM PULSE</h2>
+            <p className="body-text">
+              ESP32 sensor nodes stream temperature, humidity, ammonia, water and feed
+              levels from every house — second by second, across every farm.
+            </p>
+            <div className="stat-row" style={{ justifyContent: "flex-end" }}>
+              <div className="stat"><span className="stat-num">1Hz</span><span className="stat-label">Telemetry</span></div>
+              <div className="stat"><span className="stat-num">∞</span><span className="stat-label">Devices</span></div>
+              <div className="stat"><span className="stat-num">24/7</span><span className="stat-label">Monitoring</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="s2">
+          <div className="text-card">
+            <div className="h-line" />
+            <div className="tag">02 — AI Health</div>
+            <h2>PREDICT<br />PROTECT</h2>
+            <p className="body-text">
+              Computer vision on ESP32-CAM feeds plus anomaly detection on environmental
+              data flag disease risk and behavioural changes before outbreaks spread.
+            </p>
+            <a className="cta" href="#s3">
+              Continue
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M1 6h10M6 1l5 5-5 5" />
+              </svg>
+            </a>
+          </div>
+        </section>
+
+        <section id="s3">
+          <div className="text-card center">
+            <div className="h-line" />
+            <div className="tag">03 — Hatchery</div>
+            <h2>INCUBATE<br />AUTOMATE</h2>
+            <p className="body-text">
+              Twenty-one day cycles, candling logs, turning schedules and predicted hatch
+              dates. Feeders, vents and cooling respond automatically to your thresholds.
+            </p>
+          </div>
+        </section>
+
+        <section id="s4">
+          <div className="text-card right">
+            <div className="h-line" />
+            <div className="tag">04 — Power & Team</div>
+            <h2>SOLAR<br />BIOGAS<br />SCALE</h2>
+            <p className="body-text">
+              Track PV generation, battery state and waste-to-energy from manure digesters.
+              Multi-farm RBAC for owners, managers and workers — scoped per house and device.
+            </p>
+            <Link to="/login" search={{ mode: "signup" }} className="cta visible">
+              Get started
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M1 6h10M6 1l5 5-5 5" />
+              </svg>
             </Link>
           </div>
-        </div>
+        </section>
+      </div>
 
-        <div className="pg-hud-bottom" />
+      <div id="credit">
+        <a href="/login">PoultryGrid AI</a>
       </div>
 
       <style>{css}</style>
@@ -313,146 +443,177 @@ function Landing() {
 }
 
 const css = `
-.pg-root {
-  --pg-bg: #030303;
-  --pg-card-bg: rgba(10, 10, 10, 0.4);
-  --pg-text: #e0e0e0;
-  --pg-accent: #ff003c;
-  --pg-accent-2: #00f3ff;
-  --pg-border: rgba(255, 255, 255, 0.1);
-  --pg-font-display: 'Syncopate', 'Arial Narrow', sans-serif;
-  --pg-font-code: 'JetBrains Mono', ui-monospace, monospace;
-  position: fixed;
-  inset: 0;
-  background: var(--pg-bg);
-  color: var(--pg-text);
-  font-family: var(--pg-font-display);
-  overflow: hidden;
-  cursor: crosshair;
+.pg-landing {
+  --dark-bg: #0a0a0f;
+  --dark-fg: #e8e4d9;
+  --dark-muted: #6a6a7e;
+  --light-bg: #f0ece3;
+  --light-fg: #0d0d14;
+  --light-muted: #9a9aaa;
+  --accent-dark: #c8ff47;
+  --accent-light: #3a6e00;
+  --bg: var(--dark-bg);
+  --fg: var(--dark-fg);
+  --muted: var(--dark-muted);
+  --accent: var(--accent-dark);
+  --card-bg: rgba(10, 10, 15, 0.82);
+  --card-border: rgba(200, 255, 71, 0.18);
+  --font-display: "Bebas Neue", sans-serif;
+  --font-mono: "DM Mono", monospace;
+  --hairline: 0.0625rem;
+  --ui-inset: 2rem;
+  --nav-x: calc(var(--ui-inset) + 0.125rem);
+  --reveal-offset: 0.625rem;
+  --reveal-duration: 0.5s;
+  --z-ui: 10;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  min-height: 100vh;
 }
-.pg-scroll-proxy { height: 10000vh; position: absolute; width: 100%; z-index: -1; }
-.pg-scanlines {
-  position: fixed; inset: 0; pointer-events: none; z-index: 10;
-  background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,.2) 50%, rgba(0,0,0,.2));
-  background-size: 100% 4px;
+:root[data-theme="light"] .pg-landing {
+  --bg: var(--light-bg);
+  --fg: var(--light-fg);
+  --muted: var(--light-muted);
+  --accent: var(--accent-light);
+  --card-bg: rgba(240, 236, 227, 0.88);
+  --card-border: rgba(58, 110, 0, 0.2);
 }
-.pg-vignette { position: fixed; inset: 0; pointer-events: none; z-index: 11; background: radial-gradient(circle, transparent 40%, #000 120%); }
-.pg-noise {
-  position: fixed; inset: 0; pointer-events: none; z-index: 12; opacity: 0.07;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+.pg-landing *, .pg-landing *::before, .pg-landing *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
 }
-.pg-hud {
-  position: fixed; inset: 2rem; z-index: 20; pointer-events: none;
-  display: flex; flex-direction: column; justify-content: space-between;
-  font-family: var(--pg-font-code); font-size: 10px; color: rgba(255,255,255,.55); text-transform: uppercase;
-}
-.pg-hud-top, .pg-hud-bottom { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-.pg-hud strong { color: var(--pg-accent-2); }
-.pg-hud-line { flex: 1; height: 1px; background: rgba(255,255,255,.2); position: relative; }
-.pg-hud-line::after { content: ''; position: absolute; right: 0; top: -2px; width: 5px; height: 5px; background: var(--pg-accent); }
-.pg-brand { color: #fff; letter-spacing: .15em; font-weight: 700; }
-.pg-brand-mark { color: var(--pg-accent); }
+body:has(.pg-landing) { overflow-x: hidden; background: var(--dark-bg); }
+:root[data-theme="light"] body:has(.pg-landing) { background: var(--light-bg); }
 
-.pg-center-info {
-  pointer-events: auto;
-  align-self: center;
-  text-align: center;
-  max-width: 720px;
-  mix-blend-mode: difference;
+#webgl-canvas {
+  position: fixed; inset: 0; width: 100vw; height: 100vh;
+  z-index: 0; pointer-events: none;
 }
-.pg-hero-title {
-  font-family: var(--pg-font-display);
-  font-size: clamp(2.2rem, 5.5vw, 4.5rem);
-  font-weight: 700;
-  letter-spacing: .02em;
-  line-height: .95;
-  margin: 0 0 1rem;
-  color: #fff;
-  text-transform: uppercase;
-}
-.pg-hero-sub {
-  font-family: var(--pg-font-code);
-  font-size: 11px;
-  letter-spacing: .12em;
-  color: rgba(255,255,255,.8);
-  text-transform: uppercase;
-  margin: 0 auto 1.5rem;
-  line-height: 1.7;
-}
-.pg-cta-row { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
-.pg-cta {
-  font-family: var(--pg-font-code);
-  font-size: 11px;
-  letter-spacing: .18em;
-  padding: .85rem 1.25rem;
-  text-decoration: none;
-  text-transform: uppercase;
-  border: 1px solid var(--pg-border);
-  color: #fff;
-  transition: all .2s;
-  pointer-events: auto;
-}
-.pg-cta-primary { background: var(--pg-accent); border-color: var(--pg-accent); color: #fff; }
-.pg-cta-primary:hover { background: #fff; color: var(--pg-accent); border-color: #fff; }
-.pg-cta-ghost:hover { border-color: var(--pg-accent-2); color: var(--pg-accent-2); }
 
-.pg-viewport { position: fixed; inset: 0; perspective: 1000px; overflow: hidden; z-index: 1; }
-.pg-world { position: absolute; top: 50%; left: 50%; transform-style: preserve-3d; will-change: transform; }
-.pg-item {
-  position: absolute; left: 0; top: 0; backface-visibility: hidden;
-  transform-origin: center center; display: flex; align-items: center; justify-content: center;
+#hud {
+  position: fixed; top: var(--ui-inset); right: var(--ui-inset); z-index: var(--z-ui);
+  text-align: right; font-size: 0.65rem; letter-spacing: 0.15em;
+  color: var(--muted); text-transform: uppercase; font-family: var(--font-mono);
 }
-.pg-card {
-  width: 340px; min-height: 440px; background: var(--pg-card-bg);
-  border: 1px solid var(--pg-border); padding: 1.75rem;
-  display: flex; flex-direction: column; gap: 1rem;
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 20px 50px rgba(0,0,0,.5);
-  transform: translate(-50%, -50%);
-  position: relative;
-  color: #fff;
+#hud .progress-bar {
+  width: 7.5rem; height: var(--hairline); background: var(--muted);
+  margin-block-start: 0.5rem; margin-inline-start: auto; position: relative; overflow: hidden;
 }
-.pg-card::before, .pg-card::after {
-  content: ''; position: absolute; width: 12px; height: 12px; border: 1px solid #fff; transition: .3s;
+#hud .progress-fill {
+  position: absolute; inset-block: 0; inset-inline-start: 0; width: 0%;
+  background: var(--accent); transition: width 0.1s linear;
 }
-.pg-card::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
-.pg-card::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
-.pg-card-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding-bottom: .75rem; border-bottom: 1px solid var(--pg-border);
-}
-.pg-card-id { font-family: var(--pg-font-code); color: var(--pg-accent); font-size: .7rem; letter-spacing: .1em; }
-.pg-card-dot { width: 10px; height: 10px; background: var(--pg-accent); }
-.pg-card h2 {
-  font-size: 1.75rem; line-height: .95; margin: 0; text-transform: uppercase;
-  font-weight: 700; color: #fff; letter-spacing: .01em;
-}
-.pg-card-body {
-  font-family: var(--pg-font-code); font-size: .75rem; line-height: 1.6;
-  color: rgba(255,255,255,.75); margin: 0; text-transform: none; letter-spacing: .02em;
-}
-.pg-card-footer {
-  margin-top: auto; font-family: var(--pg-font-code); font-size: .65rem;
-  color: rgba(255,255,255,.45); display: flex; justify-content: space-between;
-  letter-spacing: .1em; text-transform: uppercase;
-}
-.pg-card-num {
-  position: absolute; bottom: 1rem; right: 1.25rem;
-  font-size: 3.5rem; opacity: .08; font-weight: 900; color: #fff;
-}
-.pg-big-text {
-  font-size: 14vw; font-weight: 700; color: transparent;
-  -webkit-text-stroke: 2px rgba(255,255,255,.18);
-  text-transform: uppercase; white-space: nowrap;
-  transform: translate(-50%, -50%); pointer-events: none;
-  letter-spacing: -.4rem; mix-blend-mode: overlay;
-  font-family: var(--pg-font-display);
-}
-.pg-star { position: absolute; width: 2px; height: 2px; background: #fff; transform: translate(-50%, -50%); }
+#hud .scene-label { font-size: 0.6rem; color: var(--accent); margin-block-start: 0.4rem; }
 
-@media (max-width: 640px) {
-  .pg-hud { inset: 1rem; }
-  .pg-card { width: 260px; min-height: 380px; padding: 1.25rem; }
-  .pg-card h2 { font-size: 1.35rem; }
+#scene-strip {
+  position: fixed; left: var(--nav-x); top: 50%; translate: -50% -50%; z-index: var(--z-ui);
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+.scene-dot {
+  width: 0.25rem; height: 0.25rem; border-radius: 50%;
+  background: var(--muted); transition: background 0.3s, scale 0.3s;
+}
+.scene-dot.active { background: var(--accent); scale: 1.8; }
+
+#theme-toggle {
+  position: fixed; bottom: var(--ui-inset); left: var(--nav-x); translate: -50% 0;
+  z-index: var(--z-ui); width: 2rem; height: 2rem; border: none;
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+  border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.3s;
+}
+#theme-toggle:hover { background: color-mix(in srgb, var(--muted) 55%, transparent); }
+#theme-toggle svg {
+  width: 0.875rem; height: 0.875rem; position: absolute;
+  transition: opacity 0.3s ease, rotate 0.3s ease; color: var(--accent);
+}
+:root[data-theme="light"] #theme-toggle svg { color: var(--fg); }
+#theme-toggle .icon-sun { opacity: 1; rotate: 0deg; }
+#theme-toggle .icon-moon { opacity: 0; rotate: 90deg; }
+:root[data-theme="light"] #theme-toggle .icon-sun { opacity: 0; rotate: -90deg; }
+:root[data-theme="light"] #theme-toggle .icon-moon { opacity: 1; rotate: 0deg; }
+
+#scroll-container { position: relative; z-index: 1; }
+.pg-landing section {
+  min-height: 100vh; display: flex; align-items: center; padding: 6rem 5rem;
+}
+.text-card {
+  max-width: 23.75rem; padding: 2.25rem 2rem; background: var(--card-bg);
+  border-left: var(--hairline) solid var(--card-border);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+.text-card.right {
+  margin-inline-start: auto; border-left: none;
+  border-right: var(--hairline) solid var(--card-border); text-align: right;
+}
+.text-card.center {
+  margin-inline: auto; border-left: none;
+  border-top: var(--hairline) solid var(--card-border); text-align: center; max-width: 28.75rem;
+}
+.pg-landing .tag {
+  font-size: 0.6rem; letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--accent); margin-block-end: 1.1rem;
+  opacity: 0; translate: 0 var(--reveal-offset);
+  transition: opacity var(--reveal-duration) ease, translate var(--reveal-duration) ease;
+}
+.pg-landing .tag.visible { opacity: 1; translate: 0 0; }
+.pg-landing h1, .pg-landing h2 {
+  font-family: var(--font-display); font-weight: 400; letter-spacing: 0.03em; line-height: 0.92;
+  opacity: 0; translate: 0 1.125rem;
+  transition: opacity var(--reveal-duration) ease 0.08s, translate var(--reveal-duration) ease 0.08s;
+  color: var(--fg);
+}
+.pg-landing h1.visible, .pg-landing h2.visible { opacity: 1; translate: 0 0; }
+.pg-landing h1 { font-size: clamp(3rem, 8vw, 6.5rem); }
+.pg-landing h2 { font-size: clamp(2.2rem, 6vw, 5rem); }
+.body-text {
+  font-size: 0.78rem; line-height: 1.8; color: color-mix(in srgb, var(--fg) 55%, transparent);
+  margin-block-start: 1.25rem; opacity: 0; translate: 0 var(--reveal-offset);
+  transition: opacity var(--reveal-duration) ease 0.2s, translate var(--reveal-duration) ease 0.2s;
+}
+.body-text.visible { opacity: 1; translate: 0 0; }
+.stat-row {
+  display: flex; gap: 2.5rem; margin-block-start: 2rem; flex-wrap: wrap;
+  opacity: 0; translate: 0 var(--reveal-offset);
+  transition: opacity var(--reveal-duration) ease 0.3s, translate var(--reveal-duration) ease 0.3s;
+}
+.stat-row.visible { opacity: 1; translate: 0 0; }
+.stat { display: flex; flex-direction: column; gap: 0.15rem; }
+.stat-num { font-family: var(--font-display); font-size: 2.2rem; color: var(--accent); line-height: 1; }
+.stat-label { font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+.h-line {
+  width: 3.125rem; height: var(--hairline); background: var(--accent); margin-block-end: 1.2rem;
+  opacity: 0; scale: 0 1; transform-origin: left;
+  transition: opacity 0.4s ease, scale 0.4s ease;
+}
+.h-line.visible { opacity: 1; scale: 1 1; }
+.text-card.right .h-line { transform-origin: right; margin-inline-start: auto; }
+.text-card.center .h-line { transform-origin: center; margin-inline: auto; }
+.pg-landing .cta {
+  display: inline-flex; align-items: center; gap: 0.6rem; margin-block-start: 1.75rem;
+  padding: 0.6rem 1.25rem; border: var(--hairline) solid var(--accent);
+  color: var(--accent); font-family: var(--font-mono); font-size: 0.62rem;
+  letter-spacing: 0.18em; text-transform: uppercase; text-decoration: none; cursor: pointer;
+  opacity: 0; translate: 0 var(--reveal-offset);
+  transition: opacity var(--reveal-duration) ease 0.35s, translate var(--reveal-duration) ease 0.35s, background 0.2s, color 0.2s;
+}
+.pg-landing .cta.visible { opacity: 1; translate: 0 0; }
+.pg-landing .cta:hover { background: var(--accent); color: var(--bg); }
+.pg-landing .cta svg { width: 0.6875rem; height: 0.6875rem; }
+
+#credit {
+  position: fixed; right: var(--ui-inset); top: 50%;
+  transform: translateY(-50%) rotate(-90deg); transform-origin: right center;
+  z-index: var(--z-ui); font-family: var(--font-mono); font-size: 0.65rem;
+  letter-spacing: 0.15em; text-transform: uppercase;
+}
+#credit a { color: var(--muted); text-decoration: none; }
+
+@media (max-width: 600px) {
+  .pg-landing section { padding: 5rem 1.5rem; }
+  #hud { top: 1rem; right: 1rem; }
+  #scene-strip { display: none; }
+  .text-card { max-width: 100%; }
+  #theme-toggle { bottom: 1rem; left: 1.25rem; translate: 0 0; }
 }
 `;
