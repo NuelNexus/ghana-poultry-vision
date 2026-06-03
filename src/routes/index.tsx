@@ -284,10 +284,6 @@ function Landing() {
           <div className="pg-brand">
             <span className="pg-brand-mark">◢◤</span> POULTRYGRID&nbsp;AI
           </div>
-          <div className="pg-hud-line" />
-          <div>
-            <strong>SYS.READY</strong> · FPS:&nbsp;<span ref={fpsRef}>60</span>
-          </div>
         </div>
 
         <div className="pg-center-info">
@@ -308,15 +304,7 @@ function Landing() {
           </div>
         </div>
 
-        <div className="pg-hud-bottom">
-          <div>
-            SCROLL VELOCITY //&nbsp;<span ref={velRef}>0.00</span>
-          </div>
-          <div className="pg-hud-line" />
-          <div>
-            COORD:&nbsp;<span ref={coordRef}>000.000</span> · VER 2.0.4 [BETA]
-          </div>
-        </div>
+        <div className="pg-hud-bottom" />
       </div>
 
       <style>{css}</style>
