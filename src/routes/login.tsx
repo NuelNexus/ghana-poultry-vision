@@ -54,29 +54,29 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-background">
-      <div className="w-full max-w-md">
-        <Link to="/" className="flex items-center gap-2 justify-center mb-6">
-          <div className="h-9 w-9 rounded-md bg-primary flex items-center justify-center">
-            <Leaf className="h-5 w-5 text-primary-foreground" />
+    <div className="auth-bg">
+      <div className="auth-shell">
+        <Link to="/" className="auth-brand">
+          <div className="auth-logo">
+            <Leaf className="auth-logo-icon" />
           </div>
-          <span className="font-semibold text-lg">PoultryGrid AI</span>
+          <span className="auth-brand-text">PoultryGrid AI</span>
         </Link>
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="text-xl font-semibold">{mode === "signin" ? "Sign in" : "Create account"}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+        <div className="contact-us">
+          <h1 className="auth-title">{mode === "signin" ? "Sign in" : "Create account"}</h1>
+          <p className="auth-subtitle">
             {mode === "signin" ? "Access your farm dashboard." : "Set up your PoultryGrid AI account."}
           </p>
-          <form onSubmit={submit} className="mt-5 space-y-3">
+          <form onSubmit={submit} className="auth-form">
             {mode === "signup" && (
               <>
                 <Field label="Full name">
                   <input value={fullName} onChange={(e) => setFullName(e.target.value)} required
-                    className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm" />
+                    className="auth-input" placeholder="Full name" />
                 </Field>
                 <Field label="Role">
                   <select value={role} onChange={(e) => setRole(e.target.value as "admin" | "manager" | "worker")}
-                    className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm">
+                    className="auth-input">
                     <option value="admin">Admin</option>
                     <option value="manager">Farm Manager</option>
                     <option value="worker">Worker</option>
@@ -86,22 +86,24 @@ function LoginPage() {
             )}
             <Field label="Email">
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm" />
+                className="auth-input" placeholder="Email" />
             </Field>
             <Field label="Password">
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
-                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm" />
+                className="auth-input" placeholder="Password" />
             </Field>
-            <button disabled={loading} type="submit"
-              className="w-full bg-primary text-primary-foreground py-2.5 rounded-md font-medium hover:bg-primary/90 disabled:opacity-60">
-              {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+            <button disabled={loading} type="submit" className="auth-button">
+              {loading ? "Please wait..." : mode === "signin" ? "Sign in" : "Create account"}
             </button>
           </form>
-          <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-            className="mt-4 text-sm text-muted-foreground hover:text-foreground w-full text-center">
+          <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="auth-toggle">
             {mode === "signin" ? "No account? Create one" : "Already have an account? Sign in"}
           </button>
         </div>
+      </div>
+      <div className="rabbit-scene" aria-hidden="true">
+        <div className="rabbit"></div>
+        <div className="clouds"></div>
       </div>
     </div>
   );
@@ -109,9 +111,9 @@ function LoginPage() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <div className="mt-1">{children}</div>
+    <label className="auth-field">
+      <span className="auth-label">{label}</span>
+      <div className="auth-control">{children}</div>
     </label>
   );
 }

@@ -38,12 +38,12 @@ const shellCss = `
   background: #000; color: #fff; font-family: 'Nunito', sans-serif;
 }
 .pg-shell {
-  --pg-bg: #000;
-  --pg-fg: #fff;
-  --pg-muted: rgba(255,255,255,.6);
-  --pg-border: rgba(255,255,255,.85);
-  --pg-card: rgba(255,255,255,0.03);
-  --pg-accent: #fff;
+  --pg-bg: #fff;
+  --pg-fg: #111;
+  --pg-muted: rgba(17,17,17,.6);
+  --pg-border: #000;
+  --pg-card: #fff;
+  --pg-accent: #111;
   min-height: 100vh;
   background: var(--pg-bg);
   color: var(--pg-fg);
@@ -88,12 +88,12 @@ const shellCss = `
   transition: background .15s, border-color .15s;
 }
 .pg-navitem a:hover, .pg-logout:hover {
-  background: rgba(255,255,255,.06);
-  border-color: rgba(255,255,255,.25);
+  background: rgba(0,0,0,.04);
+  border-color: rgba(0,0,0,.35);
 }
 .pg-navitem.pg-active a {
-  background: #fff; color: #000;
-  border-color: #fff;
+  background: #000; color: #fff;
+  border-color: #000;
 }
 .pg-nav-icon { width: 18px; height: 18px; flex-shrink: 0; }
 .pg-nav-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -129,7 +129,7 @@ const shellCss = `
 .pg-bottomnav {
   position: fixed; bottom: 0; inset-inline: 0;
   display: flex; justify-content: space-around;
-  background: #000; border-top: 1px solid var(--pg-border);
+  background: #fff; border-top: 1px solid var(--pg-border);
   z-index: 40;
 }
 .pg-bn-item {
@@ -137,7 +137,7 @@ const shellCss = `
   padding: 8px 4px; font-size: .65rem; color: var(--pg-muted);
   text-decoration: none;
 }
-.pg-bn-item.pg-active { color: #fff; }
+.pg-bn-item.pg-active { color: #111; }
 
 /* Responsive */
 @media (max-width: 1500px) {

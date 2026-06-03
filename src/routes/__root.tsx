@@ -49,7 +49,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "PoultryGrid AI — Smart Poultry Farm Management" },
       { name: "description", content: "Smart poultry farm management platform for Ghana. Real-time monitoring, hatchery, AI health, renewable energy." },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css?family=Fjalla+One&display=swap" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css?family=Nunito" },
+      { rel: "stylesheet", href: appCss },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,

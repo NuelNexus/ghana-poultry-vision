@@ -110,3 +110,567 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+.auth-bg {
+  background: url("https://s3-us-west-2.amazonaws.com/s.cdpn.io/38816/image-from-rawpixel-id-2210775-jpeg.jpg") center center no-repeat;
+  background-size: cover;
+  min-height: 100vh;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  padding: 24px;
+}
+
+.auth-shell {
+  width: min(560px, 100%);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 24px;
+  color: #2a293e;
+  text-decoration: none;
+  font-family: "Fjalla One", sans-serif;
+  letter-spacing: 1px;
+}
+
+.auth-logo {
+  height: 40px;
+  width: 40px;
+  border-radius: 6px;
+  background: #ffa580;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #000;
+  box-shadow: 3px 3px 1px #95a4ff, 3px 3px 1px 2px #000;
+}
+
+.auth-logo-icon {
+  height: 20px;
+  width: 20px;
+  color: #2a293e;
+}
+
+.auth-brand-text {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.contact-us {
+  background: #f8f4e5;
+  padding: 50px 80px;
+  border: 2px solid #000;
+  box-shadow: 15px 15px 1px #ffa580, 15px 15px 1px 2px #000;
+}
+
+.auth-title {
+  font-family: "Fjalla One", sans-serif;
+  font-size: 24px;
+  color: #2a293e;
+  letter-spacing: 1px;
+}
+
+.auth-subtitle {
+  margin-top: 6px;
+  color: #2a293e;
+  opacity: 0.8;
+  font-family: "Fjalla One", sans-serif;
+}
+
+.auth-form {
+  margin-top: 24px;
+}
+
+.auth-field {
+  display: block;
+  margin-bottom: 22px;
+}
+
+.auth-label {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 1px;
+  font-family: "Fjalla One", sans-serif;
+  color: #2a293e;
+  margin-bottom: 6px;
+}
+
+.auth-input {
+  display: block;
+  width: 100%;
+  font-size: 14pt;
+  line-height: 28pt;
+  font-family: "Fjalla One", sans-serif;
+  border: none;
+  border-bottom: 5px solid #000;
+  background: #f8f4e5;
+  min-width: 250px;
+  padding-left: 5px;
+  outline: none;
+  color: #2a293e;
+}
+
+.auth-input:focus {
+  border-bottom: 5px solid #ffa580;
+}
+
+.auth-button {
+  display: block;
+  margin: 0 auto;
+  line-height: 28pt;
+  padding: 0 20px;
+  background: #ffa580;
+  letter-spacing: 2px;
+  transition: 0.2s all ease-in-out;
+  outline: none;
+  border: 1px solid #000;
+  box-shadow: 3px 3px 1px #95a4ff, 3px 3px 1px 2px #000;
+  font-family: "Fjalla One", sans-serif;
+  width: 100%;
+}
+
+.auth-button:hover {
+  background: #000;
+  color: #fff;
+  border: 1px solid #000;
+}
+
+.auth-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.auth-toggle {
+  margin-top: 16px;
+  width: 100%;
+  text-align: center;
+  background: none;
+  border: none;
+  font-family: "Fjalla One", sans-serif;
+  color: #2a293e;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.auth-toggle:hover {
+  opacity: 1;
+}
+
+.auth-bg ::selection {
+  background: #ffc8ff;
+}
+
+.auth-bg input:-webkit-autofill,
+.auth-bg input:-webkit-autofill:hover,
+.auth-bg input:-webkit-autofill:focus {
+  border-bottom: 5px solid #95a4ff;
+  -webkit-text-fill-color: #2a293e;
+  -webkit-box-shadow: 0 0 0px 1000px #f8f4e5 inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+@media (max-width: 640px) {
+  .contact-us {
+    padding: 36px 28px;
+  }
+}
+
+.rabbit-scene {
+  position: fixed;
+  left: -20vw;
+  bottom: 14px;
+  width: 20vw;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 10;
+  animation: bunny-run 6s linear infinite;
+}
+
+
+.rabbit {
+  width: 5em;
+  height: 3em;
+  background: #ffffff;
+  border-radius: 70% 90% 60% 50%;
+  position: relative;
+  box-shadow: -0.2em 1em 0 -0.75em #b78e81;
+  transform: rotate(0deg) translate(-2em, 0);
+  animation: hop 1s infinite linear;
+  z-index: 2;
+}
+
+.rabbit::before {
+  content: "";
+  position: absolute;
+  width: 1em;
+  height: 1em;
+  background: white;
+  border-radius: 100%;
+  top: 0.5em;
+  left: -0.3em;
+  box-shadow:
+    4em 0.4em 0 -0.35em #3f3334,
+    0.5em 1em 0 white,
+    4em 1em 0 -0.3em white,
+    4em 1em 0 -0.3em white,
+    4em 1em 0 -0.4em white;
+  animation: kick 1s infinite linear;
+}
+
+.rabbit::after {
+  content: "";
+  position: absolute;
+  width: 0.75em;
+  height: 2em;
+  background: white;
+  border-radius: 50% 100% 0 0;
+  transform: rotate(-30deg);
+  right: 1em;
+  top: -1em;
+  border-top: 1px solid #f7f5f4;
+  border-left: 1px solid #f7f5f4;
+  box-shadow: -0.5em 0em 0 -0.1em white;
+}
+
+.clouds {
+  background: white;
+  width: 2em;
+  height: 2em;
+  border-radius: 100% 100% 0 0;
+  position: relative;
+  top: -5em;
+  opacity: 0;
+  transform: translate(0, 0);
+  animation: cloudy 1s infinite linear forwards;
+  box-shadow: 5em 2em 0 -0.3em white, -2em 2em 0 0 white;
+  z-index: 1;
+}
+
+.clouds::before,
+.clouds::after {
+  content: "";
+  position: absolute;
+  box-shadow: 5em 2em 0 -0.3em white, -2em 2em 0 white;
+}
+
+.clouds::before {
+  width: 1.25em;
+  height: 1.25em;
+  border-radius: 100% 100% 0 100%;
+  background: white;
+  left: -30%;
+  bottom: 0;
+}
+
+.clouds::after {
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 100% 100% 100% 0;
+  background: white;
+  right: -30%;
+  bottom: 0;
+}
+
+@keyframes hop {
+  20% {
+    transform: rotate(-10deg) translate(1em, -2em);
+    box-shadow: -0.2em 3em 0 -1em #b78e81;
+  }
+  40% {
+    transform: rotate(10deg) translate(3em, -4em);
+    box-shadow: -0.2em 3.25em 0 -1.1em #b78e81;
+  }
+  60%,
+  75% {
+    transform: rotate(0) translate(4em, 0);
+    box-shadow: -0.2em 1em 0 -0.75em #b78e81;
+  }
+}
+
+@keyframes kick {
+  20%,
+  50% {
+    box-shadow:
+      4em 0.4em 0 -0.35em #3f3334,
+      0.5em 1.5em 0 white,
+      4em 1.75em 0 -0.3em white,
+      4em 1.75em 0 -0.3em white,
+      4em 1.9em 0 -0.4em white;
+  }
+  40% {
+    box-shadow:
+      4em 0.4em 0 -0.35em #3f3334,
+      0.5em 2em 0 white,
+      4em 1.75em 0 -0.3em white,
+      4.2em 1.75em 0 -0.2em white,
+      4.4em 1.9em 0 -0.2em white;
+  }
+}
+
+@keyframes cloudy {
+  40% {
+    opacity: 0.75;
+    transform: translate(-3em, 0);
+  }
+  55% {
+    opacity: 0;
+    transform: translate(-4em, 0);
+  }
+  90% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes bunny-run {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(140vw);
+  }
+}
+
+.farm-illustration {
+  background: paleturquoise;
+  transition: background 1s;
+  width: 100%;
+  height: clamp(220px, 38vh, 420px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  padding: 12px 8px 10px;
+  margin: 12px 0 20px;
+  overflow: hidden;
+  font-family: "Nunito", sans-serif;
+}
+
+.farm-illustration a {
+  display: inline-block;
+  font: 0.8em/1.2 "Nunito", sans-serif;
+  color: #444;
+  padding: 2px 6px;
+  margin-top: 6px;
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.farm-illustration a:hover {
+  background: coral;
+  color: #fff;
+}
+
+.farm-svg {
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 0 1em;
+}
+
+.farm-svg *[class^="st"] {
+  transition: fill 1s, stroke 1s;
+}
+
+.farm-svg #blades {
+  transform-origin: 82.7px 55.2px;
+  animation: windmill 1s linear infinite;
+}
+
+.farm-svg #tractor {
+  animation: tractor 0.05s linear infinite;
+}
+
+.farm-svg .wing-up,
+.farm-svg .wing-down {
+  transform-origin: center center;
+  animation-duration: 0.1s;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+}
+
+.farm-svg .wing-up { animation-name: wing-up; }
+.farm-svg .wing-down { animation-name: wing-down; }
+
+.farm-svg *[id^="butterfly"] {
+  animation-iteration-count: infinite;
+}
+
+.farm-svg #butterfly1 {
+  transform-origin: 421px 115px;
+  animation: butterfly1 2s linear infinite;
+}
+
+.farm-svg #butterfly2,
+.farm-svg #butterfly3 {
+  transform-origin: 437px 92px;
+  animation: butterfly2 2.5s linear infinite;
+}
+
+.farm-svg #butterfly1 .wing-up,
+.farm-svg #butterfly1 .wing-down,
+.farm-svg #butterfly3 .wing-up,
+.farm-svg #butterfly3 .wing-down {
+  transform-origin: center 128px;
+}
+
+.farm-svg g[id^="rain"] {
+  opacity: 0;
+  transition: none;
+}
+
+.farm-svg #sun {
+  transition: opacity 1s;
+}
+
+.farm-svg .st0,
+.farm-svg .st33 {
+  fill: hsla(47, 100%, 56%, 1);
+}
+
+.farm-svg .st1 { fill: hsla(42, 100%, 50%, 1); }
+.farm-svg .st2 { fill: none; stroke: #fff; stroke-miterlimit: 10; }
+.farm-svg .st3 { fill: hsla(0, 100%, 100%, 1); }
+.farm-svg .st4 { fill: hsla(179, 46%, 74%, 1); }
+.farm-svg .st5 { fill: hsla(84, 100%, 37%, 1); }
+.farm-svg .st6 { fill: hsla(47, 100%, 56%, 0.2); }
+.farm-svg .st7 { clip-path: url(#XMLID_199_); }
+.farm-svg .st7,
+.farm-svg .st14,
+.farm-svg .st15,
+.farm-svg .st23 { fill: hsla(0, 40%, 31%, 1); }
+.farm-svg .st8 { fill: hsla(107, 48%, 36%, 1); }
+.farm-svg .st9 { clip-path: url(#XMLID_203_); fill: hsla(38, 100%, 50%, 1); }
+.farm-svg .st10 { fill: hsla(47, 100%, 56%, 0.3); }
+.farm-svg .st11 { clip-path: url(#XMLID_204_); fill: hsla(30, 100%, 50%, 1); }
+.farm-svg .st12 { clip-path: url(#XMLID_207_); fill: hsla(28, 100%, 28%, 0.5); }
+.farm-svg .st13 { clip-path: url(#XMLID_207_); }
+.farm-svg .st13,
+.farm-svg .st34 { fill: hsla(28, 100%, 28%, 1); }
+.farm-svg .st15 { stroke: hsla(0, 100%, 100%, 1); stroke-width: 1.9848; stroke-miterlimit: 10; }
+.farm-svg .st16 { fill: hsla(5, 100%, 63%, 1); }
+.farm-svg .st17 { fill: none; stroke: hsla(0, 100%, 100%, 1); stroke-width: 4.2356; stroke-linecap: round; stroke-miterlimit: 10; }
+.farm-svg .st18,
+.farm-svg .st20 { fill: hsla(27, 100%, 36%, 1); }
+.farm-svg .st19 { fill: none; stroke: hsla(0, 100%, 100%, 1); stroke-width: 5; stroke-linecap: round; stroke-miterlimit: 10; }
+.farm-svg .st20 { clip-path: url(#XMLID_208_); }
+.farm-svg .st21 { fill: none; stroke: hsla(0, 100%, 100%, 1); stroke-width: 5.2945; stroke-linecap: round; stroke-miterlimit: 10; }
+.farm-svg .st22 { fill: none; stroke: hsla(0, 100%, 100%, 1); stroke-width: 2.9879; stroke-miterlimit: 10; }
+.farm-svg .st23 { stroke: hsla(0, 100%, 100%, 1); stroke-width: 4; stroke-miterlimit: 10; }
+.farm-svg .st24 { fill: none; stroke: hsla(0, 100%, 100%, 1); stroke-width: 1.8555; stroke-miterlimit: 10; }
+.farm-svg .st25 { fill: none; stroke: hsla(0, 40%, 31%, 1); stroke-width: 3; stroke-linecap: round; stroke-miterlimit: 10; }
+.farm-svg .st26 { fill: hsla(201, 69%, 49%, 1); }
+.farm-svg .st27 { fill: hsla(291, 9%, 16%, 1); }
+.farm-svg .st28 { fill: hsla(47, 90%, 96%, 1); }
+.farm-svg .st29 { fill: hsla(88, 72%, 39%, 1); }
+.farm-svg .st30 { fill: hsla(71, 50%, 46%, 1); }
+.farm-svg .st31 { fill: none; stroke: hsla(291, 9%, 16%, 1); stroke-miterlimit: 10; }
+.farm-svg .st32 { fill: hsla(210, 9%, 30%, 1); }
+.farm-svg .st33 { opacity: 0.6; }
+.farm-svg .st35 { fill: hsla(26, 100%, 59%, 1); }
+
+.farm-illustration.is-rain {
+  background: darkgray;
+}
+
+.farm-illustration.is-rain .farm-svg #sun { opacity: 0.1; }
+
+.farm-illustration.is-rain .farm-svg g[id^="rain"] {
+  opacity: 1;
+  transition: opacity 1s ease-in-out 1s;
+}
+
+.farm-illustration.is-rain .farm-svg g[id^="rain"] path {
+  stroke-dasharray: 4;
+  animation: rain 1s linear infinite;
+}
+
+.farm-illustration.is-rain .farm-svg #rain2 path {
+  stroke-dasharray: 7;
+  animation-duration: 1.1s;
+  animation-name: rain-bigger-drops;
+}
+
+.farm-illustration.is-rain .farm-svg .st0 { fill: hsla(47, 90%, 50%, 1); }
+.farm-illustration.is-rain .farm-svg .st1 { fill: hsla(42, 90%, 40%, 1); }
+.farm-illustration.is-rain .farm-svg .st3 { fill: hsla(0, 0%, 80%, 1); }
+.farm-illustration.is-rain .farm-svg .st4 { fill: hsla(179, 36%, 64%, 1); }
+.farm-illustration.is-rain .farm-svg .st5 { fill: hsla(84, 90%, 28%, 1); }
+.farm-illustration.is-rain .farm-svg .st6 { fill: hsla(47, 60%, 45%, 0.2); }
+.farm-illustration.is-rain .farm-svg .st7 { fill: hsla(0, 35%, 26%, 1); }
+.farm-illustration.is-rain .farm-svg .st8 { fill: hsla(107, 38%, 26%, 1); }
+.farm-illustration.is-rain .farm-svg .st9 { fill: hsla(38, 90%, 40%, 1); }
+.farm-illustration.is-rain .farm-svg .st10 { fill: hsla(47, 90%, 46%, 0.3); }
+.farm-illustration.is-rain .farm-svg .st11 { fill: hsla(30, 90%, 40%, 1); }
+.farm-illustration.is-rain .farm-svg .st12 { fill: hsla(28, 90%, 14%, 0.5); }
+.farm-illustration.is-rain .farm-svg .st13 { fill: hsla(28, 80%, 14%, 1); }
+.farm-illustration.is-rain .farm-svg .st14 { fill: hsla(0, 30%, 20%, 1); }
+.farm-illustration.is-rain .farm-svg .st15 { fill: hsla(0, 30%, 20%, 1); }
+.farm-illustration.is-rain .farm-svg .st16 { fill: hsla(5, 80%, 53%, 1); }
+.farm-illustration.is-rain .farm-svg .st17,
+.farm-illustration.is-rain .farm-svg .st19,
+.farm-illustration.is-rain .farm-svg .st21,
+.farm-illustration.is-rain .farm-svg .st22,
+.farm-illustration.is-rain .farm-svg .st24 {
+  stroke: hsla(0, 0%, 90%, 1);
+}
+.farm-illustration.is-rain .farm-svg .st18 { fill: hsla(27, 70%, 26%, 1); }
+.farm-illustration.is-rain .farm-svg .st20 { fill: hsla(27, 80%, 26%, 1); }
+.farm-illustration.is-rain .farm-svg .st23 { fill: hsla(0, 20%, 21%, 1); stroke: hsla(0, 0%, 90%, 1); }
+.farm-illustration.is-rain .farm-svg .st26 { fill: hsla(201, 39%, 40%, 1); }
+.farm-illustration.is-rain .farm-svg .st27 { fill: hsla(291, 2%, 5%, 1); }
+.farm-illustration.is-rain .farm-svg .st28 { fill: hsla(47, 70%, 85%, 1); }
+.farm-illustration.is-rain .farm-svg .st29 { fill: hsla(88, 42%, 30%, 1); }
+.farm-illustration.is-rain .farm-svg .st30 { fill: hsla(71, 30%, 35%, 1); }
+.farm-illustration.is-rain .farm-svg .st32 { fill: hsla(210, 2%, 20%, 1); }
+.farm-illustration.is-rain .farm-svg .st33 { fill: hsla(47, 80%, 45%, 1); }
+.farm-illustration.is-rain .farm-svg .st34 { fill: hsla(28, 80%, 18%, 1); }
+.farm-illustration.is-rain .farm-svg .st35 { fill: hsla(26, 80%, 50%, 1); }
+
+@keyframes windmill {
+  from { transform: rotate(0); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes tractor {
+  to { transform: scaleY(0.95) translateY(8px); }
+}
+
+@keyframes wing-up {
+  to { transform: rotateX(45deg) translateY(1px); }
+}
+
+@keyframes wing-down {
+  to { transform: rotateX(-45deg) translateY(-1px); }
+}
+
+@keyframes butterfly1 {
+  90% {
+    transform-origin: 425px 115px;
+    transform: rotate(340deg);
+  }
+  100% {
+    transform-origin: 430px 115px;
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes butterfly2 {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes rain {
+  to { stroke-dashoffset: 10000; }
+}
+
+@keyframes rain-bigger-drops {
+  to { stroke-dashoffset: -100; }
+}
+
+
+
+
