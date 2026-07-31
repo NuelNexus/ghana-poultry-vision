@@ -1,6 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 
+import fs from "../lib/shaders/fragment_shader.fs?raw";
+import vs from "../lib/shaders/vertex_shader.vs?raw";
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -10,14 +13,24 @@ export const Route = createFileRoute("/")({
         content:
           "IoT + AI platform for poultry farms in Ghana. Real-time monitoring, hatchery control, disease prediction, ESP32 cameras, solar and biogas tracking.",
       },
-      { property: "og:title", content: "PoultryGrid AI — Smart Poultry Farm Management" },
-      { property: "og:description", content: "IoT mesh, AI health, solar & biogas, multi-farm RBAC." },
+      {
+        property: "og:title",
+        content: "PoultryGrid AI — Smart Poultry Farm Management",
+      },
+      {
+        property: "og:description",
+        content: "IoT mesh, AI health, solar & biogas, multi-farm RBAC.",
+      },
       { property: "og:url", content: "/" },
     ],
     links: [
       { rel: "canonical", href: "/" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous",
+      },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400&display=swap",
@@ -31,7 +44,9 @@ const SCENES = ["FARM 01", "FARM 02", "FARM 03", "FARM 04", "FARM 05"];
 
 function Landing() {
   useEffect(() => {
-    const canvas = document.getElementById("webgl-canvas") as HTMLCanvasElement | null;
+    const canvas = document.getElementById(
+      "webgl-canvas",
+    ) as HTMLCanvasElement | null;
     if (!canvas) return;
     const gl = canvas.getContext("webgl", { alpha: false });
     if (!gl) {
@@ -39,69 +54,7 @@ function Landing() {
       return;
     }
 
-    const vs = `attribute vec2 a; void main(){ gl_Position=vec4(a,0,1); }`;
-    const fs = `
-precision highp float;
-uniform vec2 uR;
-uniform float uT, uS, uSc, uBl;
-uniform vec3 uBg;
-#define TAU 6.2831853
-mat2 r2(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
-float sphere(vec3 p,float r){return length(p)-r;}
-float torus(vec3 p,vec2 t){vec2 q=vec2(length(p.xz)-t.x,p.y);return length(q)-t.y;}
-float box(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.);}
-float octa(vec3 p,float s){p=abs(p);return (p.x+p.y+p.z-s)*.5773;}
-float sdf(vec3 p){
-  float t=uT*.25,sc=uSc,bl=uBl;
-  float d0=sphere(p,.65+.05*sin(t*1.3));
-  vec3 p1=p; p1.xz=r2(t*.6)*p1.xz;
-  float d1=torus(p1,vec2(.55,.22));
-  vec3 p2=p; p2.xy=r2(t*.4)*p2.xy; p2.yz=r2(t*.3)*p2.yz;
-  float d2=box(p2,vec3(.42+.04*sin(t*2.)));
-  vec3 p3=p; p3.xy=r2(t*.5)*p3.xy;
-  float d3=octa(p3,.72+.04*sin(t*1.7));
-  vec3 p4=p; p4.xz=r2(t*.7)*p4.xz;
-  float d4a=torus(p4,vec2(.45,.15));
-  vec3 p5=p; p5.xy=r2(t*.5+1.2)*p5.xy;
-  float d4b=torus(p5,vec2(.35,.12));
-  float d4=min(d4a,d4b);
-  if(sc<1.)return mix(d0,d1,bl);
-  if(sc<2.)return mix(d1,d2,bl);
-  if(sc<3.)return mix(d2,d3,bl);
-  return mix(d3,d4,bl);
-}
-vec3 norm(vec3 p){float e=.001;return normalize(vec3(
-  sdf(p+vec3(e,0,0))-sdf(p-vec3(e,0,0)),
-  sdf(p+vec3(0,e,0))-sdf(p-vec3(0,e,0)),
-  sdf(p+vec3(0,0,e))-sdf(p-vec3(0,0,e))));}
-vec3 pal(float t){return .5+.5*cos(TAU*(.9*t+vec3(0.,.15,.25)));}
-void main(){
-  vec2 uv=(gl_FragCoord.xy-uR*.5)/min(uR.x,uR.y);
-  vec3 ro=vec3(0,0,2.4);
-  vec3 rd=normalize(vec3(uv,-1.2));
-  float t=0.,hit=0.;
-  for(int i=0;i<96;i++){
-    float d=sdf(ro+rd*t);
-    if(d<.001){hit=1.;break;}
-    if(t>6.)break;
-    t+=d;
-  }
-  vec3 bg=uBg,col=bg;
-  if(hit>.5){
-    vec3 p=ro+rd*t;
-    vec3 n=norm(p);
-    vec3 bc=pal(uS);
-    vec3 l=normalize(vec3(.7,1.,.5));
-    float dif=clamp(dot(n,l),0.,1.);
-    float spe=pow(clamp(dot(reflect(-l,n),-rd),0.,1.),32.);
-    float fr=pow(1.-clamp(dot(-rd,n),0.,1.),3.5);
-    col=bc*(dif*.7+.3)+spe*.5+fr*vec3(.784,1.,.278)*.6;
-    col=mix(bg,col,exp(-t*.15));
-  }
-  col=mix(uBg,col,clamp(1.-dot(uv*.9,uv*.9),0.,1.));
-  col+=(fract(sin(dot(gl_FragCoord.xy,vec2(127.1,311.7)))*43758.5)-.5)*.025;
-  gl_FragColor=vec4(col,1.);
-}`;
+    // const fs = ;
 
     const mkShader = (type: number, src: string) => {
       const s = gl.createShader(type)!;
@@ -123,7 +76,11 @@ void main(){
 
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+      gl.STATIC_DRAW,
+    );
     const ap = gl.getAttribLocation(prog, "a");
     gl.enableVertexAttribArray(ap);
     gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0);
@@ -144,13 +101,18 @@ void main(){
       canvas.style.height = `${window.innerHeight}px`;
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.uniform2f(uR, canvas.width, canvas.height);
-      maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      maxScroll = Math.max(
+        1,
+        document.documentElement.scrollHeight - window.innerHeight,
+      );
     };
     resize();
     window.addEventListener("resize", resize);
 
     const N = 5;
-    let tgt = 0, smooth = 0, velocity = 0;
+    let tgt = 0,
+      smooth = 0,
+      velocity = 0;
     const ease = 0.1;
 
     const onScroll = () => {
@@ -160,8 +122,14 @@ void main(){
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const linePx = 16, pagePx = window.innerHeight * 0.9;
-      const delta = e.deltaMode === 1 ? e.deltaY * linePx : e.deltaMode === 2 ? e.deltaY * pagePx : e.deltaY;
+      const linePx = 16,
+        pagePx = window.innerHeight * 0.9;
+      const delta =
+        e.deltaMode === 1
+          ? e.deltaY * linePx
+          : e.deltaMode === 2
+            ? e.deltaY * pagePx
+            : e.deltaY;
       velocity += delta;
       velocity = Math.max(-600, Math.min(600, velocity));
     };
@@ -182,10 +150,15 @@ void main(){
     };
 
     const revealEls = Array.from(
-      document.querySelectorAll(".tag, h1, h2, .body-text, .stat-row, .cta, .h-line")
+      document.querySelectorAll(
+        ".tag, h1, h2, .body-text, .stat-row, .cta, .h-line",
+      ),
     );
     revealEls.forEach((el) => {
-      if ((el as HTMLElement).getBoundingClientRect().top < window.innerHeight * 0.92)
+      if (
+        (el as HTMLElement).getBoundingClientRect().top <
+        window.innerHeight * 0.92
+      )
         el.classList.add("visible");
     });
     const io = new IntersectionObserver(
@@ -196,15 +169,22 @@ void main(){
             io.unobserve(e.target);
           }
         }),
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
     revealEls.forEach((el) => io.observe(el));
 
     const hexToVec3 = (hex: string) => {
       const n = parseInt(hex.replace("#", ""), 16);
-      return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255] as const;
+      return [
+        ((n >> 16) & 255) / 255,
+        ((n >> 8) & 255) / 255,
+        (n & 255) / 255,
+      ] as const;
     };
-    const bgColors: Record<string, string> = { dark: "#0a0a0f", light: "#f0ece3" };
+    const bgColors: Record<string, string> = {
+      dark: "#0a0a0f",
+      light: "#f0ece3",
+    };
     const updateBg = (theme: string) => {
       const [r, g, b] = hexToVec3(bgColors[theme] ?? bgColors.dark);
       gl.uniform3f(uBg, r, g, b);
@@ -216,12 +196,15 @@ void main(){
       updateBg(theme);
     };
     applyTheme(mq.matches ? "dark" : "light");
-    const onMq = (e: MediaQueryListEvent) => applyTheme(e.matches ? "dark" : "light");
+    const onMq = (e: MediaQueryListEvent) =>
+      applyTheme(e.matches ? "dark" : "light");
     mq.addEventListener("change", onMq);
 
     const themeBtn = document.getElementById("theme-toggle")!;
     const onThemeClick = () => {
-      const current = document.documentElement.getAttribute("data-theme") || (mq.matches ? "dark" : "light");
+      const current =
+        document.documentElement.getAttribute("data-theme") ||
+        (mq.matches ? "dark" : "light");
       applyTheme(current === "dark" ? "light" : "dark");
     };
     themeBtn.addEventListener("click", onThemeClick);
@@ -278,7 +261,8 @@ void main(){
       const dt = Math.min((now - lastNow) / 1000, 0.05);
       lastNow = now;
       velocity *= Math.pow(0.85, dt * 60);
-      if (Math.abs(velocity) > 0.2) window.scrollBy({ top: velocity * ease, behavior: "auto" });
+      if (Math.abs(velocity) > 0.2)
+        window.scrollBy({ top: velocity * ease, behavior: "auto" });
       smooth += (tgt - smooth) * (1 - Math.exp(-dt * 8));
       const raw = smooth * (N - 1);
       const flr = Math.floor(raw);
@@ -320,15 +304,29 @@ void main(){
         <div className="progress-bar">
           <div className="progress-fill" id="prog-fill" />
         </div>
-        <div className="scene-label" id="scene-name">FARM 01</div>
+        <div className="scene-label" id="scene-name">
+          FARM 01
+        </div>
       </div>
 
       <button id="theme-toggle" aria-label="Toggle light/dark mode">
-        <svg className="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <svg
+          className="icon-sun"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
           <circle cx="12" cy="12" r="4" />
           <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
         </svg>
-        <svg className="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <svg
+          className="icon-moon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
           <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
         </svg>
       </button>
@@ -345,21 +343,49 @@ void main(){
         <section id="s0">
           <div className="text-card">
             <div className="tag">PoultryGrid AI — Smart Farming Ghana</div>
-            <h1>SMART<br />POULTRY<br />FOR GHANA</h1>
+            <h1>
+              SMART
+              <br />
+              POULTRY
+              <br />
+              FOR GHANA
+            </h1>
             <p className="body-text">
-              An IoT and AI platform connecting your farms, hatcheries and people.
-              Scroll to explore real-time sensing, disease prediction and renewable power.
+              An IoT and AI platform connecting your farms, hatcheries and
+              people. Scroll to explore real-time sensing, disease prediction
+              and renewable power.
             </p>
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1.75rem" }}>
-              <Link to="/login" search={{ mode: "signup" }} className="cta visible">
+            <div
+              style={{
+                display: "flex",
+                gap: "0.75rem",
+                flexWrap: "wrap",
+                marginTop: "1.75rem",
+              }}
+            >
+              <Link
+                to="/login"
+                search={{ mode: "signup" }}
+                className="cta visible"
+              >
                 Deploy account
-                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
                   <path d="M1 6h10M6 1l5 5-5 5" />
                 </svg>
               </Link>
               <Link to="/login" className="cta visible">
                 Sign in
-                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                >
                   <path d="M1 6h10M6 1l5 5-5 5" />
                 </svg>
               </Link>
@@ -371,15 +397,29 @@ void main(){
           <div className="text-card right">
             <div className="h-line" />
             <div className="tag">01 — Sensing</div>
-            <h2>LIVE<br />FARM PULSE</h2>
+            <h2>
+              LIVE
+              <br />
+              FARM PULSE
+            </h2>
             <p className="body-text">
-              ESP32 sensor nodes stream temperature, humidity, ammonia, water and feed
-              levels from every house — second by second, across every farm.
+              ESP32 sensor nodes stream temperature, humidity, ammonia, water
+              and feed levels from every house — second by second, across every
+              farm.
             </p>
             <div className="stat-row" style={{ justifyContent: "flex-end" }}>
-              <div className="stat"><span className="stat-num">1Hz</span><span className="stat-label">Telemetry</span></div>
-              <div className="stat"><span className="stat-num">∞</span><span className="stat-label">Devices</span></div>
-              <div className="stat"><span className="stat-num">24/7</span><span className="stat-label">Monitoring</span></div>
+              <div className="stat">
+                <span className="stat-num">1Hz</span>
+                <span className="stat-label">Telemetry</span>
+              </div>
+              <div className="stat">
+                <span className="stat-num">∞</span>
+                <span className="stat-label">Devices</span>
+              </div>
+              <div className="stat">
+                <span className="stat-num">24/7</span>
+                <span className="stat-label">Monitoring</span>
+              </div>
             </div>
           </div>
         </section>
@@ -388,14 +428,24 @@ void main(){
           <div className="text-card">
             <div className="h-line" />
             <div className="tag">02 — AI Health</div>
-            <h2>PREDICT<br />PROTECT</h2>
+            <h2>
+              PREDICT
+              <br />
+              PROTECT
+            </h2>
             <p className="body-text">
-              Computer vision on ESP32-CAM feeds plus anomaly detection on environmental
-              data flag disease risk and behavioural changes before outbreaks spread.
+              Computer vision on ESP32-CAM feeds plus anomaly detection on
+              environmental data flag disease risk and behavioural changes
+              before outbreaks spread.
             </p>
             <a className="cta" href="#s3">
               Continue
-              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg
+                viewBox="0 0 12 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
                 <path d="M1 6h10M6 1l5 5-5 5" />
               </svg>
             </a>
@@ -406,10 +456,15 @@ void main(){
           <div className="text-card center">
             <div className="h-line" />
             <div className="tag">03 — Hatchery</div>
-            <h2>INCUBATE<br />AUTOMATE</h2>
+            <h2>
+              INCUBATE
+              <br />
+              AUTOMATE
+            </h2>
             <p className="body-text">
-              Twenty-one day cycles, candling logs, turning schedules and predicted hatch
-              dates. Feeders, vents and cooling respond automatically to your thresholds.
+              Twenty-one day cycles, candling logs, turning schedules and
+              predicted hatch dates. Feeders, vents and cooling respond
+              automatically to your thresholds.
             </p>
           </div>
         </section>
@@ -418,14 +473,30 @@ void main(){
           <div className="text-card right">
             <div className="h-line" />
             <div className="tag">04 — Power & Team</div>
-            <h2>SOLAR<br />BIOGAS<br />SCALE</h2>
+            <h2>
+              SOLAR
+              <br />
+              BIOGAS
+              <br />
+              SCALE
+            </h2>
             <p className="body-text">
-              Track PV generation, battery state and waste-to-energy from manure digesters.
-              Multi-farm RBAC for owners, managers and workers — scoped per house and device.
+              Track PV generation, battery state and waste-to-energy from manure
+              digesters. Multi-farm RBAC for owners, managers and workers —
+              scoped per house and device.
             </p>
-            <Link to="/login" search={{ mode: "signup" }} className="cta visible">
+            <Link
+              to="/login"
+              search={{ mode: "signup" }}
+              className="cta visible"
+            >
               Get started
-              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg
+                viewBox="0 0 12 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
                 <path d="M1 6h10M6 1l5 5-5 5" />
               </svg>
             </Link>
