@@ -41,7 +41,7 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const SCENES = ["FARM 01", "FARM 02", "FARM 03", "FARM 04", "FARM 05"];
+const SCENES = ["EGG", "CHICK", "PULLET", "LAYER", "BROILER"];
 
 function Landing() {
   useEffect(() => {
@@ -55,22 +55,35 @@ function Landing() {
       return;
     }
 
-    const mkShader = (type: number, src: string) => {
+    const mkShader = (type: number, src: string, label: string) => {
       const s = gl.createShader(type)!;
       gl.shaderSource(s, src);
       gl.compileShader(s);
       if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(s));
+        console.error(`${label} compile error:\n`, gl.getShaderInfoLog(s));
         gl.deleteShader(s);
         return null;
       }
       return s;
     };
 
+    const vShader = mkShader(gl.VERTEX_SHADER, vs, "vertex");
+    const fShader = mkShader(gl.FRAGMENT_SHADER, fs, "fragment");
+    if (!vShader || !fShader) {
+      console.error("Shader compilation failed, aborting WebGL setup.");
+      return;
+    }
+
     const prog = gl.createProgram()!;
-    gl.attachShader(prog, mkShader(gl.VERTEX_SHADER, vs)!);
-    gl.attachShader(prog, mkShader(gl.FRAGMENT_SHADER, fs)!);
+    gl.attachShader(prog, vShader);
+    gl.attachShader(prog, fShader);
     gl.linkProgram(prog);
+
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.error("Program link error:\n", gl.getProgramInfoLog(prog));
+      return;
+    }
+
     gl.useProgram(prog);
 
     const buf = gl.createBuffer();
