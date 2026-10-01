@@ -1,0 +1,19 @@
+[Unit]
+Description=PoultryGrid edge AI agent (sensors -> model -> fan -> app)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=poultrygrid
+Group=poultrygrid
+SupplementaryGroups=gpio i2c
+WorkingDirectory=/opt/poultrygrid/edge
+Environment=PG_ENV_FILE=/etc/poultrygrid/agent.env
+Environment=PG_OUTBOX_PATH=/var/lib/poultrygrid/outbox.sqlite3
+ExecStart=/opt/poultrygrid/venv/bin/python agent.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

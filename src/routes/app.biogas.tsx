@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Recycle, Trash2, Sprout, Gauge } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { listBiogas } from "@/lib/api/farm.functions";
 import { PageHeader, StatCard, Card } from "@/components/ui-kit";
 
 export const Route = createFileRoute("/app/biogas")({ component: Biogas });
@@ -9,7 +9,7 @@ export const Route = createFileRoute("/app/biogas")({ component: Biogas });
 function Biogas() {
   const q = useQuery({
     queryKey: ["biogas"],
-    queryFn: async () => (await supabase.from("biogas_records").select("*").order("created_at", { ascending: false }).limit(30)).data ?? [],
+    queryFn: () => listBiogas(),
   });
   const totals = (q.data ?? []).reduce((a, r) => ({
     gas: a.gas + Number(r.gas_m3), waste: a.waste + Number(r.waste_kg),

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { Leaf } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { signIn, signUp } from "@/lib/api/auth.functions";
 import { useAuth } from "@/lib/auth";
 
 const search = z.object({
@@ -19,12 +19,11 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const { mode: initial } = Route.useSearch();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">(initial);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<"admin" | "manager" | "worker">("manager");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { if (user) navigate({ to: "/app" }); }, [user, navigate]);
@@ -34,20 +33,13 @@ function LoginPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email, password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/app`,
-            data: { full_name: fullName, role },
-          },
-        });
-        if (error) throw error;
+        await signUp({ data: { email, password, fullName } });
         toast.success("Account created");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        await signIn({ data: { email, password } });
         toast.success("Welcome back");
       }
+      await refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Authentication failed");
     } finally { setLoading(false); }
@@ -65,7 +57,9 @@ function LoginPage() {
         <div className="contact-us">
           <h1 className="auth-title">{mode === "signin" ? "Sign in" : "Create account"}</h1>
           <p className="auth-subtitle">
-            {mode === "signin" ? "Access your farm dashboard." : "Set up your PoultryGrid AI account."}
+            {mode === "signin"
+              ? "Access your farm dashboard."
+              : "The first account becomes the farm admin; later accounts join as workers."}
           </p>
           <form onSubmit={submit} className="auth-form">
             {mode === "signup" && (
@@ -74,14 +68,6 @@ function LoginPage() {
                   <input value={fullName} onChange={(e) => setFullName(e.target.value)} required
                     className="auth-input" placeholder="Full name" />
                 </Field>
-                <Field label="Role">
-                  <select value={role} onChange={(e) => setRole(e.target.value as "admin" | "manager" | "worker")}
-                    className="auth-input">
-                    <option value="admin">Admin</option>
-                    <option value="manager">Farm Manager</option>
-                    <option value="worker">Worker</option>
-                  </select>
-                </Field>
               </>
             )}
             <Field label="Email">
@@ -89,7 +75,7 @@ function LoginPage() {
                 className="auth-input" placeholder="Email" />
             </Field>
             <Field label="Password">
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={mode === "signup" ? 8 : 1}
                 className="auth-input" placeholder="Password" />
             </Field>
             <button disabled={loading} type="submit" className="auth-button">

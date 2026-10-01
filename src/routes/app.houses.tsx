@@ -1,43 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Warehouse, Plus, Thermometer, Droplets, Wind, Cpu } from "lucide-react";
+import { Warehouse, Plus, Thermometer, Droplets, Wind, Fan } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { createHouse, listFarms, listHouses } from "@/lib/api/farm.functions";
+import { AiStatusBadge, PHASE_LABEL, isStale } from "@/components/ai-status";
+import { useAuth } from "@/lib/auth";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui-kit";
 
 export const Route = createFileRoute("/app/houses")({ component: Houses });
 
 function Houses() {
   const [open, setOpen] = useState(false);
-  const houses = useQuery({
-    queryKey: ["houses-full"],
-    queryFn: async () => {
-      const { data } = await supabase.from("poultry_houses")
-        .select("id,name,bird_count,capacity,batch_name,farm_id,farms(name)").order("created_at");
-      return data ?? [];
-    },
-  });
-
-  const latest = useQuery({
-    queryKey: ["houses-latest-readings"],
-    queryFn: async () => {
-      const { data } = await supabase.from("sensor_readings")
-        .select("house_id,temperature,humidity,air_quality,water_level,feed_level,created_at")
-        .order("created_at", { ascending: false }).limit(200);
-      const byHouse: Record<string, NonNullable<typeof data>[number]> = {};
-      (data ?? []).forEach((r) => { if (r.house_id && !byHouse[r.house_id]) byHouse[r.house_id] = r; });
-      return byHouse;
-    },
-  });
+  const { canManage } = useAuth();
+  const q = useQuery({ queryKey: ["houses"], queryFn: () => listHouses(), refetchInterval: 15_000 });
+  const houses = { data: q.data?.houses, refetch: q.refetch };
+  const latest = { data: q.data?.latest };
 
   return (
     <div>
       <PageHeader title="Poultry house monitoring" description="Live conditions across all houses.">
-        <button onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm hover:bg-primary/90">
-          <Plus className="h-4 w-4" /> Add house
-        </button>
+        {canManage && (
+          <button onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm hover:bg-primary/90">
+            <Plus className="h-4 w-4" /> Add house
+          </button>
+        )}
       </PageHeader>
 
       {houses.data?.length === 0 ? (
@@ -46,17 +34,27 @@ function Houses() {
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
           {houses.data?.map((h) => {
             const r = latest.data?.[h.id];
+            const stale = isStale(r);
             return (
-              <Card key={h.id} title={h.name} action={<Badge tone={r ? "success" : "default"}>{r ? "Online" : "No data"}</Badge>}>
+              <Card key={h.id} title={h.name} action={
+                r && !stale ? <AiStatusBadge status={r.ai_status} /> : <Badge>{r ? "Offline" : "No data"}</Badge>
+              }>
                 <div className="text-xs text-muted-foreground mb-3">
                   {h.batch_name ?? "No batch"} · {h.bird_count}/{h.capacity} birds
+                  {r?.growth_phase && ` · ${PHASE_LABEL[r.growth_phase] ?? r.growth_phase}`}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Stat icon={Thermometer} label="Temp" value={r?.temperature ?? "—"} unit="°C" />
                   <Stat icon={Droplets} label="Humidity" value={r?.humidity ?? "—"} unit="%" />
-                  <Stat icon={Wind} label="Air Q" value={r?.air_quality ?? "—"} />
-                  <Stat icon={Cpu} label="Water" value={r?.water_level ?? "—"} unit="%" />
+                  <Stat icon={Wind} label="Gas index" value={r?.gas_index ?? r?.air_quality ?? "—"} />
+                  <Stat icon={Fan} label="Fan" value={r?.fan_level ?? (r?.fan_rpm != null ? Math.round(r.fan_rpm) : "—")}
+                    unit={r?.fan_level ? undefined : "rpm"} />
                 </div>
+                {r?.ai_status && r.ai_status !== "healthy" && r.ai_causes?.length ? (
+                  <div className="mt-3 text-xs">
+                    <span className="font-medium">Why: </span>{r.ai_causes.map((c) => c.label).join(", ")}
+                  </div>
+                ) : null}
               </Card>
             );
           })}
@@ -82,24 +80,18 @@ function AddHouse({ onClose }: { onClose: () => void }) {
   const [capacity, setCapacity] = useState(1000);
   const [birdCount, setBirdCount] = useState(0);
   const [batch, setBatch] = useState("");
-  const farms = useQuery({
-    queryKey: ["farms-list"],
-    queryFn: async () => (await supabase.from("farms").select("id,name").order("name")).data ?? [],
-  });
+  const [batchStart, setBatchStart] = useState("");
+  const farms = useQuery({ queryKey: ["farms-list"], queryFn: () => listFarms() });
   const [farmId, setFarmId] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    let fid = farmId;
-    if (!fid) {
-      const { data: f, error } = await supabase.from("farms").insert({ name: "Main Farm" }).select("id").single();
-      if (error) return toast.error(error.message);
-      fid = f.id;
-    }
-    const { error } = await supabase.from("poultry_houses").insert({
-      name, capacity, bird_count: birdCount, batch_name: batch || null, farm_id: fid,
-    });
-    if (error) return toast.error(error.message);
+    try {
+      await createHouse({ data: {
+        farmId: farmId || undefined, name, capacity, birdCount,
+        batchName: batch || undefined, batchStartedAt: batchStart || undefined,
+      } });
+    } catch (err) { return toast.error(err instanceof Error ? err.message : "Failed"); }
     toast.success("House added");
     onClose();
   }
@@ -117,6 +109,11 @@ function AddHouse({ onClose }: { onClose: () => void }) {
           className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm" />
         <input placeholder="Batch name" value={batch} onChange={(e) => setBatch(e.target.value)}
           className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm" />
+        <label className="block text-xs text-muted-foreground">
+          Chicks placed on (sets flock age for the edge AI)
+          <input type="date" value={batchStart} onChange={(e) => setBatchStart(e.target.value)}
+            className="mt-1 w-full px-3 py-2 rounded-md border border-input bg-background text-sm text-foreground" />
+        </label>
         <div className="grid grid-cols-2 gap-3">
           <input type="number" placeholder="Capacity" value={capacity} onChange={(e) => setCapacity(+e.target.value)}
             className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm" />

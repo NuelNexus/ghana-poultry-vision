@@ -1,92 +1,31 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bird, Warehouse, Thermometer, Droplets, Sun, BatteryCharging, AlertTriangle,
   TrendingDown, Egg, Activity,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area } from "recharts";
-import { supabase } from "@/integrations/supabase/client";
+import { getDashboard } from "@/lib/api/farm.functions";
+import { AiStatusPanel } from "@/components/ai-status";
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui-kit";
 
 export const Route = createFileRoute("/app/")({
   component: Dashboard,
 });
 
-interface Stats {
-  totalBirds: number; activeFarms: number; temperature: number; humidity: number;
-  solar: number; battery: number; activeAlerts: number; mortalityRate: number; hatchRate: number;
-}
-
 function Dashboard() {
   const [isRain] = useState(() => Math.random() < 0.5);
-  const { data: stats } = useQuery<Stats>({
-    queryKey: ["dashboard-stats"],
-    queryFn: async () => {
-      const [houses, farms, readings, alerts, energy, hatch] = await Promise.all([
-        supabase.from("poultry_houses").select("bird_count"),
-        supabase.from("farms").select("id"),
-        supabase.from("sensor_readings").select("temperature,humidity").order("created_at", { ascending: false }).limit(20),
-        supabase.from("alerts").select("id", { count: "exact", head: true }).eq("resolved", false),
-        supabase.from("energy_records").select("solar_w,battery_pct").order("created_at", { ascending: false }).limit(1),
-        supabase.from("hatcheries").select("egg_count,hatched_count"),
-      ]);
-      const totalBirds = (houses.data ?? []).reduce((a, h) => a + (h.bird_count ?? 0), 0);
-      const temps = (readings.data ?? []).map((r) => Number(r.temperature)).filter((n) => !isNaN(n));
-      const hums = (readings.data ?? []).map((r) => Number(r.humidity)).filter((n) => !isNaN(n));
-      const totalEggs = (hatch.data ?? []).reduce((a, h) => a + (h.egg_count ?? 0), 0);
-      const totalHatched = (hatch.data ?? []).reduce((a, h) => a + (h.hatched_count ?? 0), 0);
-      return {
-        totalBirds,
-        activeFarms: farms.data?.length ?? 0,
-        temperature: temps.length ? +(temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1) : 0,
-        humidity: hums.length ? +(hums.reduce((a, b) => a + b, 0) / hums.length).toFixed(1) : 0,
-        solar: energy.data?.[0]?.solar_w ?? 0,
-        battery: energy.data?.[0]?.battery_pct ?? 0,
-        activeAlerts: alerts.count ?? 0,
-        mortalityRate: 1.2,
-        hatchRate: totalEggs > 0 ? +((totalHatched / totalEggs) * 100).toFixed(1) : 0,
-      };
-    },
-  });
-
-  const [series, setSeries] = useState<{ t: string; temp: number; hum: number }[]>([]);
-  const { data: history } = useQuery({
-    queryKey: ["dashboard-history"],
-    queryFn: async () => {
-      const { data } = await supabase.from("sensor_readings")
-        .select("temperature,humidity,created_at")
-        .order("created_at", { ascending: false }).limit(24);
-      return (data ?? []).reverse().map((r) => ({
-        t: new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        temp: Number(r.temperature) || 0,
-        hum: Number(r.humidity) || 0,
-      }));
-    },
-  });
-  useEffect(() => { if (history) setSeries(history); }, [history]);
-
-  useEffect(() => {
-    const ch = supabase.channel("dashboard-readings")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "sensor_readings" }, (payload) => {
-        const r = payload.new as { temperature: number; humidity: number; created_at: string };
-        setSeries((prev) => [...prev.slice(-23), {
-          t: new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          temp: Number(r.temperature) || 0,
-          hum: Number(r.humidity) || 0,
-        }]);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-
-  const { data: recentAlerts } = useQuery({
-    queryKey: ["recent-alerts"],
-    queryFn: async () => {
-      const { data } = await supabase.from("alerts").select("*").order("created_at", { ascending: false }).limit(5);
-      return data ?? [];
-    },
-  });
+  // Neon has no realtime channel; poll instead (the Pi reports every 30 s).
+  const { data } = useQuery({ queryKey: ["dashboard"], queryFn: () => getDashboard(), refetchInterval: 10_000 });
+  const stats = data?.stats;
+  const recentAlerts = data?.recentAlerts;
+  const series = (data?.history ?? []).map((r) => ({
+    t: new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    temp: Number(r.temperature) || 0,
+    hum: Number(r.humidity) || 0,
+  }));
+  const worst = (data?.ai ?? []).slice().sort((a, b) => rank(b.ai_status) - rank(a.ai_status))[0];
 
   return (
     <div>
@@ -533,6 +472,22 @@ function Dashboard() {
           </g>
         </svg>
       </figure>
+      {worst ? (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-medium">Edge AI · live coop condition</h2>
+            <Link to="/app/health" className="text-xs underline">Details</Link>
+          </div>
+          <AiStatusPanel r={worst} />
+        </div>
+      ) : (
+        <Card title="Edge AI" className="mb-6">
+          <p className="text-sm text-muted-foreground">
+            No Raspberry Pi has reported yet. Register one under <Link to="/app/devices" className="underline">Devices</Link> and
+            start the agent; its live status will appear here.
+          </p>
+        </Card>
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total birds" value={(stats?.totalBirds ?? 0).toLocaleString()} icon={Bird} />
         <StatCard label="Active farms" value={stats?.activeFarms ?? 0} icon={Warehouse} />
@@ -609,4 +564,8 @@ function Dashboard() {
       </div>
     </div>
   );
+}
+
+function rank(s: string | null) {
+  return s === "critical" ? 2 : s === "warning" ? 1 : 0;
 }

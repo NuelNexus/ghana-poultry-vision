@@ -1,0 +1,7 @@
+# Runtime on the Raspberry Pi (no PyTorch needed: inference is pure numpy)
+numpy>=1.24
+adafruit-blinka>=8.0
+adafruit-circuitpython-dht>=4.0
+adafruit-circuitpython-ads1x15>=2.2
+gpiozero>=2.0
+lgpio>=0.2; platform_machine == "aarch64" or platform_machine == "armv7l"

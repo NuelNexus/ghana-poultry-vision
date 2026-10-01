@@ -30,3 +30,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment
+.env
+
+# Edge agent (Python)
+__pycache__/
+*.pyc
+edge/agent.env
+edge/outbox.sqlite3

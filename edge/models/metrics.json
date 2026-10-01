@@ -1,0 +1,64 @@
+{
+  "model_version": "poultrygrid-v2.0",
+  "test_samples": 34650,
+  "epochs_trained": 31,
+  "temperature": 1.066,
+  "status_labels": [
+    "Healthy",
+    "Warning",
+    "Critical"
+  ],
+  "v2": {
+    "accuracy": 0.9379,
+    "macro_f1": 0.938,
+    "critical_recall": 0.971,
+    "confusion_matrix": [
+      [
+        10117,
+        483,
+        0
+      ],
+      [
+        837,
+        10915,
+        489
+      ],
+      [
+        0,
+        343,
+        11466
+      ]
+    ]
+  },
+  "original_ai_for_poultry_on_same_data": {
+    "accuracy": 0.8006,
+    "macro_f1": 0.8005,
+    "critical_recall": 0.8372,
+    "confusion_matrix": [
+      [
+        9096,
+        1100,
+        404
+      ],
+      [
+        2126,
+        8758,
+        1357
+      ],
+      [
+        770,
+        1153,
+        9886
+      ]
+    ]
+  },
+  "cause_f1": {
+    "heat_stress": 0.9756,
+    "cold_stress": 0.9092,
+    "ammonia": 0.8759,
+    "high_humidity": 0.9556,
+    "low_humidity": 0.9363,
+    "poor_ventilation": 0.9234,
+    "fan_fault": 0.9989
+  }
+}

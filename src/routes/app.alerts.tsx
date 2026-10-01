@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { listAlerts, resolveAlert } from "@/lib/api/farm.functions";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui-kit";
 
 export const Route = createFileRoute("/app/alerts")({ component: Alerts });
@@ -11,24 +10,21 @@ export const Route = createFileRoute("/app/alerts")({ component: Alerts });
 function Alerts() {
   const q = useQuery({
     queryKey: ["alerts-all"],
-    queryFn: async () => (await supabase.from("alerts").select("*").order("created_at", { ascending: false }).limit(100)).data ?? [],
+    queryFn: () => listAlerts(),
+    refetchInterval: 10_000,
   });
 
-  useEffect(() => {
-    const ch = supabase.channel("alerts-feed")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "alerts" }, () => { q.refetch(); })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [q]);
-
   async function resolve(id: string) {
-    const { error } = await supabase.from("alerts").update({ resolved: true }).eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Resolved"); q.refetch(); }
+    try {
+      await resolveAlert({ data: { id } });
+      toast.success("Resolved");
+      q.refetch();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
   }
 
   return (
     <div>
-      <PageHeader title="Alerts center" description="Realtime alerts across all your farms." />
+      <PageHeader title="Alerts center" description="Live alerts across all your farms, including edge AI status changes." />
       {q.data?.length === 0 ? (
         <EmptyState icon={Bell} title="No alerts" description="All systems are running smoothly." />
       ) : (

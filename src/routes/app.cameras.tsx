@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Camera as CamIcon, Plus, Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { createCamera, listCameras } from "@/lib/api/farm.functions";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui-kit";
 
 export const Route = createFileRoute("/app/cameras")({ component: Cameras });
@@ -13,7 +13,7 @@ function Cameras() {
   const [fs, setFs] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ["cameras"],
-    queryFn: async () => (await supabase.from("cameras").select("*").order("name")).data ?? [],
+    queryFn: () => listCameras(),
   });
 
   return (
@@ -62,8 +62,9 @@ function AddCamera({ onClose }: { onClose: () => void }) {
   const [url, setUrl] = useState("");
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const { error } = await supabase.from("cameras").insert({ name, stream_url: url, status: "online" });
-    if (error) return toast.error(error.message);
+    try {
+      await createCamera({ data: { name, streamUrl: url } });
+    } catch (err) { return toast.error(err instanceof Error ? err.message : "Failed"); }
     toast.success("Camera added");
     onClose();
   }

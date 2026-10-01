@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Sun, BatteryCharging, Zap, PowerOff } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { supabase } from "@/integrations/supabase/client";
+import { listEnergy } from "@/lib/api/farm.functions";
 import { PageHeader, StatCard, Card } from "@/components/ui-kit";
 
 export const Route = createFileRoute("/app/energy")({ component: Energy });
@@ -10,7 +10,7 @@ export const Route = createFileRoute("/app/energy")({ component: Energy });
 function Energy() {
   const q = useQuery({
     queryKey: ["energy"],
-    queryFn: async () => (await supabase.from("energy_records").select("*").order("created_at", { ascending: false }).limit(48)).data ?? [],
+    queryFn: () => listEnergy(),
   });
   const series = (q.data ?? []).slice().reverse().map((r) => ({
     t: new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit" }),

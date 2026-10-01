@@ -1,53 +1,49 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { Session, User } from "@supabase/supabase-js";
-
-type Role = "admin" | "manager" | "worker";
+import { createContext, useContext, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getMe, signOut as signOutFn } from "@/lib/api/auth.functions";
+import type { SessionUser, Role } from "@/lib/auth.server";
 
 interface AuthCtx {
-  user: User | null;
-  session: Session | null;
+  user: SessionUser | null;
   roles: Role[];
   loading: boolean;
+  canManage: boolean;
+  refresh: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx>({
-  user: null, session: null, roles: [], loading: true, signOut: async () => {},
+  user: null,
+  roles: [],
+  loading: true,
+  canManage: false,
+  refresh: async () => {},
+  signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s);
-      if (s?.user) {
-        setTimeout(async () => {
-          const { data } = await supabase.from("user_roles").select("role").eq("user_id", s.user.id);
-          setRoles((data ?? []).map((r) => r.role as Role));
-        }, 0);
-      } else {
-        setRoles([]);
-      }
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  const qc = useQueryClient();
+  const me = useQuery({ queryKey: ["me"], queryFn: () => getMe(), staleTime: 60_000 });
+  const user = me.data ?? null;
+  const roles = user?.roles ?? [];
 
   return (
-    <Ctx.Provider value={{
-      user: session?.user ?? null,
-      session,
-      roles,
-      loading,
-      signOut: async () => { await supabase.auth.signOut(); },
-    }}>
+    <Ctx.Provider
+      value={{
+        user,
+        roles,
+        loading: me.isPending,
+        canManage: roles.includes("admin") || roles.includes("manager"),
+        refresh: async () => {
+          await qc.invalidateQueries({ queryKey: ["me"] });
+        },
+        signOut: async () => {
+          await signOutFn();
+          qc.setQueryData(["me"], null);
+          qc.clear();
+        },
+      }}
+    >
       {children}
     </Ctx.Provider>
   );

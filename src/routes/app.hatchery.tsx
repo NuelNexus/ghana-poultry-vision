@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Egg, Plus, Thermometer, Droplets } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { createHatchery, listFarms, listHatcheries } from "@/lib/api/farm.functions";
 import { PageHeader, Card, Badge, EmptyState } from "@/components/ui-kit";
 
 export const Route = createFileRoute("/app/hatchery")({ component: Hatchery });
@@ -12,7 +12,7 @@ function Hatchery() {
   const [open, setOpen] = useState(false);
   const q = useQuery({
     queryKey: ["hatcheries"],
-    queryFn: async () => (await supabase.from("hatcheries").select("*,farms(name)").order("created_at", { ascending: false })).data ?? [],
+    queryFn: () => listHatcheries(),
   });
 
   return (
@@ -33,7 +33,7 @@ function Hatchery() {
               : 0;
             return (
               <Card key={h.id} title={h.name} action={<Badge tone="success">{Math.round(progress)}%</Badge>}>
-                <div className="text-xs text-muted-foreground">{(h as { farms?: { name?: string } }).farms?.name}</div>
+                <div className="text-xs text-muted-foreground">{h.farm_name}</div>
                 <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
                   <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
                 </div>
@@ -62,25 +62,14 @@ function Hatchery() {
 function NewBatch({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [eggCount, setEggCount] = useState(100);
-  const farms = useQuery({ queryKey: ["farms-list"], queryFn: async () => (await supabase.from("farms").select("id,name")).data ?? [] });
+  const farms = useQuery({ queryKey: ["farms-list"], queryFn: () => listFarms() });
   const [farmId, setFarmId] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    let fid = farmId;
-    if (!fid) {
-      const { data: f, error } = await supabase.from("farms").insert({ name: "Main Farm" }).select("id").single();
-      if (error) return toast.error(error.message);
-      fid = f.id;
-    }
-    const started = new Date();
-    const expected = new Date(started.getTime() + 21 * 86400_000);
-    const { error } = await supabase.from("hatcheries").insert({
-      name, egg_count: eggCount, farm_id: fid,
-      started_at: started.toISOString(), expected_hatch_at: expected.toISOString(),
-      temperature: 37.5, humidity: 55,
-    });
-    if (error) return toast.error(error.message);
+    try {
+      await createHatchery({ data: { farmId: farmId || undefined, name, eggCount } });
+    } catch (err) { return toast.error(err instanceof Error ? err.message : "Failed"); }
     toast.success("Batch started");
     onClose();
   }
