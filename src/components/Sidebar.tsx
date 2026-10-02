@@ -56,21 +56,3 @@ export function Sidebar() {
     </aside>
   );
 }
-
-export function BottomNav() {
-  const path = useRouterState({ select: (s) => s.location.pathname });
-  const items = nav.slice(0, 5);
-  return (
-    <nav className="pg-bottomnav md:hidden">
-      {items.map((n) => {
-        const active = n.exact ? path === n.to : path === n.to || path.startsWith(n.to + "/");
-        return (
-          <Link key={n.to} to={n.to} className={"pg-bn-item" + (active ? " pg-active" : "")}>
-            <n.icon className="pg-nav-icon" />
-            <span>{n.label}</span>
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}

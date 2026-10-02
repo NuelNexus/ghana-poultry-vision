@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
-import { Sidebar, BottomNav } from "@/components/Sidebar";
+import { Sidebar } from "@/components/Sidebar";
 
 export const Route = createFileRoute("/app")({
   component: AppLayout,
@@ -26,7 +26,6 @@ function AppLayout() {
           <Outlet />
         </div>
       </main>
-      <BottomNav />
       <style>{shellCss}</style>
     </div>
   );
@@ -102,7 +101,6 @@ const shellCss = `
 .pg-main {
   margin-left: 180px;
   min-height: 100vh;
-  padding-bottom: 80px;
 }
 .pg-main-inner {
   max-width: 1400px;
@@ -125,20 +123,6 @@ const shellCss = `
 .pg-main .text-muted-foreground { color: var(--pg-muted) !important; }
 .pg-main h1, .pg-main h2, .pg-main h3, .pg-main h4 { color: var(--pg-fg); }
 
-/* Bottom nav */
-.pg-bottomnav {
-  position: fixed; bottom: 0; inset-inline: 0;
-  display: flex; justify-content: space-around;
-  background: #fff; border-top: 1px solid var(--pg-border);
-  z-index: 40;
-}
-.pg-bn-item {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 8px 4px; font-size: .65rem; color: var(--pg-muted);
-  text-decoration: none;
-}
-.pg-bn-item.pg-active { color: #111; }
-
 /* Responsive */
 @media (max-width: 1500px) {
   .pg-sidebar { width: 76px; }
@@ -147,8 +131,11 @@ const shellCss = `
   .pg-main { margin-left: 76px; }
 }
 @media (max-width: 768px) {
-  .pg-sidebar { display: none; }
-  .pg-main { margin-left: 0; padding-bottom: 90px; }
+  .pg-sidebar { width: 56px; overflow-y: auto; }
+  .pg-avatar { width: 40px; height: 40px; font-size: .85rem; }
+  .pg-user p { display: none; }
+  .pg-navitem a, .pg-logout { margin: 2px 4px; width: calc(100% - 8px); }
+  .pg-main { margin-left: 56px; }
   .pg-main-inner { padding: 20px 16px 32px; }
 }
 `;
