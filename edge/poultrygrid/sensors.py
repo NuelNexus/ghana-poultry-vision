@@ -46,7 +46,8 @@ class PiHardware:
         ads = ADS.ADS1115(i2c)
         self._gas = AnalogIn(ads, ADS.P0)
         self._ldr = AnalogIn(ads, ADS.P1)
-        self._fan = PWMOutputDevice(cfg.fan_pwm_pin, frequency=cfg.fan_pwm_hz, initial_value=0.0)
+        # lgpio's software PWM rejects anything above 10 kHz
+        self._fan = PWMOutputDevice(cfg.fan_pwm_pin, frequency=min(cfg.fan_pwm_hz, 10000), initial_value=0.0)
         self._tach = DigitalInputDevice(cfg.fan_tach_pin, pull_up=True)
         self._pulses = 0
         self._lock = threading.Lock()

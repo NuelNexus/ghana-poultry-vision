@@ -68,6 +68,22 @@ Per-cause F1 ranges from 0.88 (ammonia, the noisiest sensor) to 0.999 (fan fault
 
 Works on a Pi 3, 4, 5 or Zero 2 W with Raspberry Pi OS Bookworm.
 
+## Test the sensors
+
+After wiring, check each part on its own before running the agent:
+
+```bash
+cd edge
+python3 -m venv --system-site-packages .venv
+.venv/bin/pip install -r requirements-pi.txt
+.venv/bin/python test_sensors.py          # i2c, dht, gas, light, fan, with PASS/WARN/FAIL and wiring hints
+.venv/bin/python test_sensors.py fan      # just one
+.venv/bin/python test_sensors.py live     # all readings every 2 s
+```
+
+The MQ-135 module runs on 5 V, so put a divider (10k + 20k) between its AO and the
+ADS1115's A0 to keep the input under 3.3 V.
+
 ## Install on the Pi
 
 1. In the app, open **Devices → Register device**, choose *Raspberry Pi (edge AI)* and the house.
@@ -119,6 +135,7 @@ The coop physics is in `poultrygrid/simulator.py`. Change either and retrain.
 
 | Path | What it is |
 |-|-|
+| `test_sensors.py` | Checks each sensor and the fan, with wiring hints |
 | `agent.py` | The Pi service: sensors → features → model → smoothing → fan → app (with offline outbox) |
 | `train.py` | Simulate, train, calibrate, evaluate against the original network, export |
 | `poultrygrid/features.py` | Shared domain logic: growth phases, comfort bands, labels, features, fan policy |

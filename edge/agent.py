@@ -84,7 +84,7 @@ class Config:
             dht_pin=int(e("PG_DHT_PIN", "4")),
             fan_pwm_pin=int(e("PG_FAN_PWM_PIN", "18")),
             fan_tach_pin=int(e("PG_FAN_TACH_PIN", "23")),
-            fan_pwm_hz=int(e("PG_FAN_PWM_HZ", "25000")),
+            fan_pwm_hz=int(e("PG_FAN_PWM_HZ", "10000")),
             fan_auto=e("PG_FAN_AUTO", "1") == "1",
         )
 
