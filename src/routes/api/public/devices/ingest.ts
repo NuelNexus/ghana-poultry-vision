@@ -2,11 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { query, queryOne } from "@/lib/db.server";
 
-// Devices (Raspberry Pi edge-AI agent, ESP32 sensor nodes) POST readings here.
+// The Raspberry Pi edge agent (edge/agent.py) POSTs readings here. It is the
+// only device that does: the ESP32-CAM is viewed straight from the browser.
 // Headers: x-device-id, x-api-key
 // Body: a single reading, or { "readings": [...] } for a batch (the Pi sends
-// its offline backlog this way). Readings may carry the edge model's output
-// under "ai"; status changes become alerts automatically.
+// its offline backlog this way). Each reading carries DHT22 temperature and
+// humidity, the MQ-135 gas index and LDR light level (via ADS1115), fan rpm
+// (tach) and PWM duty, plus the edge model's output under "ai". Status changes
+// become alerts automatically. The response returns the flock age and any fan
+// override so the Pi picks them up on its next upload.
 
 const cors = {
   "access-control-allow-origin": "*",
@@ -51,12 +55,8 @@ const readingSchema = z
     recorded_at: z.string().datetime({ offset: true }).optional(),
     temperature: num,
     humidity: num,
-    air_quality: num,
     gas_index: num,
-    water_level: num,
-    feed_level: num,
     light: num,
-    current: num,
     fan_rpm: num,
     fan_duty: num,
     bird_age_days: num,
@@ -127,21 +127,17 @@ export const Route = createFileRoute("/api/public/devices/ingest")({
           const ai = r.ai;
           await query(
             `insert into sensor_readings (
-               device_id, house_id, temperature, humidity, air_quality, gas_index, water_level, feed_level, light,
-               current_a, fan_rpm, fan_duty, bird_age_days, ai_status, ai_confidence, ai_probabilities, ai_causes,
+               device_id, house_id, temperature, humidity, gas_index, light,
+               fan_rpm, fan_duty, bird_age_days, ai_status, ai_confidence, ai_probabilities, ai_causes,
                fan_level, growth_phase, target_temp, model_version, payload, created_at)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
             [
               device.id,
               device.house_id,
               r.temperature ?? null,
               r.humidity ?? null,
-              r.air_quality ?? null,
               r.gas_index ?? null,
-              r.water_level ?? null,
-              r.feed_level ?? null,
               r.light ?? null,
-              r.current ?? null,
               r.fan_rpm ?? null,
               r.fan_duty ?? null,
               r.bird_age_days ?? null,

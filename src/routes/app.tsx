@@ -1,141 +1,77 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
-import { Sidebar } from "@/components/Sidebar";
+import { Sidebar, TopBar, navItemFor } from "@/components/Sidebar";
+import { Skeleton } from "@/components/ui-kit";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const Route = createFileRoute("/app")({
   component: AppLayout,
 });
 
+/**
+ * Console shell. All styling lives in src/styles.css (".pg-console" scope,
+ * shell classes .pg-side / .pg-main / .pg-topbar / .pg-content). No global
+ * overrides here: pages style themselves with tokens + ui-kit components.
+ */
 function AppLayout() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const path = useRouterState({ select: (s) => s.location.pathname });
+
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login" });
   }, [user, loading, navigate]);
 
-  if (loading || !user) {
-    return <div className="pg-shell-loading">Loading…</div>;
-  }
+  // Per-route document title: "Houses · PoultryGrid".
+  useEffect(() => {
+    const cur = navItemFor(path);
+    document.title = cur ? `${cur.item.title ?? cur.item.label} · PoultryGrid` : "PoultryGrid";
+  }, [path]);
 
+  // ThemeProvider puts the console scope + the user's theme on <html> (so
+  // portals, dialogs and toasts follow it too), sets meta theme-color, and
+  // undoes all of it when leaving /app.
   return (
-    <div className="pg-shell">
+    <ThemeProvider userId={user?.id ?? null}>
+      {loading || !user ? <ShellLoading /> : <Shell />}
+    </ThemeProvider>
+  );
+}
+
+function Shell() {
+  return (
+    <div className="pg-console pg-shell">
+      <a href="#main" className="pg-skip">
+        Skip to content
+      </a>
       <Sidebar />
-      <main className="pg-main">
-        <div className="pg-main-inner">
+      <div className="pg-main">
+        <TopBar />
+        <main id="main" tabIndex={-1} className="pg-content outline-none">
           <Outlet />
-        </div>
-      </main>
-      <style>{shellCss}</style>
+        </main>
+      </div>
     </div>
   );
 }
 
-const shellCss = `
-.pg-shell-loading {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  background: #000; color: #fff; font-family: 'Nunito', sans-serif;
+function ShellLoading() {
+  return (
+    <div className="pg-console pg-boot" role="status" aria-label="Loading console">
+      <div className="pg-boot-side" aria-hidden>
+        <Skeleton className="h-7 w-7 rounded-md" />
+        <div className="mt-4 space-y-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-4" style={{ width: `${55 + ((i * 17) % 35)}%` }} />
+          ))}
+        </div>
+      </div>
+      <div className="pg-boot-main" aria-hidden>
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-24 w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-lg" />
+      </div>
+    </div>
+  );
 }
-.pg-shell {
-  --pg-bg: #fff;
-  --pg-fg: #111;
-  --pg-muted: rgba(17,17,17,.6);
-  --pg-border: #000;
-  --pg-card: #fff;
-  --pg-accent: #111;
-  min-height: 100vh;
-  background: var(--pg-bg);
-  color: var(--pg-fg);
-  font-family: 'Nunito', system-ui, sans-serif;
-  position: relative;
-}
-.pg-shell *, .pg-shell *::before, .pg-shell *::after { box-sizing: border-box; }
-
-/* Sidebar */
-.pg-sidebar {
-  position: fixed; top: 0; left: 0; width: 180px; height: 100vh;
-  display: flex; flex-direction: column; justify-content: space-between;
-  border-right: 1px solid var(--pg-border);
-  padding: 14px 0 12px;
-  background: var(--pg-bg);
-  z-index: 30;
-}
-.pg-user { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 8px 18px; }
-.pg-avatar {
-  width: 64px; height: 64px; border-radius: 50%;
-  border: 1px solid var(--pg-border);
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 1.1rem; color: var(--pg-fg);
-  letter-spacing: .05em;
-}
-.pg-user p {
-  font-size: .85rem; color: var(--pg-fg); font-weight: 500;
-  text-align: center; word-break: break-word; line-height: 1.2; margin: 0;
-}
-.pg-navlist { list-style: none; padding: 0; margin: 0; }
-.pg-navitem a, .pg-logout {
-  display: flex; align-items: center; justify-content: flex-start; gap: 12px;
-  color: var(--pg-fg); text-decoration: none;
-  font-size: .9rem; font-weight: 500;
-  padding: 10px 14px; margin: 2px 8px;
-  border-radius: 6px;
-  background: transparent;
-  border: 1px solid transparent;
-  width: calc(100% - 16px);
-  cursor: pointer;
-  font-family: inherit;
-  transition: background .15s, border-color .15s;
-}
-.pg-navitem a:hover, .pg-logout:hover {
-  background: rgba(0,0,0,.04);
-  border-color: rgba(0,0,0,.35);
-}
-.pg-navitem.pg-active a {
-  background: #000; color: #fff;
-  border-color: #000;
-}
-.pg-nav-icon { width: 18px; height: 18px; flex-shrink: 0; }
-.pg-nav-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* Main */
-.pg-main {
-  margin-left: 180px;
-  min-height: 100vh;
-}
-.pg-main-inner {
-  max-width: 1400px;
-  padding: 28px 28px 40px;
-}
-
-/* Apply white-bordered card aesthetic to common UI inside main */
-.pg-main .bg-card,
-.pg-main [class*="border"] {
-  border-color: var(--pg-border) !important;
-}
-.pg-main .bg-card,
-.pg-main .bg-background,
-.pg-main .bg-popover,
-.pg-main .bg-muted,
-.pg-main .bg-secondary {
-  background: var(--pg-card) !important;
-  color: var(--pg-fg) !important;
-}
-.pg-main .text-muted-foreground { color: var(--pg-muted) !important; }
-.pg-main h1, .pg-main h2, .pg-main h3, .pg-main h4 { color: var(--pg-fg); }
-
-/* Responsive */
-@media (max-width: 1500px) {
-  .pg-sidebar { width: 76px; }
-  .pg-nav-text { display: none; }
-  .pg-navitem a, .pg-logout { justify-content: center; padding: 12px 0; }
-  .pg-main { margin-left: 76px; }
-}
-@media (max-width: 768px) {
-  .pg-sidebar { width: 56px; overflow-y: auto; }
-  .pg-avatar { width: 40px; height: 40px; font-size: .85rem; }
-  .pg-user p { display: none; }
-  .pg-navitem a, .pg-logout { margin: 2px 4px; width: calc(100% - 8px); }
-  .pg-main { margin-left: 56px; }
-  .pg-main-inner { padding: 20px 16px 32px; }
-}
-`;

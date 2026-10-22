@@ -54,10 +54,24 @@ async function getRunner(): Promise<Runner> {
     runner = async (text, params) =>
       (await pool.query({ text, values: params, types: pgCustom })).rows;
   } else {
-    const sql = neon(url, { types: customTypes });
-    runner = (text, params) => sql.query(text, params) as Promise<Record<string, unknown>[]>;
+    const sql = neon(url);
+    // Neon's HTTP driver ignores `types` passed to neon(); it only honours the
+    // per-query option. Without this, timestamptz arrives as a Date and
+    // numeric as a string.
+    runner = (text, params) =>
+      sql.query(text, params, { types: customTypes }) as Promise<Record<string, unknown>[]>;
   }
   return runner;
+}
+
+// Belt and braces: whatever the driver does, no Date object ever leaves the
+// server. Timestamps are ISO strings, matching src/lib/api/types.ts.
+function normalizeRow(row: Record<string, unknown>) {
+  for (const k in row) {
+    const v = row[k];
+    if (v instanceof Date) row[k] = Number.isNaN(v.getTime()) ? null : v.toISOString();
+  }
+  return row;
 }
 
 export async function query<T = Record<string, unknown>>(
@@ -65,7 +79,8 @@ export async function query<T = Record<string, unknown>>(
   params: unknown[] = [],
 ): Promise<T[]> {
   const run = await getRunner();
-  return (await run(text, params)) as T[];
+  const rows = await run(text, params);
+  return rows.map(normalizeRow) as T[];
 }
 
 export async function queryOne<T = Record<string, unknown>>(

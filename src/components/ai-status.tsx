@@ -1,6 +1,20 @@
-import { Fan, Sprout, ShieldCheck, ShieldAlert, ShieldX, Cpu } from "lucide-react";
-import type { AiSnapshot, AiStatus, Reading } from "@/lib/api/types";
-import { Badge } from "@/components/ui-kit";
+import { Cpu, ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
+import { FRESHNESS_MS, type AiSnapshot, type AiStatus, type Reading } from "@/lib/api/types";
+import {
+  StatusPill,
+  UNITS,
+  formatDateTime,
+  formatFan,
+  formatNumber,
+  formatRelative,
+  formatTemp,
+  formatUnit,
+  freshness,
+  lastKnown,
+  useDisplayPrefs,
+  useNow,
+  type Status,
+} from "@/components/ui-kit";
 import { cn } from "@/lib/utils";
 
 export const STATUS_META: Record<
@@ -8,13 +22,34 @@ export const STATUS_META: Record<
   {
     label: string;
     tone: "success" | "warning" | "destructive";
+    /** ui-kit Status for StatusPill/StatusDot. */
+    status: Status;
     icon: typeof ShieldCheck;
+    /** Hex (SVG-safe) for charts. */
     color: string;
   }
 > = {
-  healthy: { label: "Healthy", tone: "success", icon: ShieldCheck, color: "#16a34a" },
-  warning: { label: "Warning", tone: "warning", icon: ShieldAlert, color: "#d97706" },
-  critical: { label: "Critical", tone: "destructive", icon: ShieldX, color: "#dc2626" },
+  healthy: {
+    label: "Healthy",
+    tone: "success",
+    status: "ok",
+    icon: ShieldCheck,
+    color: "var(--pg-ok)",
+  },
+  warning: {
+    label: "Warning",
+    tone: "warning",
+    status: "warn",
+    icon: ShieldAlert,
+    color: "var(--pg-warn)",
+  },
+  critical: {
+    label: "Critical",
+    tone: "destructive",
+    status: "crit",
+    icon: ShieldX,
+    color: "var(--pg-crit)",
+  },
 };
 
 export const PHASE_LABEL: Record<string, string> = {
@@ -24,173 +59,258 @@ export const PHASE_LABEL: Record<string, string> = {
   finisher: "Finisher (wk 6+)",
 };
 
-export function AiStatusBadge({ status }: { status: AiStatus | null | undefined }) {
-  if (!status) return <Badge>No AI data</Badge>;
-  return <Badge tone={STATUS_META[status].tone}>{STATUS_META[status].label}</Badge>;
-}
-
-export function isStale(r: { created_at: string } | null | undefined, ms = 5 * 60_000) {
+/** Older than `ms` (default FRESHNESS_MS.delayed, 5 min) = stale, same as freshness(). */
+export function isStale(
+  r: { created_at: string } | null | undefined,
+  ms: number = FRESHNESS_MS.delayed,
+) {
   return !r || Date.now() - new Date(r.created_at).getTime() > ms;
 }
 
-/** Big status panel for one device's latest edge-AI reading. */
+/**
+ * State pill for an AI reading. Pass `at` (reading time) so stale readings
+ * render as grey "Warning · last known" instead of a live-looking status.
+ */
+export function AiStatusBadge({
+  status,
+  at,
+  size = "sm",
+}: {
+  status: AiStatus | null | undefined;
+  at?: string | null;
+  size?: "sm" | "md";
+}) {
+  useDisplayPrefs();
+  if (!status)
+    return (
+      <StatusPill status="offline" size={size}>
+        No AI data
+      </StatusPill>
+    );
+  const meta = STATUS_META[status];
+  if (at && isStale({ created_at: at }))
+    return (
+      <StatusPill
+        status="offline"
+        size={size}
+        title={`${freshness(at).caption} · ${formatDateTime(at)}`}
+      >
+        {lastKnown(meta.label)}
+      </StatusPill>
+    );
+  return (
+    <StatusPill status={meta.status} size={size}>
+      {meta.label}
+    </StatusPill>
+  );
+}
+
+function gasWord(g: number) {
+  return g >= 22 ? "High" : g >= 14 ? "Elevated" : "Normal";
+}
+
+/**
+ * Status panel for one device's latest edge-AI reading.
+ * `eyebrow={false}` drops the small "main · Coop condition" label (use it on pages
+ * whose title already says this, e.g. Flock health).
+ */
 export function AiStatusPanel({
   r,
   compact = false,
+  eyebrow = true,
 }: {
   r: AiSnapshot | Reading;
   compact?: boolean;
+  eyebrow?: boolean;
 }) {
+  const now = useNow(15_000);
+  useDisplayPrefs();
   const status = r.ai_status ?? "healthy";
   const meta = STATUS_META[status];
-  const Icon = meta.icon;
-  const stale = isStale(r);
+  const fresh = freshness(r.created_at, now);
+  const stale = fresh.state === "stale" || fresh.state === "none";
   const where = "house_name" in r ? (r.house_name ?? r.device_code) : null;
+  const conf = r.ai_confidence != null ? Math.round(r.ai_confidence * 100) : null;
+  const causes = status !== "healthy" && r.ai_causes ? r.ai_causes : [];
+
+  const cells: { label: string; value: string; sub?: string }[] = [
+    {
+      label: "Growth phase",
+      value: r.growth_phase ? (PHASE_LABEL[r.growth_phase] ?? r.growth_phase) : "—",
+      sub:
+        r.bird_age_days != null
+          ? `Day ${Math.round(r.bird_age_days)}${r.target_temp != null ? ` · target ${formatTemp(r.target_temp)}` : ""}`
+          : undefined,
+    },
+    {
+      label: "Fan",
+      value: formatFan(r.fan_level),
+      sub: r.fan_rpm != null ? formatUnit(Math.round(r.fan_rpm), UNITS.rpm, 0) : undefined,
+    },
+  ];
+  if (!compact) {
+    cells.push(
+      {
+        label: "Temperature",
+        value: formatTemp(r.temperature),
+        sub: r.humidity != null ? formatUnit(r.humidity, UNITS.rh) : undefined,
+      },
+      {
+        label: "Gas index (MQ-135)",
+        value: r.gas_index != null ? formatNumber(r.gas_index) : "—",
+        sub: r.gas_index != null ? gasWord(r.gas_index) : undefined,
+      },
+    );
+  }
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
-      <div
-        className="flex items-center gap-4 p-5"
-        style={{ background: `${meta.color}14`, borderBottom: `3px solid ${meta.color}` }}
-      >
-        <div
-          className="h-14 w-14 rounded-full flex items-center justify-center shrink-0"
-          style={{ background: meta.color }}
-        >
-          <Icon className="h-7 w-7 text-white" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            {where ? `${where} · ` : ""}Coop condition
-          </div>
-          <div className="text-2xl font-semibold" style={{ color: meta.color }}>
-            {meta.label}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {r.ai_confidence != null && `${Math.round(r.ai_confidence * 100)}% confident · `}
+    <section
+      className={cn("pg-panel overflow-hidden", stale && "bg-[var(--pg-hover)]")}
+      aria-label={`${where ? where + " " : ""}coop condition`}
+    >
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 pt-4 md:px-5">
+        <div className="min-w-0">
+          {eyebrow && <div className="pg-t-micro">{where ? `${where} · ` : ""}Coop condition</div>}
+          <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1", eyebrow && "mt-1.5")}>
             {stale ? (
-              <span className="text-destructive">last update {timeAgo(r.created_at)}</span>
+              <StatusPill status="offline">{lastKnown(meta.label)}</StatusPill>
             ) : (
-              `updated ${timeAgo(r.created_at)}`
+              <StatusPill status={meta.status}>{meta.label}</StatusPill>
+            )}
+            {conf != null && (
+              <span
+                className={cn("text-[13px] leading-[18px]", stale ? "text-ink-3" : "text-ink-2")}
+              >
+                <span className="pg-num">{formatUnit(conf, UNITS.pct, 0)}</span> confidence
+              </span>
             )}
           </div>
         </div>
+        <time
+          dateTime={new Date(r.created_at).toISOString()}
+          title={formatDateTime(r.created_at)}
+          className="pg-t-caption pt-0.5"
+        >
+          {fresh.caption}
+        </time>
       </div>
 
-      <div className={cn("grid gap-3 p-5", compact ? "grid-cols-2" : "grid-cols-2 md:grid-cols-4")}>
-        <Mini
-          icon={Sprout}
-          label="Growth phase"
-          value={r.growth_phase ? (PHASE_LABEL[r.growth_phase] ?? r.growth_phase) : "—"}
-          hint={
-            r.bird_age_days != null
-              ? `Day ${Math.round(r.bird_age_days)} · target ${r.target_temp ?? "—"}°C`
-              : undefined
-          }
-        />
-        <Mini
-          icon={Fan}
-          label="Fan"
-          value={r.fan_level ? r.fan_level[0].toUpperCase() + r.fan_level.slice(1) : "—"}
-          hint={r.fan_rpm != null ? `${Math.round(r.fan_rpm)} rpm` : undefined}
-        />
-        {!compact && (
-          <>
-            <Mini
-              label="Temp / humidity"
-              value={`${r.temperature ?? "—"}°C · ${r.humidity ?? "—"}%`}
-            />
-            <Mini
-              label="Gas index (MQ-135)"
-              value={r.gas_index != null ? String(r.gas_index) : "—"}
-              hint={
-                r.gas_index != null
-                  ? r.gas_index >= 22
-                    ? "High"
-                    : r.gas_index >= 14
-                      ? "Elevated"
-                      : "Normal"
-                  : undefined
-              }
-            />
-          </>
+      {stale && (
+        <p className="pg-t-caption mt-1.5 px-4 md:px-5">
+          Pi reported {formatDateTime(r.created_at)} · check its power and network
+        </p>
+      )}
+
+      {/* Readings */}
+      <dl
+        className={cn(
+          "mt-4 grid border-t border-hairline",
+          compact ? "grid-cols-2" : "grid-cols-2 md:grid-cols-4",
         )}
-      </div>
-
-      {status !== "healthy" && r.ai_causes && r.ai_causes.length > 0 && (
-        <div className="px-5 pb-5 space-y-2">
-          {r.ai_causes.map((c) => (
-            <div key={c.id} className="rounded-md border border-border p-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium">{c.label}</span>
-                <span className="text-xs text-muted-foreground">{Math.round(c.prob * 100)}%</span>
-              </div>
-              {c.advice && !compact && (
-                <div className="text-xs text-muted-foreground mt-1">{c.advice}</div>
+      >
+        {cells.map((c, i) => (
+          <div
+            key={c.label}
+            className={cn(
+              "min-w-0 px-4 py-3 md:px-5",
+              i % 2 === 1 && "border-l border-hairline",
+              !compact && i >= 2 && "border-t border-hairline md:border-t-0",
+              !compact && i > 0 && "md:border-l",
+            )}
+          >
+            <dt className="text-[12px] leading-4 text-ink-3">{c.label}</dt>
+            <dd
+              className={cn(
+                "mt-1 truncate text-[14px] leading-5 font-medium",
+                stale ? "text-ink-2" : "text-ink",
               )}
-            </div>
-          ))}
+            >
+              {c.value}
+            </dd>
+            {c.sub && <dd className="pg-num truncate text-[12px] leading-4 text-ink-3">{c.sub}</dd>}
+          </div>
+        ))}
+      </dl>
+
+      {/* Likely causes: a left rule by state, not a fake checkbox */}
+      {causes.length > 0 && (
+        <div className="border-t border-hairline px-4 py-3 md:px-5">
+          <h3 className="pg-t-label mb-2">{stale ? "Causes at last reading" : "Likely causes"}</h3>
+          <ul className="space-y-2">
+            {(compact ? causes.slice(0, 1) : causes).map((c) => (
+              <li
+                key={c.id}
+                className={cn(
+                  "border-l-2 pl-3",
+                  stale
+                    ? "border-line-strong"
+                    : status === "critical"
+                      ? "border-crit"
+                      : "border-warn",
+                )}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[14px] leading-5 font-medium text-ink">{c.label}</span>
+                    <span className="pg-num shrink-0 text-[12px] text-ink-3">
+                      {formatUnit(Math.round(c.prob * 100), UNITS.pct, 0)}
+                    </span>
+                  </div>
+                  {c.advice && !compact && (
+                    <p className="mt-0.5 text-[13px] leading-[18px] text-ink-2">{c.advice}</p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
+      {/* Probability split: segmented meter with labels (not colour-only) */}
       {!compact && r.ai_probabilities && (
-        <div className="px-5 pb-5">
-          <div className="flex h-2 rounded-full overflow-hidden">
-            {(["healthy", "warning", "critical"] as const).map((k) => (
-              <div
-                key={k}
-                style={{
-                  width: `${(r.ai_probabilities![k] ?? 0) * 100}%`,
-                  background: STATUS_META[k].color,
-                }}
-              />
-            ))}
-          </div>
-          <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
-            {(["healthy", "warning", "critical"] as const).map((k) => (
-              <span key={k}>
-                {STATUS_META[k].label} {Math.round((r.ai_probabilities![k] ?? 0) * 100)}%
+        <div className="border-t border-hairline px-4 py-3 md:px-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="pg-t-label">Model output</h3>
+            {r.model_version && (
+              <span className="pg-t-caption inline-flex items-center gap-1">
+                <Cpu className="size-3" aria-hidden />
+                <span className="pg-mono">{r.model_version}</span> on Raspberry Pi
               </span>
-            ))}
+            )}
           </div>
-          {r.model_version && (
-            <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-2">
-              <Cpu className="h-3 w-3" /> {r.model_version} on Raspberry Pi
-            </div>
-          )}
+          <div
+            className={cn(
+              "mt-2 flex h-2 gap-0.5 overflow-hidden rounded-full",
+              stale && "opacity-50",
+            )}
+            aria-hidden
+          >
+            {(["healthy", "warning", "critical"] as const).map((k) => {
+              const p = r.ai_probabilities![k] ?? 0;
+              return p > 0 ? (
+                <div key={k} style={{ width: `${p * 100}%`, background: STATUS_META[k].color }} />
+              ) : null;
+            })}
+          </div>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] leading-4 text-ink-2">
+            {(["healthy", "warning", "critical"] as const).map((k) => (
+              <li key={k} className="inline-flex items-center gap-1.5">
+                <span className="pg-dot" style={{ color: STATUS_META[k].color }} aria-hidden />
+                {STATUS_META[k].label}
+                <span className="pg-num text-ink">
+                  {formatUnit(Math.round((r.ai_probabilities![k] ?? 0) * 100), UNITS.pct, 0)}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
-function Mini({
-  icon: Icon,
-  label,
-  value,
-  hint,
-}: {
-  icon?: typeof Fan;
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-md bg-muted/40 p-3 min-w-0">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {Icon && <Icon className="h-3.5 w-3.5" />}
-        {label}
-      </div>
-      <div className="mt-1 font-semibold text-sm truncate">{value}</div>
-      {hint && <div className="text-[11px] text-muted-foreground truncate">{hint}</div>}
-    </div>
-  );
-}
-
+/** Kept for existing callers; prefer `formatRelative` / `RelativeTime` from ui-kit. */
 export function timeAgo(iso: string) {
-  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatRelative(iso);
 }

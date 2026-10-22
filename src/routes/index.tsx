@@ -8,10 +8,10 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "IoT + AI platform for poultry farms in Ghana. Real-time monitoring, hatchery control, disease prediction, ESP32 cameras, solar and biogas tracking.",
+          "Edge AI for poultry houses in Ghana. A Raspberry Pi watches temperature, humidity, gas and light, runs the ventilation fan, and streams an ESP32-CAM view to your phone.",
       },
       { property: "og:title", content: "PoultryGrid AI — Smart Poultry Farm Management" },
-      { property: "og:description", content: "IoT mesh, AI health, solar & biogas, multi-farm RBAC." },
+      { property: "og:description", content: "Raspberry Pi edge AI, automatic fan control, ESP32-CAM live view, roles for your team." },
       { property: "og:url", content: "/" },
     ],
     links: [
@@ -347,8 +347,8 @@ void main(){
             <div className="tag">PoultryGrid AI — Smart Farming Ghana</div>
             <h1>SMART<br />POULTRY<br />FOR GHANA</h1>
             <p className="body-text">
-              An IoT and AI platform connecting your farms, hatcheries and people.
-              Scroll to explore real-time sensing, disease prediction and renewable power.
+              A Raspberry Pi in the poultry house reads the climate, runs its own AI and
+              drives the fan. Scroll to see the sensing, the health model and the camera.
             </p>
             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1.75rem" }}>
               <Link to="/login" search={{ mode: "signup" }} className="cta visible">
@@ -373,12 +373,12 @@ void main(){
             <div className="tag">01 — Sensing</div>
             <h2>LIVE<br />FARM PULSE</h2>
             <p className="body-text">
-              ESP32 sensor nodes stream temperature, humidity, ammonia, water and feed
-              levels from every house — second by second, across every farm.
+              A DHT22, an MQ-135 gas sensor and a light sensor report temperature,
+              humidity, ammonia build-up and light every 30 seconds, with fan speed.
             </p>
             <div className="stat-row" style={{ justifyContent: "flex-end" }}>
-              <div className="stat"><span className="stat-num">1Hz</span><span className="stat-label">Telemetry</span></div>
-              <div className="stat"><span className="stat-num">∞</span><span className="stat-label">Devices</span></div>
+              <div className="stat"><span className="stat-num">30s</span><span className="stat-label">Readings</span></div>
+              <div className="stat"><span className="stat-num">Pi</span><span className="stat-label">Edge AI</span></div>
               <div className="stat"><span className="stat-num">24/7</span><span className="stat-label">Monitoring</span></div>
             </div>
           </div>
@@ -390,8 +390,8 @@ void main(){
             <div className="tag">02 — AI Health</div>
             <h2>PREDICT<br />PROTECT</h2>
             <p className="body-text">
-              Computer vision on ESP32-CAM feeds plus anomaly detection on environmental
-              data flag disease risk and behavioural changes before outbreaks spread.
+              An on-device model flags heat stress, cold for the flock’s age, gas build-up
+              and a stalled fan, with advice. An ESP32-CAM gives you eyes on the birds.
             </p>
             <a className="cta" href="#s3">
               Continue
@@ -406,10 +406,10 @@ void main(){
           <div className="text-card center">
             <div className="h-line" />
             <div className="tag">03 — Hatchery</div>
-            <h2>INCUBATE<br />AUTOMATE</h2>
+            <h2>INCUBATE<br />TRACK</h2>
             <p className="body-text">
-              Twenty-one day cycles, candling logs, turning schedules and predicted hatch
-              dates. Feeders, vents and cooling respond automatically to your thresholds.
+              Log each batch and follow its 21-day cycle: lockdown on day 18, expected hatch
+              date and the hatch rate you record at the end.
             </p>
           </div>
         </section>
@@ -417,11 +417,11 @@ void main(){
         <section id="s4">
           <div className="text-card right">
             <div className="h-line" />
-            <div className="tag">04 — Power & Team</div>
-            <h2>SOLAR<br />BIOGAS<br />SCALE</h2>
+            <div className="tag">04 — Ventilation & Team</div>
+            <h2>FAN<br />CONTROL<br />TEAM</h2>
             <p className="body-text">
-              Track PV generation, battery state and waste-to-energy from manure digesters.
-              Multi-farm RBAC for owners, managers and workers — scoped per house and device.
+              The Pi sets the fan from its own reading of the house, and you can override it
+              from anywhere. Roles for owners, managers and workers.
             </p>
             <Link to="/login" search={{ mode: "signup" }} className="cta visible">
               Get started

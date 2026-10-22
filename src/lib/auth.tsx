@@ -9,6 +9,8 @@ interface AuthCtx {
   loading: boolean;
   canManage: boolean;
   refresh: () => Promise<void>;
+  /** Optimistically patch the signed-in user (e.g. after a name change), then refetch. */
+  patchUser: (patch: Partial<Pick<SessionUser, "full_name">>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -18,6 +20,7 @@ const Ctx = createContext<AuthCtx>({
   loading: true,
   canManage: false,
   refresh: async () => {},
+  patchUser: async () => {},
   signOut: async () => {},
 });
 
@@ -35,6 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading: me.isPending,
         canManage: roles.includes("admin") || roles.includes("manager"),
         refresh: async () => {
+          await qc.invalidateQueries({ queryKey: ["me"] });
+        },
+        patchUser: async (patch) => {
+          qc.setQueryData<SessionUser | null>(["me"], (u) => (u ? { ...u, ...patch } : u));
           await qc.invalidateQueries({ queryKey: ["me"] });
         },
         signOut: async () => {

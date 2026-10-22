@@ -1,6 +1,13 @@
 // Row shapes returned by the server functions (src/lib/api/farm.functions.ts).
 // numeric/bigint columns arrive as numbers and timestamps as ISO strings
-// (see src/lib/db.server.ts).
+// (see src/lib/db.server.ts). Missing values are null, never a fake 0.
+
+/**
+ * One set of freshness thresholds for the whole app (server and UI).
+ * age < live -> "live" (and device `online`), age < delayed -> "delayed",
+ * older -> "stale". Used by ui-kit `freshness()` and listDevices.
+ */
+export const FRESHNESS_MS = { live: 90_000, delayed: 5 * 60_000 } as const;
 
 export type AiStatus = "healthy" | "warning" | "critical";
 export type FanLevel = "low" | "medium" | "high";
@@ -33,14 +40,17 @@ export interface Reading {
   id: number;
   device_id: string;
   house_id: string | null;
+  /** DHT22, °C. */
   temperature: number | null;
+  /** DHT22, % RH. */
   humidity: number | null;
-  air_quality: number | null;
+  /** MQ-135 via ADS1115: % rise over the clean-air baseline voltage (ammonia/gas). */
   gas_index: number | null;
-  water_level: number | null;
-  feed_level: number | null;
+  /** LDR via ADS1115: relative light level, 0 (dark) to 50 (bright). Not lux. */
   light: number | null;
+  /** Fan tach, revolutions per minute. */
   fan_rpm: number | null;
+  /** PWM duty the Pi is driving the fan at, 0..1. */
   fan_duty: number | null;
   bird_age_days: number | null;
   ai_status: AiStatus | null;
@@ -90,8 +100,11 @@ export interface Hatchery {
   egg_count: number | null;
   started_at: string | null;
   expected_hatch_at: string | null;
+  /** Incubator temperature setting the farmer entered (°C). Not a measurement. */
   temperature: number | null;
+  /** Incubator humidity setting the farmer entered (% RH). Not a measurement. */
   humidity: number | null;
+  /** Chicks counted by hand after the hatch. */
   hatched_count: number | null;
   created_at: string;
 }
@@ -99,25 +112,10 @@ export interface Hatchery {
 export interface Camera {
   id: string;
   name: string;
+  /** MJPEG stream, e.g. http://192.168.1.40:81/stream (ESP32-CAM CameraWebServer). */
   stream_url: string | null;
-  status: string | null;
-  created_at: string;
-}
-
-export interface EnergyRecord {
-  id: number;
-  solar_w: number | null;
-  battery_pct: number | null;
-  consumption_w: number | null;
-  created_at: string;
-}
-
-export interface BiogasRecord {
-  id: number;
-  gas_m3: number | null;
-  waste_kg: number | null;
-  fertilizer_kg: number | null;
-  efficiency_pct: number | null;
+  house_id: string | null;
+  house_name: string | null;
   created_at: string;
 }
 
@@ -126,4 +124,32 @@ export interface AiSnapshot extends Reading {
   device_code: string;
   house_name: string | null;
   last_seen: string | null;
+}
+
+/** getDashboard().stats. null = no data for that module yet (never a fake 0). */
+export interface DashboardStats {
+  totalBirds: number;
+  activeFarms: number;
+  /** Mean of the last 20 readings from any device, °C. */
+  temperature: number | null;
+  /** Mean of the last 20 readings from any device, % RH. */
+  humidity: number | null;
+  activeAlerts: number;
+  /** All open alerts with severity "critical", not only the recent 5. */
+  openCritical: number;
+  /** null when no eggs have been set. */
+  hatchRate: number | null;
+  /** Newest sensor reading from any device (ISO), or null. */
+  lastReadingAt: string | null;
+}
+
+/** getAiMonitor() result. */
+export interface AiMonitor {
+  /** Latest AI reading per device, most recently reporting first. */
+  latest: AiSnapshot[];
+  selected: string | null;
+  /** Oldest first. Always spans the whole requested range. */
+  history: Reading[];
+  /** 0 = raw readings. Otherwise each point is the last reading in a bucket of this many seconds. */
+  bucketSeconds: number;
 }
