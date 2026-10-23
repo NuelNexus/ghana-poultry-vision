@@ -5,6 +5,8 @@ import { Leaf } from "lucide-react";
 import { toast } from "sonner";
 import { signIn, signUp } from "@/lib/api/auth.functions";
 import { useAuth } from "@/lib/auth";
+import { useLanguage } from "@/components/LanguageProvider";
+import { LanguagePicker } from "@/components/LanguagePicker";
 
 const search = z.object({
   mode: z.enum(["signin", "signup"]).optional().default("signin"),
@@ -21,19 +23,24 @@ function LoginPage() {
   const navigate = useNavigate();
   const { user, refresh } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">(initial);
+  // Sign-up starts by choosing a language, so the rest of the form is in it.
+  const [step, setStep] = useState<"lang" | "form">(initial === "signup" ? "lang" : "form");
+  const { lang } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { if (user) navigate({ to: "/app" }); }, [user, navigate]);
+  useEffect(() => {
+    if (user) navigate({ to: "/app" });
+  }, [user, navigate]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
       if (mode === "signup") {
-        await signUp({ data: { email, password, fullName } });
+        await signUp({ data: { email, password, fullName, language: lang } });
         toast.success("Account created");
       } else {
         await signIn({ data: { email, password } });
@@ -42,7 +49,9 @@ function LoginPage() {
       await refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Authentication failed");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -52,39 +61,92 @@ function LoginPage() {
           <div className="auth-logo">
             <Leaf className="auth-logo-icon" />
           </div>
-          <span className="auth-brand-text">PoultryGrid AI</span>
+          <span className="auth-brand-text" translate="no">
+            PoultryGrid AI
+          </span>
         </Link>
         <div className="contact-us">
-          <h1 className="auth-title">{mode === "signin" ? "Sign in" : "Create account"}</h1>
-          <p className="auth-subtitle">
-            {mode === "signin"
-              ? "Access your farm dashboard."
-              : "The first account becomes the farm admin; later accounts join as workers."}
-          </p>
-          <form onSubmit={submit} className="auth-form">
-            {mode === "signup" && (
-              <>
-                <Field label="Full name">
-                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} required
-                    className="auth-input" placeholder="Full name" />
+          {mode === "signup" && step === "lang" ? (
+            <>
+              <h1 className="auth-title">Choose your language</h1>
+              <p className="auth-subtitle">
+                Tap your language to hear it. The whole site will use it. You can change it later in
+                Profile.
+              </p>
+              <div className="mt-6">
+                <LanguagePicker />
+              </div>
+              <button type="button" className="auth-button mt-6" onClick={() => setStep("form")}>
+                Continue
+              </button>
+              <button onClick={() => setMode("signin")} className="auth-toggle">
+                Already have an account? Sign in
+              </button>
+            </>
+          ) : (
+            <>
+              {mode === "signin" && (
+                <div className="mb-5">
+                  <LanguagePicker variant="chips" />
+                </div>
+              )}
+              <h1 className="auth-title">{mode === "signin" ? "Sign in" : "Create account"}</h1>
+              <p className="auth-subtitle">
+                {mode === "signin"
+                  ? "Access your farm dashboard."
+                  : "The first account becomes the farm admin; later accounts join as workers."}
+              </p>
+              <form onSubmit={submit} className="auth-form">
+                {mode === "signup" && (
+                  <>
+                    <Field label="Full name">
+                      <input
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        required
+                        className="auth-input"
+                        placeholder="Full name"
+                      />
+                    </Field>
+                  </>
+                )}
+                <Field label="Email">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="auth-input"
+                    placeholder="Email"
+                  />
                 </Field>
-              </>
-            )}
-            <Field label="Email">
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-                className="auth-input" placeholder="Email" />
-            </Field>
-            <Field label="Password">
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={mode === "signup" ? 8 : 1}
-                className="auth-input" placeholder="Password" />
-            </Field>
-            <button disabled={loading} type="submit" className="auth-button">
-              {loading ? "Please wait..." : mode === "signin" ? "Sign in" : "Create account"}
-            </button>
-          </form>
-          <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="auth-toggle">
-            {mode === "signin" ? "No account? Create one" : "Already have an account? Sign in"}
-          </button>
+                <Field label="Password">
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={mode === "signup" ? 8 : 1}
+                    className="auth-input"
+                    placeholder="Password"
+                  />
+                </Field>
+                <button disabled={loading} type="submit" className="auth-button">
+                  {loading ? "Please wait..." : mode === "signin" ? "Sign in" : "Create account"}
+                </button>
+              </form>
+              <button
+                onClick={() => {
+                  const next = mode === "signin" ? "signup" : "signin";
+                  setMode(next);
+                  if (next === "signup") setStep("lang");
+                }}
+                className="auth-toggle"
+              >
+                {mode === "signin" ? "No account? Create one" : "Already have an account? Sign in"}
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="rabbit-scene" aria-hidden="true">

@@ -5,7 +5,7 @@
 // Ewe. For the rest we send a short prompt written in the language, which steers
 // the transcriber to that language's spelling instead of guessing English.
 
-export type SpeechLang = "auto" | "en" | "tw" | "ga" | "ee" | "ha" | "fr";
+export type SpeechLang = "auto" | "en" | "tw" | "ga" | "ee" | "dag" | "ha" | "fr";
 
 export const SPEECH_LANGS: { id: SpeechLang; name: string; native: string }[] = [
   { id: "auto", name: "Auto-detect", native: "Auto" },
@@ -13,6 +13,7 @@ export const SPEECH_LANGS: { id: SpeechLang; name: string; native: string }[] = 
   { id: "tw", name: "Twi", native: "Twi (Akan)" },
   { id: "ga", name: "Ga", native: "Gã" },
   { id: "ee", name: "Ewe", native: "Eʋegbe" },
+  { id: "dag", name: "Dagbani", native: "Dagbanli" },
   { id: "ha", name: "Hausa", native: "Hausa" },
   { id: "fr", name: "French", native: "Français" },
 ];
@@ -26,6 +27,7 @@ export const KHAYA_CODES: Partial<Record<SpeechLang, { asr: string; tts: string;
   tw: { asr: "twi", tts: "twi", mt: "tw" },
   ga: { asr: "gaa", tts: "gaa", mt: "gaa" },
   ee: { asr: "ewe", tts: "ewe", mt: "ee" },
+  dag: { asr: "dag", tts: "dag", mt: "dag" },
   ha: { asr: "hau", tts: "hau" },
 };
 
@@ -45,6 +47,7 @@ export const STT_PROMPT: Record<SpeechLang, string> = {
   tw: "Twi kasa. Me nkokɔ no ho yɛ hyew, ɛdeɛn na menyɛ?",
   ga: "Ga wiemɔ. Mi wuoi lɛ yɛ he hiɛ, mɛni esa akɛ mafee?",
   ee: "Eʋegbe. Nye koklowo le dzo xɔm, nukae wòle be mawɔ?",
+  dag: "A poultry farmer in northern Ghana speaks Dagbani (Dagbanli). Write it in Dagbani spelling.",
   ha: "Hausa. Kajina suna jin zafi, me zan yi?",
   fr: "Un éleveur de volailles au Ghana parle de température, d'humidité et du ventilateur.",
 };

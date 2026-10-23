@@ -35,6 +35,28 @@ insert into user_roles (user_id, role)
 select id, 'manager' from users where email = 'person@example.com';
 ```
 
+## Languages and voice help
+
+The whole site works in English, Twi, Ga, Ewe, Dagbani, Hausa and French. Farmers pick a
+language when they sign up (each choice plays a spoken greeting, so they can pick by ear) and
+can change it in Profile > Language and voice. It is saved on their account.
+
+- **Translation:** every English string on screen is translated on the fly
+  (`src/lib/dom-translator.ts`), once per language, and kept in the `ui_translations` table, so
+  pages are instant after the first visit. Translations come from GhanaNLP Khaya for Twi, Ga, Ewe
+  and Dagbani when `KHAYA_API_KEY` is set, and otherwise from `OPENAI_TRANSLATE_MODEL` (default
+  `gpt-5.5`, the only OpenAI model whose Twi was correct in our tests). To keep something from
+  being translated, add `translate="no"` to it.
+- **Help buttons on every page** (`src/components/AccessDock.tsx`): **Speak** (say where to go or
+  ask about the farm, in your language), **Explain** (Ama says what the page shows) and **Tap to
+  hear** (tap any text to hear it; tap a button once to hear it and again to press it). Every text
+  box gets a microphone, and new alerts can be read out loud.
+- **Voices:** Twi uses the female `twi-1` voice from stable-twi-tts (`npm run twi` on this PC, or
+  the Pi service); other languages use Khaya with a key, else OpenAI. Speech is sent one sentence
+  at a time, so the first words play after about a second.
+- **Ama's answers** in Twi and the other Ghanaian languages use `OPENAI_LOCAL_MODEL` (default
+  `gpt-5.5`); English uses `OPENAI_CHAT_MODEL` (default `gpt-4o-mini`).
+
 ## Connect the Raspberry Pi
 
 1. **Houses → Add house**, and set *Chicks placed on* (this gives the AI the flock age).

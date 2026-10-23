@@ -132,7 +132,7 @@ journalctl -u poultrygrid-tts -f
 - Numbers and quoted English ("heat stress") are read in English, the way Ghanaians code-switch;
   the Twi voice alone skips digits. That uses espeak-ng 1.51 (GPL-3.0), bundled by the `[eng]` extra.
 - **The voice model is CC BY-NC 4.0: non-commercial use only.** The code is MIT.
-- Settings in `/etc/poultrygrid/agent.env`: `PG_TTS_VOICE` (default `twi-6`), `PG_TTS_THREADS`.
+- Settings in `/etc/poultrygrid/agent.env`: `PG_TTS_VOICE` (default `twi-1`, a female voice), `PG_TTS_THREADS`.
 
 On the same network, or behind a tunnel, the app can call the Pi directly instead:
 `python twi_tts.py serve --host 0.0.0.0 --port 5002` with `PG_TTS_TOKEN` set on the Pi, and

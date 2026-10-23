@@ -5,14 +5,15 @@ import {
   chatCompletion,
   createRealtimeClientSecret,
   fromBase64,
-  speak,
-  toBase64,
+  localModel,
   transcribe,
   type ChatMessage,
 } from "../openai.server";
 import { KHAYA_CODES, detectLang, langName, type SpeechLang } from "../ai-languages";
-import { khayaEnabled, khayaSpeak, khayaTranscribe, khayaTranslate } from "../khaya.server";
-import { twiSpeak, twiVoiceOnline, wakeTwiVoice } from "../twi-tts.server";
+import { khayaEnabled, khayaTranscribe, khayaTranslate } from "../khaya.server";
+import { twiVoiceOnline, wakeTwiVoice } from "../twi-tts.server";
+import { speakIn } from "../voice.server";
+import { SITE_LANG_IDS, siteLang, speechLangFor, type SiteLang } from "../site-lang";
 import { twiSuggest, twiWordsEnabled } from "../twi-nlp.server";
 import { requireUser } from "./middleware";
 import type { Alert, AiSnapshot } from "./types";
@@ -38,6 +39,11 @@ async function loadSnapshot() {
     ),
   ]);
   return { readings, alerts };
+}
+
+/** The live farm state as compact JSON, for prompts elsewhere (voice commands). */
+export async function farmSummary() {
+  return describeFarm(await loadSnapshot());
 }
 
 export const getAssistantSensors = createServerFn({ method: "GET" })
@@ -92,11 +98,18 @@ biogas, weight or ammonia-ppm sensors. If asked about those, say the farm has no
 give practical advice on checking it by hand. Never invent or estimate a reading. If a reading is
 null, or reading_age_min is large (over ~5 minutes), say the data is missing or out of date.`;
 
-function systemPrompt(farm: string, voice: boolean, lang: SpeechLang = "auto") {
+function systemPrompt(
+  farm: string,
+  voice: boolean,
+  lang: SpeechLang = "auto",
+  uiLang: SiteLang = "en",
+) {
   const langLine =
-    lang === "auto"
-      ? ""
-      : `\nThe farmer has said they will speak ${langName(lang)}. Expect ${langName(lang)} and reply in ${langName(lang)} unless they clearly switch language.`;
+    lang !== "auto"
+      ? `\nThe farmer has said they will speak ${langName(lang)}. Expect ${langName(lang)} and reply in ${langName(lang)} unless they clearly switch language.`
+      : uiLang !== "en"
+        ? `\nThe farmer uses the app in ${siteLang(uiLang).name}. If you can't tell which language they used, reply in ${siteLang(uiLang).name}.`
+        : "";
   return `You are Ama, the AI assistant inside PoultryGrid, a smart poultry farm dashboard used in Ghana.
 You help farmers understand their poultry houses and act on them: temperature, humidity, gas and
 ammonia, ventilation, bird health, water, feed and biosecurity. Base answers on the live farm data
@@ -132,13 +145,27 @@ const stripBold = (t: string) => t.replace(/\*\*(.+?)\*\*/g, "$1");
  * trained on Ghanaian text, so the result reads far more naturally than GPT
  * writing Twi itself. Everything else is answered directly by GPT.
  */
-async function answer(farm: string, turns: Turn[], lang: SpeechLang, voice: boolean) {
+/** Twi, Ga, Ewe, Dagbani, Hausa: the bigger model, the only one that writes them well. */
+const LOCAL_UI: SiteLang[] = ["tw", "ga", "ee", "dag", "ha"];
+const modelFor = (lang: SpeechLang, uiLang: SiteLang) =>
+  lang === "tw" || LOCAL_UI.includes(uiLang) ? localModel() : undefined;
+
+async function answer(
+  farm: string,
+  turns: Turn[],
+  lang: SpeechLang,
+  voice: boolean,
+  uiLang: SiteLang = "en",
+) {
   const direct = async () => ({
-    reply: (
-      await chatCompletion([
-        { role: "system", content: systemPrompt(farm, voice, lang) },
-        ...turns.map((t) => ({ role: t.role, content: t.content })),
-      ])
+    reply: stripBold(
+      await chatCompletion(
+        [
+          { role: "system", content: systemPrompt(farm, voice, lang, uiLang) },
+          ...turns.map((t) => ({ role: t.role, content: t.content })),
+        ],
+        { model: modelFor(lang, uiLang) },
+      ),
     ).trim(),
     english: null as string | null,
     youEnglish: null as string | null,
@@ -193,8 +220,11 @@ they wrote in ${name}: a translation model turns your English into ${name} for t
  * down first; if that turns out to be Twi and there is a Khaya key, Khaya (trained
  * on Ghanaian speech) transcribes it again.
  */
-async function hear(audio: Uint8Array, mimeType: string) {
-  const text = await transcribe(audio, mimeType, "auto");
+export async function hear(audio: Uint8Array, mimeType: string, uiLang: SiteLang = "en") {
+  // The site language steers the transcriber toward that language's spelling;
+  // English and French speakers get the open "auto" hint.
+  const hint = uiLang === "en" || uiLang === "fr" ? "auto" : siteLang(uiLang).speech;
+  const text = await transcribe(audio, mimeType, hint);
   if (khayaEnabled() && mimeType.includes("wav") && detectLang(text) === "tw") {
     try {
       const better = await khayaTranscribe(audio, "tw");
@@ -204,30 +234,6 @@ async function hear(audio: Uint8Array, mimeType: string) {
     }
   }
   return text;
-}
-
-/**
- * Ama's voice. Twi: the farm Pi's stable-twi-tts voice first, then Khaya, then
- * OpenAI. Ga, Ewe, Hausa: Khaya, then OpenAI. Everything else: OpenAI.
- */
-async function voiceFor(text: string, lang: SpeechLang = detectLang(text)) {
-  const clean = stripBold(text).replace(/^\s*[-*•]\s+/gm, "");
-  if (lang === "tw") {
-    try {
-      return { audio: toBase64(await twiSpeak(clean)), mimeType: "audio/wav" };
-    } catch {
-      /* Pi offline or slow: next option */
-    }
-  }
-  if (khayaEnabled() && lang === "tw") {
-    try {
-      return { audio: toBase64(await khayaSpeak(clean, lang)), mimeType: "audio/wav" };
-    } catch {
-      /* fall back to OpenAI */
-    }
-  }
-  const mp3 = await speak(clean, lang === "auto" ? undefined : langName(lang));
-  return { audio: toBase64(mp3), mimeType: "audio/mpeg" };
 }
 
 /** Which speech engines this server has keys for (the browser picks its voice mode from it). */
@@ -356,6 +362,7 @@ export const askAssistant = createServerFn({ method: "POST" })
     z.object({
       messages: historySchema.min(1),
       conversationId: z.string().uuid().optional(),
+      uiLang: z.enum(SITE_LANG_IDS).default("en"),
     }),
   )
   .handler(async ({ data, context }) => {
@@ -366,7 +373,13 @@ export const askAssistant = createServerFn({ method: "POST" })
       loadSnapshot().then(describeFarm),
       conversationFor(context.user.id, data.conversationId, last.content),
     ]);
-    const { reply, english, youEnglish } = await answer(farm, data.messages, lang, false);
+    const { reply, english, youEnglish } = await answer(
+      farm,
+      data.messages,
+      lang,
+      false,
+      data.uiLang,
+    );
     const language = lang === "tw" ? langName(lang) : null;
     await saveMessages(conversationId, [
       ...(last.role === "user"
@@ -392,17 +405,31 @@ export const transcribeSpeech = createServerFn({ method: "POST" })
     z.object({
       audio: z.string().min(1).max(8_000_000), // base64, about 6 MB (a few minutes of speech)
       mimeType: z.string().max(100),
+      uiLang: z.enum(SITE_LANG_IDS).default("en"),
     }),
   )
   .handler(async ({ data }) => ({
-    text: await hear(fromBase64(data.audio), data.mimeType),
+    text: await hear(fromBase64(data.audio), data.mimeType, data.uiLang),
   }));
 
-// Spoken replies for the text chat ("Voice replies" on): audio as base64.
+// Speech for one sentence of a reply (the browser sends them one by one and plays
+// each as it arrives): audio as base64.
 export const speakReply = createServerFn({ method: "POST" })
   .middleware([requireUser])
-  .inputValidator(z.object({ text: z.string().min(1).max(4000) }))
-  .handler(({ data }) => voiceFor(data.text));
+  .inputValidator(
+    z.object({
+      text: z.string().min(1).max(4000),
+      /** Language of the whole reply, so every sentence uses the same voice. */
+      lang: z.enum(["auto", "en", "tw", "ga", "ee", "dag", "ha", "fr"]).optional(),
+      uiLang: z.enum(SITE_LANG_IDS).default("en"),
+      slowTwi: z.boolean().default(false),
+    }),
+  )
+  .handler(({ data }) =>
+    speakIn(data.text, data.lang ?? speechLangFor(data.text, data.uiLang), {
+      slowTwi: data.slowTwi,
+    }),
+  );
 
 // A Twi turn inside the live voice call. The call is OpenAI's realtime model;
 // when the farmer's words come back as Twi, the browser holds its reply and asks
@@ -418,8 +445,9 @@ export const twiReply = createServerFn({ method: "POST" })
       "tw",
       true,
     );
-    const voice = await voiceFor(turn.reply, "tw");
-    return { ama: turn.reply, amaEnglish: turn.english, youEnglish: turn.youEnglish, ...voice };
+    // Text only: the browser speaks it sentence by sentence (speakReply), so her
+    // words show at once and the first sentence plays while the rest is made.
+    return { ama: turn.reply, amaEnglish: turn.english, youEnglish: turn.youEnglish };
   });
 
 // Speech to speech -----------------------------------------------------------
@@ -432,10 +460,18 @@ export const createVoiceSession = createServerFn({ method: "POST" })
   .middleware([requireUser])
   // twiRouting: the browser decides who answers each turn (Twi -> twiReply), so the
   // realtime model waits to be asked instead of answering on its own.
-  .inputValidator(z.object({ twiRouting: z.boolean().default(false) }))
+  .inputValidator(
+    z.object({
+      twiRouting: z.boolean().default(false),
+      uiLang: z.enum(SITE_LANG_IDS).default("en"),
+    }),
+  )
   .handler(async ({ data }) => {
     const farm = describeFarm(await loadSnapshot());
-    return createRealtimeClientSecret(systemPrompt(farm, true), "auto", {
+    // The site language steers speech recognition toward that language's spelling.
+    const hint =
+      data.uiLang === "en" || data.uiLang === "fr" ? "auto" : siteLang(data.uiLang).speech;
+    return createRealtimeClientSecret(systemPrompt(farm, true, "auto", data.uiLang), hint, {
       manualResponse: data.twiRouting,
     });
   });

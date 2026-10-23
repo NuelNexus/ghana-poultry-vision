@@ -40,13 +40,15 @@ import { detectLang } from "@/lib/ai-languages";
 import {
   MIC_CONSTRAINTS,
   Recorder,
-  ReplyPlayer,
   blobToBase64,
   micErrorMessage,
   micUnavailableReason,
   toWav16k,
 } from "@/lib/ai-audio";
 import { useTheme } from "@/components/ThemeProvider";
+import { useLanguage } from "@/components/LanguageProvider";
+import { SpeechPlayer, cachedChunk, type FetchChunk } from "@/lib/speech-client";
+import { speechLangFor, type SiteLang } from "@/lib/site-lang";
 import { AiStatusBadge, isStale } from "@/components/ai-status";
 import type { VoiceSegment } from "@/lib/avatar-actions";
 import { ExplorerAvatar, type ExplorerAvatarHandle } from "@/components/ExplorerAvatar";
@@ -615,6 +617,14 @@ function suggestions(data: Snapshot | undefined) {
   return out.slice(0, 4);
 }
 
+/** Ama's voice for one sentence, cached so Listen twice costs nothing. */
+const replyChunks =
+  (lang: ReturnType<typeof speechLangFor>, uiLang: SiteLang): FetchChunk =>
+  (text, slowTwi) =>
+    cachedChunk(`ai\u0000${lang}\u0000${text}`, () =>
+      speakReply({ data: { text: text.slice(0, 4000), lang, uiLang, slowTwi } }),
+    );
+
 let msgSeq = 0;
 const newId = () => `m${Date.now().toString(36)}${(msgSeq++).toString(36)}`;
 
@@ -623,6 +633,7 @@ type RecState = "idle" | "recording" | "transcribing";
 function TextChat() {
   useDisplayPrefs();
   const { settings, update } = useTheme();
+  const { lang: uiLang } = useLanguage();
   const qc = useQueryClient();
   const sensors = useQuery(sensorsQuery);
   // With a Khaya key, dictation is sent as WAV so Khaya can re-hear it if it's Twi.
@@ -638,17 +649,17 @@ function TextChat() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Spoken replies -------------------------------------------------------------
-  const player = useRef<ReplyPlayer | null>(null);
-  const audioCache = useRef(new Map<string, Promise<{ audio: string; mimeType: string }>>());
+  // Sentence by sentence: the first one plays while the rest are still being made.
+  const player = useRef<SpeechPlayer | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [loadingAudio, setLoadingAudio] = useState<string | null>(null);
   useEffect(() => {
-    const p = new ReplyPlayer();
+    const p = new SpeechPlayer();
     p.onChange = setPlaying;
     player.current = p;
     return () => {
       p.onChange = null;
-      p.stop();
+      p.dispose();
     };
   }, []);
 
@@ -661,15 +672,14 @@ function TextChat() {
     }
     p.unlock();
     setLoadingAudio(m.id);
+    const lang = speechLangFor(m.content, uiLang);
+    const fetchChunk = replyChunks(lang, uiLang);
     try {
-      let req = audioCache.current.get(m.id);
-      if (!req) {
-        req = speakReply({ data: { text: m.content.slice(0, 4000) } });
-        audioCache.current.set(m.id, req);
-        req.catch(() => audioCache.current.delete(m.id));
-      }
-      const a = await req;
-      await p.play(m.id, a.audio, a.mimeType);
+      // Spinner only until the first sentence is ready.
+      void fetchChunk(m.content.split(/(?<=[.!?])\s/)[0] ?? m.content, false)
+        .catch(() => {})
+        .finally(() => setLoadingAudio((id) => (id === m.id ? null : id)));
+      await p.speak(m.id, m.content, fetchChunk, { twi: lang === "tw" });
     } catch (err) {
       setError(
         err instanceof DOMException && err.name === "NotAllowedError"
@@ -726,7 +736,7 @@ function TextChat() {
       // Khaya needs WAV; if this browser can't convert, OpenAI takes the original.
       const audio = (khaya && (await toWav16k(blob))) || blob;
       const { text } = await transcribeSpeech({
-        data: { audio: await blobToBase64(audio), mimeType: audio.type },
+        data: { audio: await blobToBase64(audio), mimeType: audio.type, uiLang },
       });
       if (!text.trim()) setError("Didn’t catch that. Try again, a little slower.");
       else {
@@ -764,6 +774,7 @@ function TextChat() {
             english: m.english?.slice(0, 4000) ?? null,
           })),
           conversationId: conversationId ?? undefined,
+          uiLang,
         },
       });
       const msg: Msg = { id: newId(), role: "assistant", content: reply, english };
@@ -975,10 +986,17 @@ function TextChat() {
                         Ama
                         {m.mode === "voice" && <Mic className="size-3" aria-label="spoken" />}
                       </p>
-                      <p className="mt-1 text-[14px] leading-[22px] whitespace-pre-wrap text-ink">
+                      <p
+                        className="mt-1 text-[14px] leading-[22px] whitespace-pre-wrap text-ink"
+                        translate="no"
+                      >
                         {withBold(m.content)}
                       </p>
-                      {m.english && <p className="ai-float-en">English: {m.english}</p>}
+                      {m.english && (
+                        <p className="ai-float-en">
+                          English: <span translate="no">{m.english}</span>
+                        </p>
+                      )}
                       <button
                         type="button"
                         className={cn("ai-listen", playing === m.id && "is-on")}
@@ -1000,7 +1018,7 @@ function TextChat() {
                   </li>
                 ) : (
                   <li key={m.id} className="flex flex-col items-end gap-1">
-                    <p className="ai-user-msg">
+                    <p className="ai-user-msg" translate="no">
                       {m.mode === "voice" && (
                         <Mic
                           className="mr-1 inline size-3 align-[-1px] text-ink-3"
@@ -1010,7 +1028,9 @@ function TextChat() {
                       {m.content}
                     </p>
                     {m.english && (
-                      <p className="ai-float-en max-w-[85%] text-right">English: {m.english}</p>
+                      <p className="ai-float-en max-w-[85%] text-right">
+                        English: <span translate="no">{m.english}</span>
+                      </p>
                     )}
                   </li>
                 ),
@@ -1072,6 +1092,7 @@ function TextChat() {
           </label>
           <textarea
             ref={inputRef}
+            data-no-dictate
             id="ai-message"
             name="message"
             rows={1}
@@ -1174,13 +1195,14 @@ type TurnHistory = { role: "user" | "assistant"; content: string; english: strin
 
 function VoiceChat({ active }: { active: boolean }) {
   const twiRouting = useTwiVoice();
+  const { lang: uiLang } = useLanguage();
   const qc = useQueryClient();
   const avatar = useRef<ExplorerAvatarHandle>(null);
   // Her voice plays through this element; it lives in the page so phones keep it.
   const audioRef = useRef<HTMLAudioElement>(null);
   // Twi replies (GhanaNLP voice) play through their own element.
   const twiAudioRef = useRef<HTMLAudioElement>(null);
-  const twiUrl = useRef<string | null>(null);
+  const twiPlayer = useRef<SpeechPlayer | null>(null);
   const twiSeq = useRef(0);
   const twiPending = useRef(""); // Twi words not yet answered (cut off by more speech)
   const manual = useRef(false); // this call's session waits for response.create
@@ -1249,31 +1271,27 @@ function VoiceChat({ active }: { active: boolean }) {
       c.audio.srcObject = null;
     }
     twiSeq.current++;
-    const t = twiAudioRef.current;
-    if (t) {
-      t.onended = null;
-      t.pause();
-    }
+    twiPlayer.current?.stop();
     void saveChain.current.then(() => qc.invalidateQueries({ queryKey: ["ai-conversations"] }));
     avatar.current?.play("idle");
     setState("off");
   }, [qc]);
-  useEffect(
-    () => () => {
-      if (twiUrl.current) URL.revokeObjectURL(twiUrl.current);
-    },
-    [],
-  );
+  useEffect(() => () => twiPlayer.current?.dispose(), []);
 
   // Pre-mint the session secret while voice mode is open, so tapping the mic
   // only has to do the WebRTC handshake. Secrets live 120 s; use them within 90.
-  const warm = useRef<{ p: Promise<VoiceSession>; at: number; twi: boolean } | null>(null);
+  const warm = useRef<{
+    p: Promise<VoiceSession>;
+    at: number;
+    twi: boolean;
+    lang: SiteLang;
+  } | null>(null);
   const takeSession = () => {
     const w = warm.current;
     warm.current = null;
-    return w && w.twi === twiRouting && Date.now() - w.at < 90_000
+    return w && w.twi === twiRouting && w.lang === uiLang && Date.now() - w.at < 90_000
       ? w.p
-      : createVoiceSession({ data: { twiRouting } });
+      : createVoiceSession({ data: { twiRouting, uiLang } });
   };
   useEffect(() => {
     if (!active) {
@@ -1283,16 +1301,16 @@ function VoiceChat({ active }: { active: boolean }) {
     if (micUnavailableReason()) return;
     const prewarm = () => {
       if (call.current) return;
-      const p = createVoiceSession({ data: { twiRouting } });
+      const p = createVoiceSession({ data: { twiRouting, uiLang } });
       p.catch(() => {
         if (warm.current?.p === p) warm.current = null;
       });
-      warm.current = { p, at: Date.now(), twi: twiRouting };
+      warm.current = { p, at: Date.now(), twi: twiRouting, lang: uiLang };
     };
     prewarm();
     const t = window.setInterval(prewarm, 85_000);
     return () => window.clearInterval(t);
-  }, [active, twiRouting]);
+  }, [active, twiRouting, uiLang]);
 
   const send = (event: Record<string, unknown>) => {
     const dc = call.current?.dc;
@@ -1348,21 +1366,16 @@ function VoiceChat({ active }: { active: boolean }) {
       });
       const a = twiAudioRef.current;
       if (!a) return setState("listening");
-      if (twiUrl.current) URL.revokeObjectURL(twiUrl.current);
-      const bytes = Uint8Array.from(atob(r.audio), (c) => c.charCodeAt(0));
-      twiUrl.current = URL.createObjectURL(new Blob([bytes], { type: r.mimeType }));
-      a.src = twiUrl.current;
-      a.onended = () => {
-        if (my !== gen.current || seq !== twiSeq.current) return;
-        setState("listening");
-        avatar.current?.play("idle");
-      };
+      const player = (twiPlayer.current ??= new SpeechPlayer(a));
       setState("speaking");
       avatar.current?.play(turns.current++ % 2 ? "talking2" : "talking");
-      await a.play().catch(() => {
+      // Sentence by sentence in the GhanaNLP voice: the first plays while the rest are made.
+      await player.speak(`twi${seq}`, r.ama, replyChunks("tw", uiLang), { twi: true }).catch(() => {
         setError("Your browser blocked Ama’s voice. Her reply is written above.");
-        setState("listening");
       });
+      if (my !== gen.current || seq !== twiSeq.current) return;
+      setState("listening");
+      avatar.current?.play("idle");
     } catch {
       if (my !== gen.current || seq !== twiSeq.current) return;
       // The Twi stack is unreachable: let the live model answer instead.
@@ -1408,11 +1421,9 @@ function VoiceChat({ active }: { active: boolean }) {
     switch (e.type) {
       case "input_audio_buffer.speech_started": {
         // Talking over a Twi reply stops it, like the live voice.
-        const t = twiAudioRef.current;
-        if (t && !t.paused) {
+        if (twiPlayer.current?.busy) {
           twiSeq.current++;
-          t.onended = null;
-          t.pause();
+          twiPlayer.current.stop();
         }
         youItem.current = e.item_id ?? null;
         setYou("");
@@ -1661,18 +1672,26 @@ function VoiceChat({ active }: { active: boolean }) {
               <p className="ai-float-label">
                 You{trans?.language && trans.language !== "English" ? ` · ${trans.language}` : ""}
               </p>
-              <p className="mt-0.5 text-ink">{you}</p>
+              <p className="mt-0.5 text-ink" translate="no">
+                {you}
+              </p>
               {trans?.you && trans.language !== "English" && trans.you.trim() !== you.trim() && (
-                <p className="ai-float-en">English: {trans.you}</p>
+                <p className="ai-float-en">
+                  English: <span translate="no">{trans.you}</span>
+                </p>
               )}
             </div>
           )}
           {ama && (
             <div className="ai-float">
               <p className="ai-float-label">Ama</p>
-              <p className="mt-0.5 text-ink">{ama}</p>
+              <p className="mt-0.5 text-ink" translate="no">
+                {ama}
+              </p>
               {trans?.ama && trans.language !== "English" && trans.ama.trim() !== ama.trim() && (
-                <p className="ai-float-en">English: {trans.ama}</p>
+                <p className="ai-float-en">
+                  English: <span translate="no">{trans.ama}</span>
+                </p>
               )}
             </div>
           )}

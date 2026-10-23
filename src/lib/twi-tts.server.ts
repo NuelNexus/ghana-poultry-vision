@@ -11,9 +11,10 @@ import { query, queryOne } from "./db.server";
 //                       for the Pi, which polls /api/public/devices/tts, to upload the WAV.
 //                       Works behind any router, with the Pi's existing device key.
 //
-//   TWI_TTS_VOICE    - stable-twi-tts voice (default twi-6, the clearest for pure Twi)
+//   TWI_TTS_VOICE    - stable-twi-tts voice (default twi-1: a female voice, about 190 Hz,
+//                      and the package's best-scoring voice for clarity)
 
-const VOICE = () => process.env.TWI_TTS_VOICE || "twi-6";
+const VOICE = () => process.env.TWI_TTS_VOICE || "twi-1";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** True when some Pi's voice service polled in the last minute (or a direct URL is set). */
@@ -37,8 +38,12 @@ export async function wakeTwiVoice() {
   ).catch(() => {});
 }
 
-/** Speak Twi text on the Pi. Returns WAV bytes, or throws if it isn't reachable in time. */
-export async function twiSpeak(text: string): Promise<Uint8Array> {
+/**
+ * Speak Twi text on the Pi (or this PC). Returns WAV bytes, or throws if it isn't
+ * reachable within timeoutMs. Callers send one sentence at a time, so a short
+ * timeout is plenty and a slow machine falls back to another voice quickly.
+ */
+export async function twiSpeak(text: string, timeoutMs = 12_000): Promise<Uint8Array> {
   const url = process.env.TWI_TTS_URL;
   if (url) {
     const token = process.env.TWI_TTS_TOKEN;
@@ -49,15 +54,15 @@ export async function twiSpeak(text: string): Promise<Uint8Array> {
         ...(token && { authorization: `Bearer ${token}` }),
       },
       body: JSON.stringify({ text, voice: VOICE() }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) throw new Error(`Twi voice server failed (${res.status})`);
     return new Uint8Array(await res.arrayBuffer());
   }
-  return relaySpeak(text);
+  return relaySpeak(text, timeoutMs + 3_000);
 }
 
-async function relaySpeak(text: string) {
+async function relaySpeak(text: string, timeoutMs: number) {
   if (!(await twiVoiceOnline())) throw new Error("No Pi is running the Twi voice service");
   await wakeTwiVoice();
   // Tidy up old jobs (and their audio) while we're here.
@@ -69,9 +74,9 @@ async function relaySpeak(text: string) {
     [text, VOICE()],
   );
   const id = job!.id;
-  // A Pi that is polling fast picks it up within a second; give up after 25 s
-  // so the caller can fall back to another voice.
-  const deadline = Date.now() + 25_000;
+  // A Pi that is polling fast picks it up within a second; give up after
+  // timeoutMs so the caller can fall back to another voice.
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await sleep(350);
     const row = await queryOne<{ status: string; audio: string | null; error: string | null }>(

@@ -55,6 +55,13 @@ export class Recorder {
   private timer = 0;
   /** Loudest moment so far (RMS, 0..1). Near zero means nothing was said. */
   peak = 0;
+  /**
+   * Called once when the speaker has talked and then gone quiet for about 1.6 s
+   * (or after 30 s), so hands-free helpers can stop without a second tap.
+   */
+  onSilence: (() => void) | null = null;
+  private quietSince = 0;
+  private startedAt = 0;
 
   /** Must be called from a tap/click so phones show the permission prompt. */
   async start() {
@@ -88,11 +95,27 @@ export class Recorder {
       this.ctx.createMediaStreamSource(stream).connect(an);
       const buf = new Float32Array(an.fftSize);
       this.peak = 0;
+      this.startedAt = performance.now();
+      this.quietSince = 0;
       this.timer = window.setInterval(() => {
         an.getFloatTimeDomainData(buf);
         let sum = 0;
         for (const v of buf) sum += v * v;
-        this.peak = Math.max(this.peak, Math.sqrt(sum / buf.length));
+        const rms = Math.sqrt(sum / buf.length);
+        this.peak = Math.max(this.peak, rms);
+        if (!this.onSilence) return;
+        const now = performance.now();
+        const talked = this.peak >= 0.02;
+        if (rms > Math.max(0.012, this.peak * 0.18)) this.quietSince = 0;
+        else if (!this.quietSince) this.quietSince = now;
+        if (
+          (talked && this.quietSince && now - this.quietSince > 1600) ||
+          now - this.startedAt > 30_000
+        ) {
+          const cb = this.onSilence;
+          this.onSilence = null;
+          cb();
+        }
       }, 80);
     } catch {
       this.ctx = null; // no meter: just send the audio

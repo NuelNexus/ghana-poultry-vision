@@ -12,6 +12,8 @@ export interface SessionUser {
   email: string;
   full_name: string | null;
   roles: Role[];
+  /** Site language (src/lib/site-lang.ts). */
+  language: string;
 }
 
 const COOKIE = "pg_session";
@@ -86,8 +88,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     email: string;
     full_name: string | null;
     roles: Role[] | null;
+    language: string;
   }>(
-    `select u.id, u.email, u.full_name,
+    `select u.id, u.email, u.full_name, u.language,
             coalesce(array_agg(r.role::text) filter (where r.role is not null), '{}') as roles
        from sessions s
        join users u on u.id = s.user_id

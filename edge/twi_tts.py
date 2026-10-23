@@ -10,7 +10,7 @@ The worker needs no open ports: it polls the app with the Pi's device key
 It checks every 20 s, and every second while someone is talking to Ama in Twi.
 
 Settings (env or agent.env):
-  PG_TTS_VOICE    voice, default twi-6 (clearest for pure Twi; see `stable-twi-tts --list-voices`)
+  PG_TTS_VOICE    voice, default twi-1 (female, the clearest in the package's tests; see `stable-twi-tts --list-voices`)
   PG_TTS_THREADS  CPU threads for synthesis, default 4 (a Pi 4/5 has 4 cores)
   PG_TTS_CACHE    where the 80 MB voice model is cached
   PG_TTS_TOKEN    bearer token required by `serve` (recommended whenever it is reachable)
@@ -34,6 +34,7 @@ import time
 import urllib.error
 import urllib.request
 import wave
+from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -114,9 +115,10 @@ class Voice:
 
         _lenient_symbols()
         cache = os.environ.get("PG_TTS_CACHE") or None
-        self.voice = os.environ.get("PG_TTS_VOICE", "twi-6")
+        self.voice = os.environ.get("PG_TTS_VOICE", "twi-1")
         self.tts = StableTwiTTS(ensure_model(cache), num_threads=int(os.environ.get("PG_TTS_THREADS", "4")))
         self.lock = threading.Lock()  # one synthesis at a time; the Pi has no cores to spare
+        self.cache: "OrderedDict[tuple[str, str], tuple[bytes, float]]" = OrderedDict()  # recent sentences
         self.tts.synthesize("Akwaaba", voice=self.voice)  # warm up
 
     def wav(self, text: str, voice: str | None = None) -> tuple[bytes, float]:
@@ -125,7 +127,11 @@ class Voice:
         if not said:
             raise ValueError("nothing to say")
         v = voice or self.voice
+        key = (said, v)
         with self.lock:
+            if key in self.cache:  # greetings, menu words and repeated advice come back instantly
+                self.cache.move_to_end(key)
+                return self.cache[key]
             try:
                 s = self.tts.synthesize(said, voice=v, language="mixed")
             except Exception as e:  # English support (espeak) missing, or an odd symbol
@@ -138,7 +144,12 @@ class Voice:
             w.setframerate(s.sample_rate)
             pcm = (s.audio.clip(-1, 1) * 32767).astype("<i2")
             w.writeframes(pcm.tobytes())
-        return buf.getvalue(), s.duration
+        out = (buf.getvalue(), s.duration)
+        with self.lock:
+            self.cache[key] = out
+            while len(self.cache) > 128:
+                self.cache.popitem(last=False)
+        return out
 
 
 # Worker: the app hands out jobs -------------------------------------------------
@@ -245,6 +256,9 @@ def serve(voice: Voice, host: str, port: int):
                 return self._send(400, json.dumps({"error": str(e)[:300]}).encode())
             self._send(200, audio, "audio/wav")
 
+    # On Windows, address reuse lets a second copy share the port silently (and an
+    # old copy keeps answering). Fail loudly instead.
+    ThreadingHTTPServer.allow_reuse_address = os.name != "nt"
     httpd = ThreadingHTTPServer((host, port), Handler)
     log.info("Twi voice server on http://%s:%d (POST /synthesize, GET /health)", host, port)
     httpd.serve_forever()

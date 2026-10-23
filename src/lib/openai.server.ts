@@ -5,7 +5,10 @@ import { STT_ISO, STT_PROMPT, isPromptEcho, type SpeechLang } from "./ai-languag
 // OPENAI_API_KEY never reaches the browser.
 //
 // Models are the low-cost tier by default and can be swapped via .env:
-//   OPENAI_CHAT_MODEL  - answers + translation   (default gpt-4o-mini)
+//   OPENAI_CHAT_MODEL  - English answers         (default gpt-4o-mini)
+//   OPENAI_LOCAL_MODEL - answers in Twi, Ga, Ewe, Dagbani, Hausa (default gpt-5.5: in our
+//                        tests the only OpenAI model that writes correct, natural Twi)
+//   OPENAI_TRANSLATE_MODEL - site text translation (default gpt-5.5, cached once per sentence)
 //   OPENAI_STT_MODEL   - speech to text          (default gpt-4o-transcribe: much better than
 //                        the mini model on Twi, Ga and Ewe, still about $0.006 a minute)
 //   OPENAI_TTS_MODEL   - text to speech          (default gpt-4o-mini-tts)
@@ -40,19 +43,34 @@ async function fail(res: Response, what: string): Promise<never> {
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
+export const localModel = () => process.env.OPENAI_LOCAL_MODEL || "gpt-5.5";
+export const translateModel = () => process.env.OPENAI_TRANSLATE_MODEL || "gpt-5.5";
+
 export async function chatCompletion(
   messages: ChatMessage[],
-  opts: { jsonSchema?: { name: string; schema: Record<string, unknown> }; maxTokens?: number } = {},
+  opts: {
+    jsonSchema?: { name: string; schema: Record<string, unknown> };
+    maxTokens?: number;
+    /** Another model than OPENAI_CHAT_MODEL, e.g. localModel() for Ghanaian languages. */
+    model?: string;
+    timeoutMs?: number;
+  } = {},
 ) {
   const c = cfg();
+  const model = opts.model ?? c.chat;
+  // GPT-5 family: no temperature, a different token limit, and reasoning switched
+  // off so short replies come back as fast as the older chat models.
+  const gpt5 = /^gpt-5/.test(model);
   const res = await fetch(`${BASE}/chat/completions`, {
     method: "POST",
     headers: { authorization: `Bearer ${c.key}`, "content-type": "application/json" },
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
     body: JSON.stringify({
-      model: c.chat,
+      model,
       messages,
-      temperature: 0.6,
-      max_tokens: opts.maxTokens ?? 600,
+      ...(gpt5
+        ? { reasoning_effort: "none", max_completion_tokens: opts.maxTokens ?? 1200 }
+        : { temperature: 0.6, max_tokens: opts.maxTokens ?? 600 }),
       ...(opts.jsonSchema && {
         response_format: {
           type: "json_schema",

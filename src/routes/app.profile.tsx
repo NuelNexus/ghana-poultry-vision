@@ -37,6 +37,8 @@ import {
   useDisplayPrefs,
 } from "@/components/ui-kit";
 import { useTheme } from "@/components/ThemeProvider";
+import { useLanguage } from "@/components/LanguageProvider";
+import { LanguagePicker } from "@/components/LanguagePicker";
 import {
   ACCENTS,
   FAMILIES,
@@ -88,6 +90,7 @@ const CAPABILITIES: { label: string; managers: boolean }[] = [
 
 const SECTIONS = [
   { id: "account", label: "Account" },
+  { id: "language", label: "Language and voice" },
   { id: "security", label: "Security" },
   { id: "appearance", label: "Appearance" },
   { id: "preferences", label: "Preferences" },
@@ -120,6 +123,7 @@ function ProfilePage() {
         </nav>
         <div className="flex min-w-0 flex-col gap-10">
           <AccountSection />
+          <LanguageSection />
           <SecuritySection />
           <AppearanceSection />
           <AccessibilitySection />
@@ -1033,6 +1037,68 @@ function ToggleRow({
         </label>
       </div>
     </SettingRow>
+  );
+}
+
+/* -------------------------------------------------------------------------- *
+ * Language and voice
+ * -------------------------------------------------------------------------- */
+
+function LanguageSection() {
+  const { prefs, setPrefs } = useLanguage();
+  return (
+    <Section
+      id="language"
+      title="Language and voice"
+      description="The language the whole site is shown and spoken in, and help for anyone who finds reading hard. Your language is saved on your account."
+    >
+      <div className="flex flex-col gap-4">
+        <Card padding="md">
+          <h3 className="pg-t-h3 mb-1">Language</h3>
+          <p className="pg-t-caption mb-4">
+            Tap a language to use it everywhere and hear a greeting in it.
+          </p>
+          <LanguagePicker />
+        </Card>
+        <Card padding="md">
+          <h3 className="pg-t-h3 mb-3">Speaking and listening help</h3>
+          <div className="divide-y divide-hairline">
+            <ToggleRow
+              label="Help buttons"
+              hint="Speak (ask or say where to go), Explain (hear what this page shows) and Tap to hear, at the bottom of every page."
+              checked={prefs.dock}
+              onChange={(v) => setPrefs({ dock: v })}
+              on="Shown on every page"
+              off="Hidden"
+            />
+            <ToggleRow
+              label="Tap to hear"
+              hint="Tap any text to hear it read out. Tap a button once to hear its name, and again to press it."
+              checked={prefs.tapToHear}
+              onChange={(v) => setPrefs({ tapToHear: v })}
+              on="Tapping reads aloud"
+              off="Off"
+            />
+            <ToggleRow
+              label="Microphone on text boxes"
+              hint="A mic button appears in any box you type in, so you can speak instead of typing."
+              checked={prefs.dictation}
+              onChange={(v) => setPrefs({ dictation: v })}
+              on="Mic shown"
+              off="Off"
+            />
+            <ToggleRow
+              label="Read new alerts aloud"
+              hint="When a new warning or critical alert arrives while PoultryGrid is open, Ama says it out loud."
+              checked={prefs.speakAlerts}
+              onChange={(v) => setPrefs({ speakAlerts: v })}
+              on="Alerts are spoken"
+              off="Off"
+            />
+          </div>
+        </Card>
+      </div>
+    </Section>
   );
 }
 

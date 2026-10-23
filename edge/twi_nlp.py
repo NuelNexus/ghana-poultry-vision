@@ -108,6 +108,9 @@ def serve(helper: Helper, host: str, port: int):
             except Exception as e:
                 self._send(400, {"error": str(e)[:300]})
 
+    # On Windows, address reuse lets a second copy share the port silently (and an
+    # old copy keeps answering). Fail loudly instead.
+    ThreadingHTTPServer.allow_reuse_address = os.name != "nt"
     httpd = ThreadingHTTPServer((host, port), Handler)
     log.info("Twi word helper (%s) on http://%s:%d", MODEL, host, port)
     httpd.serve_forever()

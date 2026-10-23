@@ -10,6 +10,7 @@ import {
 import { query, queryOne } from "../db.server";
 import { requireUser } from "./middleware";
 import type { Role } from "../auth.server";
+import { SITE_LANG_IDS } from "../site-lang";
 
 export const getMe = createServerFn({ method: "GET" }).handler(async () => getSessionUser());
 
@@ -33,6 +34,7 @@ export const signUp = createServerFn({ method: "POST" })
       email: z.string().email(),
       password: z.string().min(8, "Password must be at least 8 characters"),
       fullName: z.string().min(1).max(120),
+      language: z.enum(SITE_LANG_IDS).default("en"),
     }),
   )
   .handler(async ({ data }) => {
@@ -41,8 +43,8 @@ export const signUp = createServerFn({ method: "POST" })
     ]);
     if (exists) throw new Error("An account with this email already exists");
     const user = await queryOne<{ id: string }>(
-      "insert into users (email, password_hash, full_name) values ($1, $2, $3) returning id",
-      [data.email.trim(), await hashPassword(data.password), data.fullName.trim()],
+      "insert into users (email, password_hash, full_name, language) values ($1, $2, $3, $4) returning id",
+      [data.email.trim(), await hashPassword(data.password), data.fullName.trim(), data.language],
     );
     // The first account owns the farm; everyone after joins as a worker
     // until an admin promotes them.
@@ -116,6 +118,15 @@ export const updateProfile = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await query("update users set full_name = $1 where id = $2", [data.fullName, context.user.id]);
     return { ok: true, fullName: data.fullName };
+  });
+
+/** The language the site is shown in, for this account on every device. */
+export const setMyLanguage = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .inputValidator(z.object({ language: z.enum(SITE_LANG_IDS) }))
+  .handler(async ({ data, context }) => {
+    await query("update users set language = $1 where id = $2", [data.language, context.user.id]);
+    return { ok: true, language: data.language };
   });
 
 export const changePassword = createServerFn({ method: "POST" })
