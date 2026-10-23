@@ -32,6 +32,7 @@ import {
   listConversations,
   saveVoiceTurn,
   speakReply,
+  suggestTwiWords,
   transcribeSpeech,
   voiceTurn,
   wakeTwiVoiceFn,
@@ -861,6 +862,57 @@ function TextChat() {
   const lastIsUser = messages[messages.length - 1]?.role === "user";
   const recording = rec === "recording";
 
+  // Twi word helper (DistilABENA on the server's TWI_NLP_URL) -------------------
+  // While typing Twi: finish the current word, suggest the next one, or fill a ___ blank.
+  const engines = useQuery(enginesQuery);
+  const twiWords = settings.aiLang === "tw" && Boolean(engines.data?.twiWords);
+  const [hints, setHints] = useState<{ words: string[]; label: string } | null>(null);
+  useEffect(() => {
+    const text = input;
+    if (!twiWords || rec !== "idle" || !text.trim()) {
+      setHints(null);
+      return;
+    }
+    const blank = /_{2,}/.test(text);
+    // Mid-word: predict the word at this spot and keep the ones that start with what's typed.
+    const partial = !blank && !/\s$/.test(text) ? (text.match(/[^\s]+$/)?.[0] ?? "") : "";
+    const context = partial ? text.slice(0, -partial.length) : text;
+    if (partial && !context.trim()) {
+      setHints(null);
+      return;
+    }
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      suggestTwiWords({ data: { text: context.slice(-2000) } })
+        .then((r) => {
+          if (cancelled) return;
+          const p = partial.toLowerCase();
+          const words = r.words
+            .map((w) => w.word)
+            .filter((w) => !p || (w.startsWith(p) && w !== p))
+            .slice(0, 5);
+          setHints(
+            words.length
+              ? { words, label: blank ? "Fill the blank" : partial ? "Finish word" : "Next word" }
+              : null,
+          );
+        })
+        .catch(() => !cancelled && setHints(null));
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [input, twiWords, rec]);
+  const pickHint = (word: string) => {
+    setInput((cur) => {
+      if (/_{2,}/.test(cur)) return cur.replace(/_{2,}/, word);
+      if (!/\s$/.test(cur)) return cur.replace(/[^\s]+$/, `${word} `);
+      return `${cur}${word} `;
+    });
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
   return (
     <div className="ai-fade relative flex h-full flex-col">
       <div className="ai-toolbar">
@@ -1025,6 +1077,24 @@ function TextChat() {
       </div>
 
       <form onSubmit={send} className="ai-composer">
+        {hints && (
+          <div
+            className="ai-twi-hints mx-auto w-full max-w-[720px]"
+            aria-label="Twi word suggestions"
+          >
+            <span className="ai-twi-hints-label">{hints.label} · DistilABENA</span>
+            {hints.words.map((w) => (
+              <button
+                key={w}
+                type="button"
+                className="ai-chip ai-chip--sm"
+                onClick={() => pickHint(w)}
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="mx-auto flex w-full max-w-[720px] items-end gap-2">
           <label htmlFor="ai-message" className="sr-only">
             Message Ama
@@ -1860,6 +1930,11 @@ const pageCss = `
   cursor: pointer;
 }
 .ai-chip:hover { background: var(--pg-hover); border-color: #b9b4a5; }
+.ai-chip--sm { min-height: 28px; padding: 3px 10px; font-size: 13px; }
+.ai-twi-hints {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px;
+}
+.ai-twi-hints-label { font-size: 12px; line-height: 16px; color: var(--pg-ink-3); margin-right: 2px; }
 .ai-user-msg {
   max-width: min(85%, 560px);
   padding: 8px 12px; border-radius: 8px 8px 2px 8px;

@@ -13,6 +13,7 @@ import {
 import { KHAYA_CODES, isSpeechLang, langName, usesKhaya, type SpeechLang } from "../ai-languages";
 import { khayaEnabled, khayaSpeak, khayaTranscribe, khayaTranslate } from "../khaya.server";
 import { twiSpeak, twiVoiceOnline, wakeTwiVoice } from "../twi-tts.server";
+import { twiSuggest, twiWordsEnabled } from "../twi-nlp.server";
 import { requireUser } from "./middleware";
 import type { Alert, AiSnapshot } from "./types";
 import { AVATAR_ACTIONS, AVATAR_ACTION_IDS, type VoiceSegment } from "../avatar-actions";
@@ -226,7 +227,17 @@ async function voiceFor(text: string, lang: SpeechLang) {
 /** Which speech engines this server has keys for (the browser picks its voice mode from it). */
 export const getSpeechEngines = createServerFn({ method: "GET" })
   .middleware([requireUser])
-  .handler(async () => ({ khaya: khayaEnabled(), twiVoice: await twiVoiceOnline() }));
+  .handler(async () => ({
+    khaya: khayaEnabled(),
+    twiVoice: await twiVoiceOnline(),
+    twiWords: twiWordsEnabled(),
+  }));
+
+/** Twi word suggestions from DistilABENA: the next word, or the word for a "___" blank. */
+export const suggestTwiWords = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .inputValidator(z.object({ text: z.string().max(2000) }))
+  .handler(({ data }) => twiSuggest(data.text, 10));
 
 /** Called while the AI tab is open in Twi, so the Pi polls fast and replies aren't delayed. */
 export const wakeTwiVoiceFn = createServerFn({ method: "POST" })
