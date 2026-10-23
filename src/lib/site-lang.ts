@@ -95,7 +95,8 @@ export const LANG_STORAGE_KEY = "pg-lang";
  * voice for text that isn't plainly English, otherwise the default (English) voice.
  */
 export function speechLangFor(text: string, uiLang: SiteLang = "en"): SpeechLang {
-  if (detectLang(text) === "tw") return "tw";
+  const seen = detectLang(text);
+  if (seen !== "auto") return seen; // Twi, Ga or Ewe recognised in the text itself
   if (uiLang === "en" || /\b(the|and|is|your|you|are|this)\b/i.test(text)) return "auto";
   return siteLang(uiLang).speech;
 }

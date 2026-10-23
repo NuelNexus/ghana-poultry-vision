@@ -7,6 +7,7 @@ import { signIn, signUp } from "@/lib/api/auth.functions";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/components/LanguageProvider";
 import { LanguagePicker } from "@/components/LanguagePicker";
+import { HatchLoop } from "@/components/HatchLoop";
 
 const search = z.object({
   mode: z.enum(["signin", "signup"]).optional().default("signin"),
@@ -149,10 +150,7 @@ function LoginPage() {
           )}
         </div>
       </div>
-      <div className="rabbit-scene" aria-hidden="true">
-        <div className="rabbit"></div>
-        <div className="clouds"></div>
-      </div>
+      <HatchLoop />
     </div>
   );
 }

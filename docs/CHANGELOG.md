@@ -1,0 +1,184 @@
+# Changelog
+
+Newest first. Each entry gives the problem, the change, the files involved and how it was
+checked. Commit hashes come from `git log`. Entries marked *(from git history)* are summarised
+from commit messages and file lists; they weren't re-tested for this document.
+
+---
+
+## Unreleased — AI behaviour, sign-in page, languages fit, docs
+
+### Ama no longer brings up temperature unprompted
+- **Problem:** in every language, Ama worked the farm's readings (temperature, "your data is old")
+  into replies to greetings and general questions.
+- **Cause:** the system prompt said "Base answers on the live farm data below", and the
+  hardware notes told her to report stale data.
+- **Change:** a "WHEN TO MENTION READINGS" rule in `systemPrompt`: readings only when asked, when
+  the question is about how the farm is doing, or for an open critical alert. The stale-data
+  note now applies only when she's already discussing a reading.
+- **Files:** `src/lib/api/assistant.functions.ts`. The rule also covers the voice call, which
+  uses the same prompt.
+- **Tested:** 8 unrelated messages plus 1 heat question, each in a fresh chat
+  (`docs/TESTING.md` T1). Unprompted mentions went from 2/8 to 0/8; the heat question still gets
+  the 28.2 °C reading.
+
+### Ga and Ewe recognised; answered in the right language
+- **Problem:** "Ojekoo, te oyɔɔ tɛŋŋ?" (Ga) was treated as Twi; after that was fixed, the small
+  model still answered it in Twi.
+- **Change:** `detectLang` now returns `ga` / `ee` (new Ga words: ojekoo, oyɔɔ, tɛŋŋ, tɛɛ, minyɛ).
+  Those languages use the bigger model with an instruction to reply in that language. The
+  saved chat language and the reading-aloud voice follow the detected language.
+- **Files:** `src/lib/ai-languages.ts`, `src/lib/api/assistant.functions.ts`, `src/lib/site-lang.ts`.
+- **Tested:** detection cases 19/19 (T2).
+
+### Sign-in / sign-up animation: egg → chick → hen (replaces the bunny)
+- **Request:** a rolling egg that becomes a chick, then a chicken, looping; then: in the same
+  style as the bunny, moving left to right.
+- **Change:** new `HatchLoop` component (SVG + CSS). It uses the bunny's look (flat white
+  shapes, dot eye, brown ground shadow, hop, dust puffs) and path (off-screen left to
+  off-screen right). A 12 s loop: egg rolls → wobbles and cracks (the top of the shell flies
+  off) → chick hops on → grows into a hen → hops off. With "reduce motion" on it plays in one
+  spot by fading between stages. The bunny's 155 lines of CSS were removed.
+- **Files:** `src/components/HatchLoop.tsx` (new), `src/routes/login.tsx`, `src/styles.css`.
+- **Tested:** frames captured at 1.5, 3.9, 4.6, 5.6, 7, 8 s (T3).
+
+### Sign-in background loads again
+- **Problem:** the background image didn't load.
+- **Cause:** it was hot-linked from `s3-us-west-2.amazonaws.com/s.cdpn.io/…`, which now
+  returns 403 Forbidden.
+- **Change:** redrew the same design (pale yellow with outlined shapes, checked against an
+  archived copy) as `public/auth-bg.svg`, served by the site itself. The CSS also sets the
+  yellow colour so it shows instantly.
+- **Files:** `public/auth-bg.svg` (new), `src/styles.css` (`.auth-bg`).
+- **Tested:** the page loads `/auth-bg.svg` with no failed requests (T4).
+
+### Translated text fits the layout
+- **Problem:** Twi, Ga and other translations are often longer than the English they replace.
+- **Change:** a scan of 11 pages × 2 screen sizes per language found the places that broke, all on
+  phones: text cut off with "…", one figure pushed out of its box, and (in Ewe) a long option
+  hidden off-screen in a sideways-scrolling segmented control. When the site language isn't
+  English, these now wrap instead: `.truncate`, `.whitespace-nowrap` and `.pg-seg` inside the
+  console, and long words may break or hyphenate. English keeps its compact layout.
+- **Files:** `src/styles.css` (end of file).
+- **Tested:** problems went 4 → 1 → 0 across Twi, Ga, Ewe, Dagbani, Hausa and French (T5). The
+  sign-in and sign-up pages fit on a phone in Twi, Ga, Dagbani and French.
+
+### Documentation
+- New `docs/` folder: this changelog, `IMPLEMENTATION.md`, `TESTING.md`, `FILE_GUIDE.md`,
+  `DECISIONS.md`, `KHAYA_SETUP.md`.
+
+---
+
+## e08f1b2 — Whole site in 7 languages, voice help on every page, female Twi voice (2026-10-23)
+
+### Site language
+- **Request:** translate all the site's text (OpenAI generally, the Twi AI for Twi), let people
+  pick the language in settings and at sign-up, and help people who can't read English.
+- **Change:**
+  - Languages: English, Twi, Ga, Ewe, Dagbani, Hausa, French.
+  - Sign-up starts with a language picker; tapping a language plays a greeting in it.
+  - Language chips on the sign-in page.
+  - Profile → Language and voice.
+  - The choice is saved on the account (`users.language`).
+  - Every page is translated in place and cached per language (`ui_translations`). Engine:
+    GPT-5.5, or Khaya for Ghanaian languages when a key exists.
+  - All six languages were pre-filled (≈510 strings each).
+- **Files:** `src/lib/site-lang.ts`, `src/lib/dom-translator.ts`, `src/lib/translate.server.ts`,
+  `src/components/LanguageProvider.tsx`, `src/components/LanguagePicker.tsx`,
+  `src/lib/api/i18n.functions.ts`, `src/lib/api/auth.functions.ts`, `src/lib/auth.server.ts`,
+  `src/routes/login.tsx`, `src/routes/app.profile.tsx`, `src/routes/__root.tsx`,
+  `db/migrations/004_site_language.sql`.
+- **Tested:** the sign-up page switched to Twi ("Paw wo kasa") and the greeting played (1.4 s
+  once cached). The Overview page was fully in Twi 4 s after a first visit, including alert
+  messages and dates. The landing page was in Twi on a phone.
+
+### Voice help on every page
+- **Change:** Speak, Explain, Tap to hear, a mic on every text box and optional spoken alerts.
+  It also works signed out, with hourly limits.
+- **Files:** `src/components/AccessDock.tsx`, `src/lib/ai-audio.ts` (auto-stop on silence),
+  `src/lib/api/i18n.functions.ts`.
+- **Tested:**
+  - Speak with recorded Twi speech: stopped on silence at 8.4 s, answered in Twi, spoken.
+  - Explain on Overview: Twi summary; voice started at 6.3 s.
+  - Tap to hear: works for visitors after two fixes (CSS-capitalised text; headings made of
+    several pieces).
+  - Phone layout: the dock covered page buttons, so it now collapses to Speak plus "more".
+
+### Twi voice: female, faster, more dependable
+- **Change:**
+  - Default voice changed from `twi-6` (male, ~120 Hz) to `twi-1` (female, ~189 Hz).
+  - Speech is played sentence by sentence with prefetch.
+  - 12 s per sentence; after one miss, the rest of the reply uses the next voice.
+  - Sentence caches on the server and in the voice server.
+  - The voice server refuses a busy port on Windows. An old copy had kept answering with the
+    male voice.
+- **Files:** `src/lib/voice.server.ts`, `src/lib/speech-client.ts`, `src/lib/twi-tts.server.ts`,
+  `edge/twi_tts.py`, `edge/twi_nlp.py`, `src/routes/app.ai.tsx`, `edge/README.md`.
+- **Tested:**
+  - Listen → first sound in 2.0 s.
+  - Twi voice call: reply shown and spoken about 7 s after the farmer stopped talking.
+  - The voice server's health check reports `twi-1`.
+
+### Ama's Ghanaian-language answers use GPT-5.5
+- **Evidence:** GPT-4o-mini's Twi was garbled; GPT-5.5 gave correct advice in 3.6 s vs 2.5 s
+  (`DECISIONS.md` D11).
+- **Files:** `src/lib/openai.server.ts` (GPT-5 parameters, `localModel`, `translateModel`),
+  `src/lib/api/assistant.functions.ts`.
+
+## d0ff5fc — Auto-detect the language (2026-10-23)
+- Removed the language picker from chat, voice and profile. Twi is detected from what is typed
+  or said.
+- Voice mode stays a live GPT call; Twi turns are answered by the Twi stack and spoken in the
+  GhanaNLP voice.
+- Removed the separate turn-by-turn voice mode.
+- Fixed a garbled Twi transcript being sent to GPT: any ɛ/ɔ now means Twi.
+- Fixed half a sentence being lost when a pause split a turn.
+
+## d09700e — Twi word helper and local Twi lab (2026-10-23)
+- DistilABENA v2 suggests the next Twi word, or fills a `___` blank, in the chat composer
+  (`edge/twi_nlp.py`, `src/lib/twi-nlp.server.ts`).
+  - Hidden-word test: 65% first guess and 91% top-5 correct, ahead of ABENA, RoBAKO and
+    GPT-4o-mini.
+- `npm run twi` starts the Twi voice and word helper on this PC (`scripts/twi-lab.mjs`).
+
+## 4722b82 — Hatch landing, chat history, voice upgrades, Twi voice on the Pi (2026-10-23)
+*(from git history and earlier session notes)*
+- Landing page: the chicken life-cycle video as a scroll-scrubbed frame sequence (`public/hatch/`).
+- Ama: chats saved per user with a History panel; spoken replies and dictation; mobile mic
+  fixes; better Twi/Ga/Ewe/Hausa transcription.
+- Khaya integration for speech, translation and voices (`src/lib/khaya.server.ts`), switched on
+  by `KHAYA_API_KEY`.
+- Twi voice on the Raspberry Pi (`edge/twi_tts.py`): the Pi polls the app for jobs, or serves
+  HTTP directly.
+  - Comparison with OpenAI's voice, character error rate (lower is better): Pi voice 0.46,
+    OpenAI 0.10 by OpenAI's transcriber; 0.37 vs 0.27 by an independent Akan transcriber.
+- Migrations 002 (chat history) and 003 (Twi voice jobs).
+
+## 7aa614a — Ama, profile and themes, app redesign, promo ad (2026-10-22)
+*(from git history)*
+- The AI assistant tab with the 3D Ama avatar (`ExplorerAvatar.tsx`) and farm scene
+  (`FarmScene.tsx`); OpenAI chat, speech and realtime voice.
+- Profile page with themes (Field, Coastal, Savanna, Kente, High contrast), fonts, text size and
+  accessibility settings (`src/lib/theme.ts`, `ThemeProvider.tsx`).
+- Console redesign (`ui-kit.tsx`, `Sidebar.tsx`); promo video in `promo/`.
+
+## 0b818f2, 6e234aa, 6a41809 — Pi tooling and docs (2026-10-02/03)
+*(from git history)*
+- Sensor test script (`edge/test_sensors.py`); README section on the edge AI.
+- The bottom nav was removed (the sidebar stays as an icon rail on phones).
+- Migrations run over Neon's HTTP driver (WebSockets failed behind firewalls).
+
+## 9f38741 — Raspberry Pi edge AI; Supabase → Neon (2026-10-01)
+*(from git history)*
+- Coop-condition model retrained on a time-series simulator: 21 features, Healthy/Warning/Critical
+  plus 7 causes, 93.8% accuracy / 97.1% critical recall (vs 80.1% / 83.7% before), numpy-only
+  32 KB model.
+- Pi agent: DHT22, ADS1115 (MQ-135, LDR), fan PWM + tach, offline outbox, systemd installer.
+- App moved from Supabase to Neon with server functions, session cookies, role middleware and SQL
+  migrations. The ingest endpoint raises and resolves AI alerts.
+
+## June 2026 — initial app (Lovable)
+*(from git history; commits titled "Changes" by gpt-engineer-app)*
+- TanStack Start template, "Built PoultryGrid AI app" (`463a83b`), dark dashboard redesign
+  (`a40e069`), WebGL landing page (`e291398`), Google Fonts (`046b325`). Detailed changes in
+  this period can't be confirmed from the commit messages alone.

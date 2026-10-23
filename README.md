@@ -7,6 +7,9 @@ hatchery, alerts, energy and biogas tracking.
 - **Web app**: TanStack Start (React) with a [Neon](https://neon.tech) Postgres database
 - **Edge AI**: [`edge/`](edge/README.md), the Raspberry Pi agent and model (rebuilt from AI_For_Poultry)
 
+Full documentation (changelog, how things work, decisions, tests, file guide, Khaya key setup)
+is in [`docs/`](docs/README.md).
+
 ## Set up the database (Neon)
 
 1. Create a project at [console.neon.tech](https://console.neon.tech) and copy the

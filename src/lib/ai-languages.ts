@@ -135,19 +135,28 @@ const GA_WORDS = new Set([
   "mɛni",
   "meni",
   "oyiwaladɔŋŋ",
+  "ojekoo",
+  "oyɔɔ",
+  "tɛŋŋ",
+  "tɛɛ",
+  "minyɛ",
 ]);
 
-/** "tw" when the text is Twi, otherwise "auto" (GPT handles English and every other language). */
+/**
+ * "tw" for Twi, "ga" / "ee" when Ga or Ewe is clear, otherwise "auto" (English and every
+ * other language). Twi goes to the Twi stack; Ga and Ewe are answered by the bigger model
+ * told which language it is (the small one replies to them in Twi).
+ */
 export function detectLang(text: string): SpeechLang {
   const t = text.normalize("NFC").toLowerCase();
-  if (/[ɖʋƒɣ]|[àèìòù]/.test(t)) return "auto"; // Ewe letters and tone marks
+  if (/[ɖʋƒɣ]|[àèìòù]/.test(t)) return "ee"; // Ewe letters and tone marks
   const words = t.match(/[\p{L}']+/gu) ?? [];
   if (!words.length) return "auto";
   const strong = words.filter((w) => TWI_WORDS.has(w) && !TWI_WEAK.has(w)).length;
   const weak = words.filter((w) => TWI_WEAK.has(w)).length;
   const ga = words.filter((w) => GA_WORDS.has(w)).length;
   const ewe = words.filter((w) => EWE_WORDS.has(w)).length;
-  if (Math.max(ga, ewe) >= 2 && Math.max(ga, ewe) >= strong) return "auto";
+  if (Math.max(ga, ewe) >= 2 && Math.max(ga, ewe) >= strong) return ewe > ga ? "ee" : "ga";
   // ɛ and ɔ never appear in English; with Ewe and Ga ruled out above, they mean Twi
   // (even when the transcriber misheard the words themselves).
   if (/[ɛɔ]/.test(t)) return "tw";

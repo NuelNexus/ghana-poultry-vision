@@ -95,8 +95,9 @@ const HARDWARE = `The farm's hardware is exactly this, nothing more:
 - One ESP32-CAM camera that the farmer can watch live in the Cameras page. You cannot see its images.
 There are NO water-level, feed-level, drinker, feeder, lighting-control, power, solar, battery,
 biogas, weight or ammonia-ppm sensors. If asked about those, say the farm has no sensor for it and
-give practical advice on checking it by hand. Never invent or estimate a reading. If a reading is
-null, or reading_age_min is large (over ~5 minutes), say the data is missing or out of date.`;
+give practical advice on checking it by hand. Never invent or estimate a reading. When you do talk
+about a reading and it is null, or reading_age_min is large (over ~5 minutes), say the data is
+missing or out of date.`;
 
 function systemPrompt(
   farm: string,
@@ -112,8 +113,13 @@ function systemPrompt(
         : "";
   return `You are Ama, the AI assistant inside PoultryGrid, a smart poultry farm dashboard used in Ghana.
 You help farmers understand their poultry houses and act on them: temperature, humidity, gas and
-ammonia, ventilation, bird health, water, feed and biosecurity. Base answers on the live farm data
-below. Give practical, specific advice.
+ammonia, ventilation, bird health, water, feed and biosecurity. Give practical, specific advice.
+
+WHEN TO MENTION READINGS: answer what the farmer actually asked. Only bring up the live farm data
+below (temperature, humidity, gas, fan, how old the data is) when they ask about those readings,
+about how the farm or a house is doing, or when there is an open critical alert they should know
+about. For greetings, small talk and general questions (feed, vaccines, eggs, diseases, prices),
+just answer that, in any language, without adding readings or status updates.
 
 ${HARDWARE}
 
@@ -148,7 +154,9 @@ const stripBold = (t: string) => t.replace(/\*\*(.+?)\*\*/g, "$1");
 /** Twi, Ga, Ewe, Dagbani, Hausa: the bigger model, the only one that writes them well. */
 const LOCAL_UI: SiteLang[] = ["tw", "ga", "ee", "dag", "ha"];
 const modelFor = (lang: SpeechLang, uiLang: SiteLang) =>
-  lang === "tw" || LOCAL_UI.includes(uiLang) ? localModel() : undefined;
+  (lang !== "auto" && lang !== "en" && lang !== "fr") || LOCAL_UI.includes(uiLang)
+    ? localModel()
+    : undefined;
 
 async function answer(
   farm: string,
@@ -380,7 +388,7 @@ export const askAssistant = createServerFn({ method: "POST" })
       false,
       data.uiLang,
     );
-    const language = lang === "tw" ? langName(lang) : null;
+    const language = lang !== "auto" ? langName(lang) : null;
     await saveMessages(conversationId, [
       ...(last.role === "user"
         ? [
