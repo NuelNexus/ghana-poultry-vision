@@ -11,7 +11,11 @@ export const Route = createFileRoute("/")({
           "Edge AI for poultry houses in Ghana. A Raspberry Pi watches temperature, humidity, gas and light, runs the ventilation fan, and streams an ESP32-CAM view to your phone.",
       },
       { property: "og:title", content: "PoultryGrid AI — Smart Poultry Farm Management" },
-      { property: "og:description", content: "Raspberry Pi edge AI, automatic fan control, ESP32-CAM live view, roles for your team." },
+      {
+        property: "og:description",
+        content:
+          "Raspberry Pi edge AI, automatic fan control, ESP32-CAM live view, roles for your team.",
+      },
       { property: "og:url", content: "/" },
     ],
     links: [
@@ -27,113 +31,92 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const SCENES = ["FARM 01", "FARM 02", "FARM 03", "FARM 04", "FARM 05"];
+const SCENES = [
+  "DAY 0 · EGG",
+  "DAY 21 · HATCH",
+  "WEEK 1 · CHICK",
+  "WEEK 8 · GROWER",
+  "WEEK 20 · LAYER",
+];
+const FRAME_COUNT = 192;
 
 function Landing() {
   useEffect(() => {
-    const canvas = document.getElementById("webgl-canvas") as HTMLCanvasElement | null;
-    if (!canvas) return;
-    const gl = canvas.getContext("webgl", { alpha: false });
-    if (!gl) {
-      canvas.style.background = "#0a0a0f";
-      return;
-    }
+    const canvas = document.getElementById("seq-canvas") as HTMLCanvasElement | null;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
 
-    const vs = `attribute vec2 a; void main(){ gl_Position=vec4(a,0,1); }`;
-    const fs = `
-precision highp float;
-uniform vec2 uR;
-uniform float uT, uS, uSc, uBl;
-uniform vec3 uBg;
-#define TAU 6.2831853
-mat2 r2(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
-float sphere(vec3 p,float r){return length(p)-r;}
-float torus(vec3 p,vec2 t){vec2 q=vec2(length(p.xz)-t.x,p.y);return length(q)-t.y;}
-float box(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.);}
-float octa(vec3 p,float s){p=abs(p);return (p.x+p.y+p.z-s)*.5773;}
-float sdf(vec3 p){
-  float t=uT*.25,sc=uSc,bl=uBl;
-  float d0=sphere(p,.65+.05*sin(t*1.3));
-  vec3 p1=p; p1.xz=r2(t*.6)*p1.xz;
-  float d1=torus(p1,vec2(.55,.22));
-  vec3 p2=p; p2.xy=r2(t*.4)*p2.xy; p2.yz=r2(t*.3)*p2.yz;
-  float d2=box(p2,vec3(.42+.04*sin(t*2.)));
-  vec3 p3=p; p3.xy=r2(t*.5)*p3.xy;
-  float d3=octa(p3,.72+.04*sin(t*1.7));
-  vec3 p4=p; p4.xz=r2(t*.7)*p4.xz;
-  float d4a=torus(p4,vec2(.45,.15));
-  vec3 p5=p; p5.xy=r2(t*.5+1.2)*p5.xy;
-  float d4b=torus(p5,vec2(.35,.12));
-  float d4=min(d4a,d4b);
-  if(sc<1.)return mix(d0,d1,bl);
-  if(sc<2.)return mix(d1,d2,bl);
-  if(sc<3.)return mix(d2,d3,bl);
-  return mix(d3,d4,bl);
-}
-vec3 norm(vec3 p){float e=.001;return normalize(vec3(
-  sdf(p+vec3(e,0,0))-sdf(p-vec3(e,0,0)),
-  sdf(p+vec3(0,e,0))-sdf(p-vec3(0,e,0)),
-  sdf(p+vec3(0,0,e))-sdf(p-vec3(0,0,e))));}
-vec3 pal(float t){return .5+.5*cos(TAU*(.9*t+vec3(0.,.15,.25)));}
-void main(){
-  vec2 uv=(gl_FragCoord.xy-uR*.5)/min(uR.x,uR.y);
-  vec3 ro=vec3(0,0,2.4);
-  vec3 rd=normalize(vec3(uv,-1.2));
-  float t=0.,hit=0.;
-  for(int i=0;i<96;i++){
-    float d=sdf(ro+rd*t);
-    if(d<.001){hit=1.;break;}
-    if(t>6.)break;
-    t+=d;
-  }
-  vec3 bg=uBg,col=bg;
-  if(hit>.5){
-    vec3 p=ro+rd*t;
-    vec3 n=norm(p);
-    vec3 bc=pal(uS);
-    vec3 l=normalize(vec3(.7,1.,.5));
-    float dif=clamp(dot(n,l),0.,1.);
-    float spe=pow(clamp(dot(reflect(-l,n),-rd),0.,1.),32.);
-    float fr=pow(1.-clamp(dot(-rd,n),0.,1.),3.5);
-    col=bc*(dif*.7+.3)+spe*.5+fr*vec3(.784,1.,.278)*.6;
-    col=mix(bg,col,exp(-t*.15));
-  }
-  col=mix(uBg,col,clamp(1.-dot(uv*.9,uv*.9),0.,1.));
-  col+=(fract(sin(dot(gl_FragCoord.xy,vec2(127.1,311.7)))*43758.5)-.5)*.025;
-  gl_FragColor=vec4(col,1.);
-}`;
-
-    const mkShader = (type: number, src: string) => {
-      const s = gl.createShader(type)!;
-      gl.shaderSource(s, src);
-      gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(s));
-        gl.deleteShader(s);
-        return null;
+    // Frame sequence of the egg-to-hen video (public/hatch). Scroll position picks the frame.
+    const frames: (HTMLImageElement | null)[] = new Array(FRAME_COUNT).fill(null);
+    let disposed = false;
+    const frameSrc = (i: number) => `/hatch/f${String(i + 1).padStart(3, "0")}.webp`;
+    const loadFrame = (i: number) =>
+      new Promise<void>((resolve) => {
+        const img = new Image();
+        img.decoding = "async";
+        img.onload = () => {
+          if (!disposed) frames[i] = img;
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = frameSrc(i);
+      });
+    // first frame, then a coarse pass (every 8th) so scrubbing works early, then the rest
+    const order: number[] = [];
+    for (const step of [8, 4, 2, 1])
+      for (let i = 0; i < FRAME_COUNT; i += step) if (!order.includes(i)) order.push(i);
+    order.push(FRAME_COUNT - 1);
+    (async () => {
+      await loadFrame(0);
+      let next = 1;
+      const worker = async () => {
+        while (!disposed && next < order.length) await loadFrame(order[next++]);
+      };
+      await Promise.all(Array.from({ length: 6 }, worker));
+    })();
+    const nearestLoaded = (i: number) => {
+      for (let d = 0; d < FRAME_COUNT; d++) {
+        if (frames[i - d]) return frames[i - d];
+        if (frames[i + d]) return frames[i + d];
       }
-      return s;
+      return null;
     };
 
-    const prog = gl.createProgram()!;
-    gl.attachShader(prog, mkShader(gl.VERTEX_SHADER, vs)!);
-    gl.attachShader(prog, mkShader(gl.FRAGMENT_SHADER, fs)!);
-    gl.linkProgram(prog);
-    gl.useProgram(prog);
-
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    const ap = gl.getAttribLocation(prog, "a");
-    gl.enableVertexAttribArray(ap);
-    gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0);
-
-    const uR = gl.getUniformLocation(prog, "uR");
-    const uTi = gl.getUniformLocation(prog, "uT");
-    const uScroll = gl.getUniformLocation(prog, "uS");
-    const uScene = gl.getUniformLocation(prog, "uSc");
-    const uBlend = gl.getUniformLocation(prog, "uBl");
-    const uBg = gl.getUniformLocation(prog, "uBg");
+    const sampler = document
+      .createElement("canvas")
+      .getContext("2d", { willReadFrequently: true })!;
+    let drawn: HTMLImageElement | null = null;
+    let dirty = true;
+    const draw = (img: HTMLImageElement) => {
+      const cw = canvas.width,
+        ch = canvas.height;
+      const iw = img.naturalWidth,
+        ih = img.naturalHeight;
+      if (cw / ch >= 1) {
+        // landscape: cover; the bird stays centred in the video
+        const sc = Math.max(cw / iw, ch / ih);
+        const w = iw * sc,
+          h = ih * sc;
+        ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
+      } else {
+        // portrait: the whole bird in the top ~60%, fading into the floor colour below
+        const h = Math.max(ch * 0.6, cw * (ih / iw)),
+          w = iw * (h / ih);
+        sampler.drawImage(img, iw * 0.4, ih * 0.94, iw * 0.2, ih * 0.06, 0, 0, 1, 1);
+        const [r, g, b] = sampler.getImageData(0, 0, 1, 1).data;
+        const floor = `rgb(${r},${g},${b})`;
+        ctx.fillStyle = floor;
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.drawImage(img, (cw - w) / 2, 0, w, h);
+        const fade = ctx.createLinearGradient(0, h * 0.78, 0, h);
+        fade.addColorStop(0, `rgba(${r},${g},${b},0)`);
+        fade.addColorStop(1, floor);
+        ctx.fillStyle = fade;
+        ctx.fillRect(0, h * 0.78 - 1, cw, h * 0.22 + 2);
+      }
+      drawn = img;
+      dirty = false;
+    };
 
     let maxScroll = 1;
     const resize = () => {
@@ -142,15 +125,16 @@ void main(){
       canvas.height = window.innerHeight * dpr;
       canvas.style.width = `${window.innerWidth}px`;
       canvas.style.height = `${window.innerHeight}px`;
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.uniform2f(uR, canvas.width, canvas.height);
+      dirty = true;
       maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
     };
     resize();
     window.addEventListener("resize", resize);
 
     const N = 5;
-    let tgt = 0, smooth = 0, velocity = 0;
+    let tgt = 0,
+      smooth = 0,
+      velocity = 0;
     const ease = 0.1;
 
     const onScroll = () => {
@@ -160,8 +144,10 @@ void main(){
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const linePx = 16, pagePx = window.innerHeight * 0.9;
-      const delta = e.deltaMode === 1 ? e.deltaY * linePx : e.deltaMode === 2 ? e.deltaY * pagePx : e.deltaY;
+      const linePx = 16,
+        pagePx = window.innerHeight * 0.9;
+      const delta =
+        e.deltaMode === 1 ? e.deltaY * linePx : e.deltaMode === 2 ? e.deltaY * pagePx : e.deltaY;
       velocity += delta;
       velocity = Math.max(-600, Math.min(600, velocity));
     };
@@ -182,7 +168,7 @@ void main(){
     };
 
     const revealEls = Array.from(
-      document.querySelectorAll(".tag, h1, h2, .body-text, .stat-row, .cta, .h-line")
+      document.querySelectorAll(".tag, h1, h2, .body-text, .stat-row, .cta, .h-line"),
     );
     revealEls.forEach((el) => {
       if ((el as HTMLElement).getBoundingClientRect().top < window.innerHeight * 0.92)
@@ -196,35 +182,9 @@ void main(){
             io.unobserve(e.target);
           }
         }),
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
     revealEls.forEach((el) => io.observe(el));
-
-    const hexToVec3 = (hex: string) => {
-      const n = parseInt(hex.replace("#", ""), 16);
-      return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255] as const;
-    };
-    const bgColors: Record<string, string> = { dark: "#0a0a0f", light: "#f0ece3" };
-    const updateBg = (theme: string) => {
-      const [r, g, b] = hexToVec3(bgColors[theme] ?? bgColors.dark);
-      gl.uniform3f(uBg, r, g, b);
-    };
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const applyTheme = (theme: string) => {
-      document.documentElement.setAttribute("data-theme", theme);
-      (document.documentElement.style as any).colorScheme = theme;
-      updateBg(theme);
-    };
-    applyTheme(mq.matches ? "dark" : "light");
-    const onMq = (e: MediaQueryListEvent) => applyTheme(e.matches ? "dark" : "light");
-    mq.addEventListener("change", onMq);
-
-    const themeBtn = document.getElementById("theme-toggle")!;
-    const onThemeClick = () => {
-      const current = document.documentElement.getAttribute("data-theme") || (mq.matches ? "dark" : "light");
-      applyTheme(current === "dark" ? "light" : "dark");
-    };
-    themeBtn.addEventListener("click", onThemeClick);
 
     let anchorAnim: number | null = null;
     const stopAnchorAnim = () => {
@@ -270,8 +230,7 @@ void main(){
       anchorHandlers.push({ a, fn });
     });
 
-    const t0 = performance.now();
-    let lastNow = t0;
+    let lastNow = performance.now();
     let rafId = 0;
     const frame = (now: number) => {
       rafId = requestAnimationFrame(frame);
@@ -280,20 +239,14 @@ void main(){
       velocity *= Math.pow(0.85, dt * 60);
       if (Math.abs(velocity) > 0.2) window.scrollBy({ top: velocity * ease, behavior: "auto" });
       smooth += (tgt - smooth) * (1 - Math.exp(-dt * 8));
-      const raw = smooth * (N - 1);
-      const flr = Math.floor(raw);
-      const si = Math.min(flr, N - 2);
-      const bl = flr >= N - 1 ? 1.0 : raw - flr;
       updateHUD(smooth);
-      gl.uniform1f(uTi, (now - t0) / 1000);
-      gl.uniform1f(uScroll, smooth);
-      gl.uniform1f(uScene, si);
-      gl.uniform1f(uBlend, bl);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      const img = nearestLoaded(Math.round(smooth * (FRAME_COUNT - 1)));
+      if (img && (img !== drawn || dirty)) draw(img);
     };
     rafId = requestAnimationFrame(frame);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(rafId);
       stopAnchorAnim();
       window.removeEventListener("resize", resize);
@@ -303,35 +256,25 @@ void main(){
       window.removeEventListener("touchstart", stopAnchorAnim);
       window.removeEventListener("mousedown", stopAnchorAnim);
       window.removeEventListener("keydown", stopAnchorAnim);
-      mq.removeEventListener("change", onMq);
-      themeBtn.removeEventListener("click", onThemeClick);
       anchorHandlers.forEach(({ a, fn }) => a.removeEventListener("click", fn));
       io.disconnect();
-      document.documentElement.removeAttribute("data-theme");
     };
   }, []);
 
   return (
     <div className="pg-landing">
-      <canvas id="webgl-canvas" />
+      <canvas id="seq-canvas" aria-hidden="true" />
+      <div id="seq-shade" aria-hidden="true" />
 
       <div id="hud">
         <div id="hud-pct">000%</div>
         <div className="progress-bar">
           <div className="progress-fill" id="prog-fill" />
         </div>
-        <div className="scene-label" id="scene-name">FARM 01</div>
+        <div className="scene-label" id="scene-name">
+          {SCENES[0]}
+        </div>
       </div>
-
-      <button id="theme-toggle" aria-label="Toggle light/dark mode">
-        <svg className="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-        </svg>
-        <svg className="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
-        </svg>
-      </button>
 
       <div id="scene-strip">
         <div className="scene-dot active" />
@@ -345,12 +288,20 @@ void main(){
         <section id="s0">
           <div className="text-card">
             <div className="tag">PoultryGrid AI — Smart Farming Ghana</div>
-            <h1>SMART<br />POULTRY<br />FOR GHANA</h1>
+            <h1>
+              SMART
+              <br />
+              POULTRY
+              <br />
+              FOR GHANA
+            </h1>
             <p className="body-text">
-              A Raspberry Pi in the poultry house reads the climate, runs its own AI and
-              drives the fan. Scroll to see the sensing, the health model and the camera.
+              A Raspberry Pi in the poultry house reads the climate, runs its own AI and drives the
+              fan. Scroll to watch an egg grow into a laying hen, with PoultryGrid at every stage.
             </p>
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1.75rem" }}>
+            <div
+              style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1.75rem" }}
+            >
               <Link to="/login" search={{ mode: "signup" }} className="cta visible">
                 Deploy account
                 <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -370,16 +321,25 @@ void main(){
         <section id="s1">
           <div className="text-card right">
             <div className="h-line" />
-            <div className="tag">01 — Sensing</div>
-            <h2>LIVE<br />FARM PULSE</h2>
+            <div className="tag">01 — Hatchery</div>
+            <h2>
+              INCUBATE
+              <br />
+              TRACK
+            </h2>
             <p className="body-text">
-              A DHT22, an MQ-135 gas sensor and a light sensor report temperature,
-              humidity, ammonia build-up and light every 30 seconds, with fan speed.
+              Log each batch and follow its 21-day cycle: lockdown on day 18, expected hatch date
+              and the hatch rate you record at the end.
             </p>
             <div className="stat-row" style={{ justifyContent: "flex-end" }}>
-              <div className="stat"><span className="stat-num">30s</span><span className="stat-label">Readings</span></div>
-              <div className="stat"><span className="stat-num">Pi</span><span className="stat-label">Edge AI</span></div>
-              <div className="stat"><span className="stat-num">24/7</span><span className="stat-label">Monitoring</span></div>
+              <div className="stat">
+                <span className="stat-num">21</span>
+                <span className="stat-label">Day cycle</span>
+              </div>
+              <div className="stat">
+                <span className="stat-num">D18</span>
+                <span className="stat-label">Lockdown</span>
+              </div>
             </div>
           </div>
         </section>
@@ -387,13 +347,47 @@ void main(){
         <section id="s2">
           <div className="text-card">
             <div className="h-line" />
-            <div className="tag">02 — AI Health</div>
-            <h2>PREDICT<br />PROTECT</h2>
+            <div className="tag">02 — Sensing</div>
+            <h2>
+              LIVE
+              <br />
+              FARM PULSE
+            </h2>
             <p className="body-text">
-              An on-device model flags heat stress, cold for the flock’s age, gas build-up
-              and a stalled fan, with advice. An ESP32-CAM gives you eyes on the birds.
+              A DHT22, an MQ-135 gas sensor and a light sensor report temperature, humidity, ammonia
+              build-up and light every 30 seconds, with fan speed.
             </p>
-            <a className="cta" href="#s3">
+            <div className="stat-row">
+              <div className="stat">
+                <span className="stat-num">30s</span>
+                <span className="stat-label">Readings</span>
+              </div>
+              <div className="stat">
+                <span className="stat-num">Pi</span>
+                <span className="stat-label">Edge AI</span>
+              </div>
+              <div className="stat">
+                <span className="stat-num">24/7</span>
+                <span className="stat-label">Monitoring</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="s3">
+          <div className="text-card right">
+            <div className="h-line" />
+            <div className="tag">03 — AI Health</div>
+            <h2>
+              PREDICT
+              <br />
+              PROTECT
+            </h2>
+            <p className="body-text">
+              An on-device model flags heat stress, cold for the flock’s age, gas build-up and a
+              stalled fan, with advice. An ESP32-CAM gives you eyes on the birds.
+            </p>
+            <a className="cta" href="#s4">
               Continue
               <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M1 6h10M6 1l5 5-5 5" />
@@ -402,26 +396,20 @@ void main(){
           </div>
         </section>
 
-        <section id="s3">
-          <div className="text-card center">
-            <div className="h-line" />
-            <div className="tag">03 — Hatchery</div>
-            <h2>INCUBATE<br />TRACK</h2>
-            <p className="body-text">
-              Log each batch and follow its 21-day cycle: lockdown on day 18, expected hatch
-              date and the hatch rate you record at the end.
-            </p>
-          </div>
-        </section>
-
         <section id="s4">
-          <div className="text-card right">
+          <div className="text-card">
             <div className="h-line" />
             <div className="tag">04 — Ventilation & Team</div>
-            <h2>FAN<br />CONTROL<br />TEAM</h2>
+            <h2>
+              FAN
+              <br />
+              CONTROL
+              <br />
+              TEAM
+            </h2>
             <p className="body-text">
-              The Pi sets the fan from its own reading of the house, and you can override it
-              from anywhere. Roles for owners, managers and workers.
+              The Pi sets the fan from its own reading of the house, and you can override it from
+              anywhere. Roles for owners, managers and workers.
             </p>
             <Link to="/login" search={{ mode: "signup" }} className="cta visible">
               Get started
@@ -444,20 +432,13 @@ void main(){
 
 const css = `
 .pg-landing {
-  --dark-bg: #0a0a0f;
-  --dark-fg: #e8e4d9;
-  --dark-muted: #6a6a7e;
-  --light-bg: #f0ece3;
-  --light-fg: #0d0d14;
-  --light-muted: #9a9aaa;
-  --accent-dark: #c8ff47;
-  --accent-light: #3a6e00;
-  --bg: var(--dark-bg);
-  --fg: var(--dark-fg);
-  --muted: var(--dark-muted);
-  --accent: var(--accent-dark);
-  --card-bg: rgba(10, 10, 15, 0.82);
-  --card-border: rgba(200, 255, 71, 0.18);
+  /* warm palette sampled from the hatching video's backdrop */
+  --bg: #c9ab8a;
+  --fg: #2b1d12;
+  --muted: rgba(43, 29, 18, 0.55);
+  --accent: #a3321e;           /* the hen's comb */
+  --glass: rgba(246, 236, 222, 0.38);
+  --glass-edge: rgba(255, 250, 242, 0.55);
   --font-display: "Bebas Neue", sans-serif;
   --font-mono: "DM Mono", monospace;
   --hairline: 0.0625rem;
@@ -466,28 +447,25 @@ const css = `
   --reveal-offset: 0.625rem;
   --reveal-duration: 0.5s;
   --z-ui: 10;
+  color-scheme: light;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-mono);
   min-height: 100vh;
 }
-:root[data-theme="light"] .pg-landing {
-  --bg: var(--light-bg);
-  --fg: var(--light-fg);
-  --muted: var(--light-muted);
-  --accent: var(--accent-light);
-  --card-bg: rgba(240, 236, 227, 0.88);
-  --card-border: rgba(58, 110, 0, 0.2);
-}
 .pg-landing *, .pg-landing *::before, .pg-landing *::after {
   box-sizing: border-box; margin: 0; padding: 0;
 }
-body:has(.pg-landing) { overflow-x: hidden; background: var(--dark-bg); }
-:root[data-theme="light"] body:has(.pg-landing) { background: var(--light-bg); }
+body:has(.pg-landing) { overflow-x: hidden; background: #c9ab8a; }
 
-#webgl-canvas {
+#seq-canvas {
   position: fixed; inset: 0; width: 100vw; height: 100vh;
-  z-index: 0; pointer-events: none;
+  z-index: 0; pointer-events: none; background: var(--bg);
+}
+/* very light warm vignette that only softens the corners */
+#seq-shade {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse 80% 75% at 50% 50%, transparent 55%, rgba(120, 86, 52, 0.22) 100%);
 }
 
 #hud {
@@ -515,41 +493,17 @@ body:has(.pg-landing) { overflow-x: hidden; background: var(--dark-bg); }
 }
 .scene-dot.active { background: var(--accent); scale: 1.8; }
 
-#theme-toggle {
-  position: fixed; bottom: var(--ui-inset); left: var(--nav-x); translate: -50% 0;
-  z-index: var(--z-ui); width: 2rem; height: 2rem; border: none;
-  background: color-mix(in srgb, var(--muted) 35%, transparent);
-  border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: background 0.3s;
-}
-#theme-toggle:hover { background: color-mix(in srgb, var(--muted) 55%, transparent); }
-#theme-toggle svg {
-  width: 0.875rem; height: 0.875rem; position: absolute;
-  transition: opacity 0.3s ease, rotate 0.3s ease; color: var(--accent);
-}
-:root[data-theme="light"] #theme-toggle svg { color: var(--fg); }
-#theme-toggle .icon-sun { opacity: 1; rotate: 0deg; }
-#theme-toggle .icon-moon { opacity: 0; rotate: 90deg; }
-:root[data-theme="light"] #theme-toggle .icon-sun { opacity: 0; rotate: -90deg; }
-:root[data-theme="light"] #theme-toggle .icon-moon { opacity: 1; rotate: 0deg; }
-
 #scroll-container { position: relative; z-index: 1; }
 .pg-landing section {
   min-height: 100vh; display: flex; align-items: center; padding: 6rem 5rem;
 }
 .text-card {
-  max-width: 23.75rem; padding: 2.25rem 2rem; background: var(--card-bg);
-  border-left: var(--hairline) solid var(--card-border);
-  transition: background 0.3s ease, border-color 0.3s ease;
+  /* no box: text sits straight on the video, with a soft warm glow to stay readable */
+  max-width: 25rem; padding: 0;
+  text-shadow: 0 0 1.5rem rgba(232, 214, 190, 0.9), 0 0 0.4rem rgba(232, 214, 190, 0.7);
 }
-.text-card.right {
-  margin-inline-start: auto; border-left: none;
-  border-right: var(--hairline) solid var(--card-border); text-align: right;
-}
-.text-card.center {
-  margin-inline: auto; border-left: none;
-  border-top: var(--hairline) solid var(--card-border); text-align: center; max-width: 28.75rem;
-}
+.text-card.right { margin-inline-start: auto; text-align: right; }
+.text-card.center { margin-inline: auto; text-align: center; max-width: 28.75rem; }
 .pg-landing .tag {
   font-size: 0.6rem; letter-spacing: 0.25em; text-transform: uppercase;
   color: var(--accent); margin-block-end: 1.1rem;
@@ -567,7 +521,7 @@ body:has(.pg-landing) { overflow-x: hidden; background: var(--dark-bg); }
 .pg-landing h1 { font-size: clamp(3rem, 8vw, 6.5rem); }
 .pg-landing h2 { font-size: clamp(2.2rem, 6vw, 5rem); }
 .body-text {
-  font-size: 0.78rem; line-height: 1.8; color: color-mix(in srgb, var(--fg) 55%, transparent);
+  font-size: 0.9rem; line-height: 1.75; color: rgba(43, 29, 18, 0.8);
   margin-block-start: 1.25rem; opacity: 0; translate: 0 var(--reveal-offset);
   transition: opacity var(--reveal-duration) ease 0.2s, translate var(--reveal-duration) ease 0.2s;
 }
@@ -591,14 +545,14 @@ body:has(.pg-landing) { overflow-x: hidden; background: var(--dark-bg); }
 .text-card.center .h-line { transform-origin: center; margin-inline: auto; }
 .pg-landing .cta {
   display: inline-flex; align-items: center; gap: 0.6rem; margin-block-start: 1.75rem;
-  padding: 0.6rem 1.25rem; border: var(--hairline) solid var(--accent);
+  padding: 0.7rem 1.35rem; border: var(--hairline) solid var(--accent); border-radius: 999px;
   color: var(--accent); font-family: var(--font-mono); font-size: 0.62rem;
   letter-spacing: 0.18em; text-transform: uppercase; text-decoration: none; cursor: pointer;
   opacity: 0; translate: 0 var(--reveal-offset);
   transition: opacity var(--reveal-duration) ease 0.35s, translate var(--reveal-duration) ease 0.35s, background 0.2s, color 0.2s;
 }
 .pg-landing .cta.visible { opacity: 1; translate: 0 0; }
-.pg-landing .cta:hover { background: var(--accent); color: var(--bg); }
+.pg-landing .cta:hover { background: var(--accent); color: #fff6ea; }
 .pg-landing .cta svg { width: 0.6875rem; height: 0.6875rem; }
 
 #credit {
@@ -609,11 +563,14 @@ body:has(.pg-landing) { overflow-x: hidden; background: var(--dark-bg); }
 }
 #credit a { color: var(--muted); text-decoration: none; }
 
+.pg-landing section { min-height: 130vh; }
+.pg-landing section#s0 { min-height: 100vh; }
+
 @media (max-width: 600px) {
-  .pg-landing section { padding: 5rem 1.5rem; }
+  /* keep the bird visible above the card on phones */
+  .pg-landing section { padding: 5rem 1.25rem 2.5rem; align-items: flex-end; }
   #hud { top: 1rem; right: 1rem; }
-  #scene-strip { display: none; }
+  #scene-strip, #credit { display: none; }
   .text-card { max-width: 100%; }
-  #theme-toggle { bottom: 1rem; left: 1.25rem; translate: 0 0; }
 }
 `;

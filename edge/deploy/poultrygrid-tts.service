@@ -1,0 +1,20 @@
+[Unit]
+Description=PoultryGrid Twi voice for Ama (stable-twi-tts)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=poultrygrid
+Group=poultrygrid
+WorkingDirectory=/opt/poultrygrid/edge
+Environment=PG_ENV_FILE=/etc/poultrygrid/agent.env
+Environment=PG_TTS_CACHE=/var/lib/poultrygrid/tts
+ExecStart=/opt/poultrygrid/venv/bin/python twi_tts.py
+Restart=always
+RestartSec=10
+# Keep the sensor agent responsive while she speaks.
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

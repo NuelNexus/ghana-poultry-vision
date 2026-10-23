@@ -107,6 +107,37 @@ ADS1115's A0 to keep the input under 3.3 V.
 22:10:45 CRITICAL 91% | T=35.9°C RH=72% gas=3.6 rpm=2497 | fan=high | Heat stress, Humidity too high
 ```
 
+## Twi voice for Ama (optional)
+
+The same Pi can give Ama, the app's AI assistant, a native Twi voice with GhanaNLP's
+[stable-twi-tts](https://github.com/GhanaNLP/stable-twi-tts) (a Piper/VITS model on ONNX, no PyTorch).
+
+```
+app: Ama writes a Twi reply ──> tts_jobs (Neon) <── Pi polls /api/public/devices/tts (device key)
+                                      ▲                        │ speaks it (stable-twi-tts)
+browser plays it  <── app  <──────────┴──── uploads the WAV ───┘
+```
+
+The Pi asks the app for work, so nothing needs to be opened on the farm router. It checks every
+20 s, and every second while someone has the AI tab open in Twi. If the Pi is off, Ama falls back
+to Khaya (with a key) or OpenAI's voice.
+
+```bash
+sudo ghana-poultry-vision/edge/deploy/install_tts.sh   # after install_pi.sh
+journalctl -u poultrygrid-tts -f
+```
+
+- **Needs 64-bit Raspberry Pi OS** (onnxruntime has no 32-bit ARM build). Pi 4 or 5 recommended;
+  the model is 80 MB on disk and peaked at about 175 MB of RAM in testing. `twi_tts.py bench` prints the speed.
+- Numbers and quoted English ("heat stress") are read in English, the way Ghanaians code-switch;
+  the Twi voice alone skips digits. That uses espeak-ng 1.51 (GPL-3.0), bundled by the `[eng]` extra.
+- **The voice model is CC BY-NC 4.0: non-commercial use only.** The code is MIT.
+- Settings in `/etc/poultrygrid/agent.env`: `PG_TTS_VOICE` (default `twi-6`), `PG_TTS_THREADS`.
+
+On the same network, or behind a tunnel, the app can call the Pi directly instead:
+`python twi_tts.py serve --host 0.0.0.0 --port 5002` with `PG_TTS_TOKEN` set on the Pi, and
+`TWI_TTS_URL=http://<pi>:5002` plus the same `TWI_TTS_TOKEN` in the app's environment.
+
 ## Try it without hardware
 
 ```bash
@@ -142,5 +173,6 @@ The coop physics is in `poultrygrid/simulator.py`. Change either and retrain.
 | `poultrygrid/simulator.py` | Time-series coop simulator used for training |
 | `poultrygrid/model_np.py` | Numpy inference for the exported model |
 | `poultrygrid/sensors.py` | DHT22 / ADS1115 / PWM / tach drivers, plus the simulated coop |
+| `twi_tts.py` | Ama's Twi voice: takes replies from the app and speaks them (stable-twi-tts) |
 | `models/` | Trained model and its metrics |
 | `deploy/` | Installer and systemd unit |

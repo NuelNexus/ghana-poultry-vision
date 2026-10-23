@@ -26,13 +26,19 @@ export type PresetId =
 export type FontId = "plex" | "inter" | "geist" | "manrope" | "source" | "atkinson";
 export type MonoId = "plex-mono" | "jetbrains" | "geist-mono" | "source-code" | "same";
 export type Background = "plain" | "texture" | "tint";
-export type TextSize = "s" | "m" | "l";
+export type TextSize = "s" | "m" | "l" | "xl";
 export type Density = "comfortable" | "compact";
 export type Radius = "sharp" | "default" | "round";
 export type Motion = "system" | "reduce";
 export type SidebarStyle = "surface" | "blend" | "ink";
 export type ClockFormat = "24h" | "12h";
 export type TempUnitPref = "C" | "F";
+export type Spacing = "normal" | "relaxed";
+export type FocusStyle = "default" | "strong";
+export type TargetSize = "default" | "large";
+export type StatusColors = "default" | "cvd";
+/** Language the farmer speaks to Ama in (see src/lib/ai-languages.ts). */
+export type AiLang = "auto" | "en" | "tw" | "ga" | "ee" | "ha" | "fr";
 
 export interface ThemeSettings {
   v: 1;
@@ -52,6 +58,21 @@ export interface ThemeSettings {
   clock: ClockFormat;
   /** Display unit for temperatures; data and the DB stay in °C. */
   tempUnit: TempUnitPref;
+  /* Accessibility */
+  /** Taller lines and a little letter spacing for easier reading. */
+  spacing: Spacing;
+  underlineLinks: boolean;
+  /** Thick, high-contrast focus ring for keyboard users. */
+  focus: FocusStyle;
+  /** 44px minimum for buttons and inputs, easier to tap. */
+  targets: TargetSize;
+  /** Show a still Ama instead of the animated GIF (WCAG 2.2.2). */
+  stillImages: boolean;
+  /** Blue / orange / purple status colours that work for red-green colour blindness. */
+  statusColors: StatusColors;
+  /** Ama reads her text-chat replies aloud. */
+  aiSpeak: boolean;
+  aiLang: AiLang;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -559,7 +580,7 @@ export const MONO_FONTS: Record<MonoId, { name: string; family: string | null; c
 export const fontUrl = (css: string, text?: string) =>
   `https://fonts.googleapis.com/css2?family=${css}&display=swap${text ? `&text=${encodeURIComponent(text)}` : ""}`;
 
-export const TEXT_ZOOM: Record<TextSize, number> = { s: 13 / 14, m: 1, l: 16 / 14 };
+export const TEXT_ZOOM: Record<TextSize, number> = { s: 13 / 14, m: 1, l: 16 / 14, xl: 18 / 14 };
 const RADIUS_PX: Record<Radius, number> = { sharp: 4, default: 8, round: 12 };
 
 export const DEFAULT_SETTINGS: ThemeSettings = {
@@ -578,6 +599,14 @@ export const DEFAULT_SETTINGS: ThemeSettings = {
   motion: "system",
   clock: "24h",
   tempUnit: "C",
+  spacing: "normal",
+  underlineLinks: false,
+  focus: "default",
+  targets: "default",
+  stillImages: false,
+  statusColors: "default",
+  aiSpeak: false,
+  aiLang: "auto",
 };
 
 /** Settings a preset owns (colour); everything else is personal and survives preset changes. */
@@ -618,12 +647,20 @@ export function sanitize(raw: unknown): ThemeSettings {
     sidebar: pick(r.sidebar, ["surface", "blend", "ink"] as const, d.sidebar),
     font: pick(r.font, Object.keys(FONTS) as FontId[], d.font),
     mono: pick(r.mono, Object.keys(MONO_FONTS) as MonoId[], d.mono),
-    textSize: pick(r.textSize, ["s", "m", "l"] as const, d.textSize),
+    textSize: pick(r.textSize, ["s", "m", "l", "xl"] as const, d.textSize),
     density: pick(r.density, ["comfortable", "compact"] as const, d.density),
     radius: pick(r.radius, ["sharp", "default", "round"] as const, d.radius),
     motion: pick(r.motion, ["system", "reduce"] as const, d.motion),
     clock: pick(r.clock, ["24h", "12h"] as const, d.clock),
     tempUnit: pick(r.tempUnit, ["C", "F"] as const, d.tempUnit),
+    spacing: pick(r.spacing, ["normal", "relaxed"] as const, d.spacing),
+    underlineLinks: typeof r.underlineLinks === "boolean" ? r.underlineLinks : d.underlineLinks,
+    focus: pick(r.focus, ["default", "strong"] as const, d.focus),
+    targets: pick(r.targets, ["default", "large"] as const, d.targets),
+    stillImages: typeof r.stillImages === "boolean" ? r.stillImages : d.stillImages,
+    statusColors: pick(r.statusColors, ["default", "cvd"] as const, d.statusColors),
+    aiSpeak: typeof r.aiSpeak === "boolean" ? r.aiSpeak : d.aiSpeak,
+    aiLang: pick(r.aiLang, ["auto", "en", "tw", "ga", "ee", "ha", "fr"] as const, d.aiLang),
   };
 }
 
@@ -791,6 +828,21 @@ export function computeTheme(s: ThemeSettings, prefersDark: boolean): ComputedTh
   vars["--pg-zoom"] = String(TEXT_ZOOM[s.textSize]);
   vars["--pg-radius"] = `${RADIUS_PX[s.radius]}px`;
 
+  // Colour-blind-safe status colours (Okabe-Ito inspired): blue = fine, orange = warning,
+  // reddish purple = critical. Each passes AA on its tint.
+  if (s.statusColors === "cvd") {
+    const light = scheme === "light";
+    Object.assign(vars, {
+      "--pg-ok": light ? "#0b5ea8" : "#71b5ee",
+      "--pg-ok-tint": light ? "#e3eef9" : "#132a3e",
+      "--pg-warn": light ? "#8f5300" : "#eda552",
+      "--pg-warn-tint": light ? "#fcefdc" : "#35260f",
+      "--pg-crit": light ? "#9c1b62" : "#f08cc0",
+      "--pg-crit-tint": light ? "#f9e3ef" : "#3c1429",
+      "--pg-on-crit": light ? "#ffffff" : FAMILIES[s.family].dark.paper,
+    });
+  }
+
   const fonts: string[] = [];
   if (font.css) fonts.push(fontUrl(font.css));
   if (mono.css) fonts.push(fontUrl(mono.css));
@@ -805,6 +857,12 @@ export function computeTheme(s: ThemeSettings, prefersDark: boolean): ComputedTh
       "data-pg-radius": s.radius,
       "data-pg-motion": s.motion,
       "data-pg-sidebar": s.sidebar,
+      "data-pg-spacing": s.spacing,
+      "data-pg-underline": s.underlineLinks ? "on" : "off",
+      "data-pg-focus": s.focus,
+      "data-pg-targets": s.targets,
+      "data-pg-still": s.stillImages ? "on" : "off",
+      "data-pg-status": s.statusColors,
     },
     fonts,
     themeColor: vars["--pg-paper"],

@@ -1,0 +1,3 @@
+# Twi voice for Ama (twi_tts.py). Needs 64-bit Raspberry Pi OS (onnxruntime has no 32-bit ARM build).
+# [twi] is the Twi front-end; [eng] bundles espeak-ng 1.51 (GPL-3.0) so numbers and English words are read.
+stable-twi-tts[twi,eng]==0.2.1

@@ -23,6 +23,7 @@ import { Route as AppCamerasRouteImport } from './routes/app.cameras'
 import { Route as AppAutomationRouteImport } from './routes/app.automation'
 import { Route as AppAlertsRouteImport } from './routes/app.alerts'
 import { Route as AppAiRouteImport } from './routes/app.ai'
+import { Route as ApiPublicDevicesTtsRouteImport } from './routes/api/public/devices/tts'
 import { Route as ApiPublicDevicesIngestRouteImport } from './routes/api/public/devices/ingest'
 
 const LoginRoute = LoginRouteImport.update({
@@ -95,6 +96,11 @@ const AppAiRoute = AppAiRouteImport.update({
   path: '/ai',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicDevicesTtsRoute = ApiPublicDevicesTtsRouteImport.update({
+  id: '/api/public/devices/tts',
+  path: '/api/public/devices/tts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicDevicesIngestRoute = ApiPublicDevicesIngestRouteImport.update({
   id: '/api/public/devices/ingest',
   path: '/api/public/devices/ingest',
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/app/reports': typeof AppReportsRoute
   '/app/': typeof AppIndexRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
+  '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/app/reports': typeof AppReportsRoute
   '/app': typeof AppIndexRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
+  '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/app/reports': typeof AppReportsRoute
   '/app/': typeof AppIndexRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
+  '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/'
     | '/api/public/devices/ingest'
+    | '/api/public/devices/tts'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app'
     | '/api/public/devices/ingest'
+    | '/api/public/devices/tts'
   id:
     | '__root__'
     | '/'
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/'
     | '/api/public/devices/ingest'
+    | '/api/public/devices/tts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -210,6 +222,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiPublicDevicesIngestRoute: typeof ApiPublicDevicesIngestRoute
+  ApiPublicDevicesTtsRoute: typeof ApiPublicDevicesTtsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -312,6 +325,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAiRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/devices/tts': {
+      id: '/api/public/devices/tts'
+      path: '/api/public/devices/tts'
+      fullPath: '/api/public/devices/tts'
+      preLoaderRoute: typeof ApiPublicDevicesTtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/devices/ingest': {
       id: '/api/public/devices/ingest'
       path: '/api/public/devices/ingest'
@@ -357,6 +377,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiPublicDevicesIngestRoute: ApiPublicDevicesIngestRoute,
+  ApiPublicDevicesTtsRoute: ApiPublicDevicesTtsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

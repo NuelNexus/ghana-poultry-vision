@@ -25,6 +25,7 @@ import {
   Select,
   Skeleton,
   SkeletonText,
+  StatusDot,
   StatusPill,
   Switch,
   formatDate,
@@ -50,10 +51,12 @@ import {
   isCustomised,
   paletteVars,
   type FontId,
+  type AiLang,
   type MonoId,
   type Preset,
   type ThemeSettings,
 } from "@/lib/theme";
+import { SPEECH_LANGS } from "@/lib/ai-languages";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/profile")({
@@ -121,6 +124,7 @@ function ProfilePage() {
           <AccountSection />
           <SecuritySection />
           <AppearanceSection />
+          <AccessibilitySection />
           <PreferencesSection />
           <AboutSection />
         </div>
@@ -875,7 +879,6 @@ function FontPicker() {
 
 function AppearanceSection() {
   const { settings, scheme, update, resetToPreset } = useTheme();
-  const motionId = useId();
   const monoId = useId();
   const set =
     <K extends keyof ThemeSettings>(k: K) =>
@@ -973,18 +976,6 @@ function AppearanceSection() {
                 </span>
               </div>
             </SettingRow>
-            <SettingRow label="Text size" hint="Scales the whole console, like browser zoom.">
-              <SegmentedControl
-                ariaLabel="Text size"
-                value={settings.textSize}
-                onChange={set("textSize")}
-                options={[
-                  { value: "s", label: "Small" },
-                  { value: "m", label: "Default" },
-                  { value: "l", label: "Large" },
-                ]}
-              />
-            </SettingRow>
             <SettingRow label="Density" hint="Compact fits more table rows on screen.">
               <SegmentedControl
                 ariaLabel="Density"
@@ -1008,26 +999,243 @@ function AppearanceSection() {
                 ]}
               />
             </SettingRow>
+          </div>
+        </Card>
+      </div>
+    </Section>
+  );
+}
+
+/* -------------------------------------------------------------------------- *
+ * Accessibility
+ * -------------------------------------------------------------------------- */
+
+function ToggleRow({
+  label,
+  hint,
+  checked,
+  onChange,
+  on,
+  off,
+}: {
+  label: string;
+  hint?: ReactNode;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  on: string;
+  off: string;
+}) {
+  const id = useId();
+  return (
+    <SettingRow label={label} hint={hint} labelId={`${id}-l`}>
+      <div className="flex items-center gap-3">
+        <Switch id={id} checked={checked} onCheckedChange={onChange} />
+        <label htmlFor={id} className="cursor-pointer text-[13px] leading-[18px] text-ink-2">
+          {checked ? on : off}
+        </label>
+      </div>
+    </SettingRow>
+  );
+}
+
+function AccessibilitySection() {
+  const { settings, update, choosePreset } = useTheme();
+  const langId = useId();
+  const set =
+    <K extends keyof ThemeSettings>(k: K) =>
+    (v: ThemeSettings[K]) =>
+      update({ [k]: v } as Partial<ThemeSettings>);
+
+  return (
+    <Section
+      id="accessibility"
+      title="Accessibility"
+      description="Make PoultryGrid easier to read, see, tap and hear. Saved for your account in this browser."
+    >
+      <div className="flex flex-col gap-4">
+        <Card padding="md">
+          <h3 className="pg-t-h3 mb-3">Reading</h3>
+          <div className="divide-y divide-hairline">
+            <SettingRow label="Text size" hint="Scales the whole console, like browser zoom.">
+              <SegmentedControl
+                ariaLabel="Text size"
+                value={settings.textSize}
+                onChange={set("textSize")}
+                options={[
+                  { value: "s", label: "Small" },
+                  { value: "m", label: "Default" },
+                  { value: "l", label: "Large" },
+                  { value: "xl", label: "Extra large" },
+                ]}
+              />
+            </SettingRow>
             <SettingRow
-              label="Reduce motion"
-              labelId={`${motionId}-l`}
-              hint="Off follows your device setting."
+              label="Line spacing"
+              hint="More room between lines and words. Helps with dyslexia and tired eyes."
             >
-              <div className="flex items-center gap-3">
-                <Switch
-                  id={motionId}
-                  checked={settings.motion === "reduce"}
-                  onCheckedChange={(v) => update({ motion: v ? "reduce" : "system" })}
+              <SegmentedControl
+                ariaLabel="Line spacing"
+                value={settings.spacing}
+                onChange={set("spacing")}
+                options={[
+                  { value: "normal", label: "Normal" },
+                  { value: "relaxed", label: "Relaxed" },
+                ]}
+              />
+            </SettingRow>
+            <SettingRow
+              label="Most readable font"
+              hint="Atkinson Hyperlegible was designed for low-vision readers."
+            >
+              {settings.font === "atkinson" ? (
+                <p className="flex items-center gap-1.5 text-[13px] leading-[18px] text-ink-2">
+                  <Check className="size-4 text-ok" aria-hidden /> In use
+                </p>
+              ) : (
+                <Button size="sm" onClick={() => update({ font: "atkinson" })}>
+                  Use Atkinson Hyperlegible
+                </Button>
+              )}
+            </SettingRow>
+            <ToggleRow
+              label="Underline links"
+              checked={settings.underlineLinks}
+              onChange={set("underlineLinks")}
+              on="Links are always underlined"
+              off="Underlined on hover"
+            />
+          </div>
+        </Card>
+
+        <Card padding="md">
+          <h3 className="pg-t-h3 mb-3">Seeing</h3>
+          <div className="divide-y divide-hairline">
+            <SettingRow
+              label="High contrast"
+              hint="Black and white with strong outlines. Replaces your colour theme."
+            >
+              {settings.preset === "contrast" ? (
+                <p className="flex items-center gap-1.5 text-[13px] leading-[18px] text-ink-2">
+                  <Check className="size-4 text-ok" aria-hidden /> In use. Pick another theme under
+                  Appearance to switch back.
+                </p>
+              ) : (
+                <Button size="sm" onClick={() => choosePreset("contrast")}>
+                  Switch to high contrast
+                </Button>
+              )}
+            </SettingRow>
+            <SettingRow
+              label="Status colours"
+              hint="Colour-blind safe uses blue, orange and purple instead of green, amber and red."
+            >
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <SegmentedControl
+                  ariaLabel="Status colours"
+                  value={settings.statusColors}
+                  onChange={set("statusColors")}
+                  options={[
+                    { value: "default", label: "Default" },
+                    { value: "cvd", label: "Colour-blind safe" },
+                  ]}
                 />
-                <label
-                  htmlFor={motionId}
-                  className="cursor-pointer text-[13px] leading-[18px] text-ink-2"
+                <span
+                  className="flex items-center gap-3 text-[12px] leading-4 text-ink-2"
+                  aria-hidden
                 >
-                  {settings.motion === "reduce"
-                    ? "Animations off in the console"
-                    : "Following device"}
-                </label>
+                  <span className="flex items-center gap-1.5">
+                    <StatusDot status="ok" /> Fine
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <StatusDot status="warn" /> Warning
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <StatusDot status="crit" /> Critical
+                  </span>
+                </span>
               </div>
+            </SettingRow>
+            <ToggleRow
+              label="Pause animated images"
+              hint="Shows a still Ama instead of the moving one."
+              checked={settings.stillImages}
+              onChange={set("stillImages")}
+              on="Animations paused"
+              off="Ama moves"
+            />
+            <ToggleRow
+              label="Reduce motion"
+              hint="Off follows your device setting."
+              checked={settings.motion === "reduce"}
+              onChange={(v) => update({ motion: v ? "reduce" : "system" })}
+              on="Animations off in the console"
+              off="Following device"
+            />
+          </div>
+        </Card>
+
+        <Card padding="md">
+          <h3 className="pg-t-h3 mb-3">Keyboard and touch</h3>
+          <div className="divide-y divide-hairline">
+            <SettingRow
+              label="Focus outline"
+              hint="The ring that shows where you are when using a keyboard or switch."
+            >
+              <SegmentedControl
+                ariaLabel="Focus outline"
+                value={settings.focus}
+                onChange={set("focus")}
+                options={[
+                  { value: "default", label: "Default" },
+                  { value: "strong", label: "Strong" },
+                ]}
+              />
+            </SettingRow>
+            <SettingRow
+              label="Button size"
+              hint="Large makes every button and field at least 44 px tall, easier to tap."
+            >
+              <SegmentedControl
+                ariaLabel="Button size"
+                value={settings.targets}
+                onChange={set("targets")}
+                options={[
+                  { value: "default", label: "Default" },
+                  { value: "large", label: "Large" },
+                ]}
+              />
+            </SettingRow>
+          </div>
+        </Card>
+
+        <Card padding="md">
+          <h3 className="pg-t-h3 mb-3">Listening and speaking</h3>
+          <div className="divide-y divide-hairline">
+            <ToggleRow
+              label="Read Ama’s replies aloud"
+              hint="In the AI chat she speaks every answer. You can also tap Listen on any reply."
+              checked={settings.aiSpeak}
+              onChange={set("aiSpeak")}
+              on="Ama speaks her replies"
+              off="Text only"
+            />
+            <SettingRow
+              label="Language you speak"
+              hint="Helps Ama hear Twi, Ga, Ewe and Hausa correctly when you use the mic."
+              labelId={`${langId}-l`}
+            >
+              <Select
+                aria-labelledby={`${langId}-l`}
+                className="w-full sm:w-56"
+                value={settings.aiLang}
+                onChange={(e) => update({ aiLang: e.target.value as AiLang })}
+              >
+                {SPEECH_LANGS.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.id === "auto" ? "Any language (auto-detect)" : l.native}
+                  </option>
+                ))}
+              </Select>
             </SettingRow>
           </div>
         </Card>

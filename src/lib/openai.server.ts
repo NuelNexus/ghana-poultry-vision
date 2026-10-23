@@ -1,11 +1,13 @@
 import process from "node:process";
+import { STT_ISO, STT_PROMPT, isPromptEcho, type SpeechLang } from "./ai-languages";
 
 // Thin OpenAI REST client for the AI assistant tab. Server-only: the key in
 // OPENAI_API_KEY never reaches the browser.
 //
 // Models are the low-cost tier by default and can be swapped via .env:
 //   OPENAI_CHAT_MODEL  - answers + translation   (default gpt-4o-mini)
-//   OPENAI_STT_MODEL   - speech to text          (default gpt-4o-mini-transcribe)
+//   OPENAI_STT_MODEL   - speech to text          (default gpt-4o-transcribe: much better than
+//                        the mini model on Twi, Ga and Ewe, still about $0.006 a minute)
 //   OPENAI_TTS_MODEL   - text to speech          (default gpt-4o-mini-tts)
 //   OPENAI_TTS_VOICE   - female voice            (default nova)
 //   OPENAI_REALTIME_MODEL - live voice mode      (default gpt-realtime-mini)
@@ -19,7 +21,7 @@ function cfg() {
   return {
     key,
     chat: process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini",
-    stt: process.env.OPENAI_STT_MODEL || "gpt-4o-mini-transcribe",
+    stt: process.env.OPENAI_STT_MODEL || "gpt-4o-transcribe",
     tts: process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts",
     voice: process.env.OPENAI_TTS_VOICE || "nova",
   };
@@ -64,7 +66,7 @@ export async function chatCompletion(
   return data.choices[0]?.message?.content ?? "";
 }
 
-export async function transcribe(audio: Uint8Array, mimeType: string) {
+export async function transcribe(audio: Uint8Array, mimeType: string, lang: SpeechLang = "auto") {
   const c = cfg();
   const ext =
     [
@@ -82,16 +84,22 @@ export async function transcribe(audio: Uint8Array, mimeType: string) {
     `speech.${ext}`,
   );
   form.append("model", c.stt);
+  form.append("prompt", STT_PROMPT[lang]);
+  const iso = STT_ISO[lang];
+  if (iso) form.append("language", iso);
   const res = await fetch(`${BASE}/audio/transcriptions`, {
     method: "POST",
     headers: { authorization: `Bearer ${c.key}` },
     body: form,
   });
   if (!res.ok) await fail(res, "transcription");
-  return ((await res.json()) as { text: string }).text.trim();
+  const text = ((await res.json()) as { text: string }).text.trim();
+  // On silence or noise the model can repeat the hint prompt back; that isn't speech.
+  return isPromptEcho(text, lang) ? "" : text;
 }
 
-export async function speak(text: string, language: string) {
+/** Text to speech. Without a language, she speaks whatever language the text is written in. */
+export async function speak(text: string, language?: string) {
   const c = cfg();
   const res = await fetch(`${BASE}/audio/speech`, {
     method: "POST",
@@ -101,7 +109,11 @@ export async function speak(text: string, language: string) {
       voice: c.voice,
       input: text,
       response_format: "mp3",
-      instructions: `Speak in ${language} with natural native pronunciation. Warm, friendly, clear female farm advisor.`,
+      instructions: `${
+        language
+          ? `Speak in ${language}`
+          : "Speak in the language the text is written in (it may be English, Twi, Ga, Ewe, Hausa or French)"
+      } with natural native Ghanaian pronunciation. Warm, friendly, clear female farm advisor.`,
     }),
   });
   if (!res.ok) await fail(res, "speech");
@@ -113,7 +125,7 @@ export async function speak(text: string, language: string) {
  * browser uses it to open a WebRTC call straight to OpenAI, so audio never
  * round-trips through this server and the real API key stays here.
  */
-export async function createRealtimeClientSecret(instructions: string) {
+export async function createRealtimeClientSecret(instructions: string, lang: SpeechLang = "auto") {
   const c = cfg();
   const model = process.env.OPENAI_REALTIME_MODEL || "gpt-realtime-mini";
   const res = await fetch(`${BASE}/realtime/client_secrets`, {
@@ -128,7 +140,11 @@ export async function createRealtimeClientSecret(instructions: string) {
         audio: {
           input: {
             noise_reduction: { type: "far_field" },
-            transcription: { model: c.stt },
+            transcription: {
+              model: c.stt,
+              prompt: STT_PROMPT[lang],
+              ...(STT_ISO[lang] && { language: STT_ISO[lang] }),
+            },
             turn_detection: { type: "semantic_vad", eagerness: "high" },
           },
           output: { voice: process.env.OPENAI_REALTIME_VOICE || "marin" },

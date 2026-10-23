@@ -65,7 +65,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // The theme boot script sets attributes on <html> before React hydrates.
+    <html lang="en" suppressHydrationWarning>
       <head><HeadContent /></head>
       <body>{children}<Scripts /></body>
     </html>

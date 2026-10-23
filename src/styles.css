@@ -1210,6 +1210,37 @@ html.pg-console[data-pg-motion="reduce"] *::after {
   scroll-behavior: auto !important;
 }
 
+/* Accessibility (profile page > Accessibility) ------------------------------ */
+
+/* Easier reading: taller lines, a touch of letter and word spacing. */
+html.pg-console[data-pg-spacing="relaxed"] .pg-console.pg-shell :is(p, li, dd, td, label, .pg-t-caption) {
+  line-height: 1.7 !important;
+  letter-spacing: 0.012em;
+  word-spacing: 0.06em;
+}
+
+/* Links always underlined, not just on hover. */
+html.pg-console[data-pg-underline="on"] .pg-console a:not(.pg-btn):not([role="tab"]):not(.pg-navlink) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+
+/* Strong focus ring: thick, two-tone, visible on any background. */
+html.pg-console[data-pg-focus="strong"] :focus-visible {
+  outline: 3px solid var(--pg-ink) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 6px var(--pg-surface), 0 0 0 9px var(--pg-focus) !important;
+}
+
+/* Bigger tap targets (WCAG 2.5.5): 44px controls everywhere. */
+html.pg-console[data-pg-targets="large"] .pg-btn,
+html.pg-console[data-pg-targets="large"] .pg-btn--sm,
+html.pg-console[data-pg-targets="large"] .pg-input,
+html.pg-console[data-pg-targets="large"] select.pg-input { height: 44px !important; min-height: 44px; }
+html.pg-console[data-pg-targets="large"] .pg-btn--icon { width: 44px !important; }
+html.pg-console[data-pg-targets="large"] .pg-console :is(button, [role="button"], a[role="tab"], [role="switch"]) { min-height: 44px; }
+
 /* Background: subtle paper grain (tint is computed into --pg-paper). */
 html.pg-console[data-pg-bg="texture"] .pg-console.pg-shell,
 html.pg-console[data-pg-bg="texture"] .pg-topbar {
