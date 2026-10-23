@@ -125,7 +125,11 @@ export async function speak(text: string, language?: string) {
  * browser uses it to open a WebRTC call straight to OpenAI, so audio never
  * round-trips through this server and the real API key stays here.
  */
-export async function createRealtimeClientSecret(instructions: string, lang: SpeechLang = "auto") {
+export async function createRealtimeClientSecret(
+  instructions: string,
+  lang: SpeechLang = "auto",
+  opts: { manualResponse?: boolean } = {},
+) {
   const c = cfg();
   const model = process.env.OPENAI_REALTIME_MODEL || "gpt-realtime-mini";
   const res = await fetch(`${BASE}/realtime/client_secrets`, {
@@ -145,7 +149,15 @@ export async function createRealtimeClientSecret(instructions: string, lang: Spe
               prompt: STT_PROMPT[lang],
               ...(STT_ISO[lang] && { language: STT_ISO[lang] }),
             },
-            turn_detection: { type: "semantic_vad", eagerness: "high" },
+            // manualResponse: the browser sends response.create itself once it has
+            // checked the farmer's language (Twi turns are answered elsewhere).
+            turn_detection: {
+              type: "semantic_vad",
+              // With routing, a little more patience: a reply cut off by the next
+              // breath costs a whole Twi turn (they take a few seconds).
+              eagerness: opts.manualResponse ? "medium" : "high",
+              ...(opts.manualResponse && { create_response: false, interrupt_response: true }),
+            },
           },
           output: { voice: process.env.OPENAI_REALTIME_VOICE || "marin" },
         },

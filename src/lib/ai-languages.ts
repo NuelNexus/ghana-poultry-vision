@@ -17,8 +17,6 @@ export const SPEECH_LANGS: { id: SpeechLang; name: string; native: string }[] = 
   { id: "fr", name: "French", native: "Français" },
 ];
 
-export const isSpeechLang = (v: unknown): v is SpeechLang => SPEECH_LANGS.some((l) => l.id === v);
-
 /**
  * GhanaNLP Khaya codes for the languages it handles better than OpenAI: speech
  * recognition (asr), translation to and from English (mt) and voices (tts).
@@ -30,7 +28,6 @@ export const KHAYA_CODES: Partial<Record<SpeechLang, { asr: string; tts: string;
   ee: { asr: "ewe", tts: "ewe", mt: "ee" },
   ha: { asr: "hau", tts: "hau" },
 };
-export const usesKhaya = (lang: SpeechLang) => lang in KHAYA_CODES;
 
 /** ISO-639-1 code the transcription API accepts, when it supports the language. */
 export const STT_ISO: Partial<Record<SpeechLang, string>> = { en: "en", fr: "fr" };
@@ -42,8 +39,8 @@ export const STT_ISO: Partial<Record<SpeechLang, string>> = { en: "en", fr: "fr"
  */
 export const STT_PROMPT: Record<SpeechLang, string> = {
   auto:
-    "A Ghanaian poultry farmer may speak English, Twi, Ga, Ewe or Hausa. " +
-    "Write what is said in the language spoken, with that language's own letters such as ɛ, ɔ, ŋ, ɖ and ʋ.",
+    "A Ghanaian poultry farmer speaks, usually in English or Twi (Akan), sometimes another language. " +
+    "Write what is said in the language spoken. Write Twi in Twi spelling with ɛ and ɔ.",
   en: "A poultry farmer in Ghana asks about the temperature, humidity, ammonia, the fan and the birds.",
   tw: "Twi kasa. Me nkokɔ no ho yɛ hyew, ɛdeɛn na menyɛ?",
   ga: "Ga wiemɔ. Mi wuoi lɛ yɛ he hiɛ, mɛni esa akɛ mafee?",
@@ -73,6 +70,87 @@ export function isPromptEcho(text: string, lang: SpeechLang) {
       // Sometimes the whole prompt comes back wrapped, e.g. "context: ### <prompt> ###".
       t.includes(p),
   );
+}
+
+// Language detection -----------------------------------------------------------
+// Ama picks her tools by language: Twi goes to the Ghanaian stack (stable-twi-tts
+// voice, Khaya, DistilABENA), everything else to the GPT models. Detection is a
+// quick word check, so it runs on every message and voice turn at no cost.
+
+// Common Twi words, with and without the special letters (people often type "ye" for "yɛ").
+const TWI_WORDS = new Set(
+  (
+    "akwaaba ɛte ete sɛn sen yɛ ye ɛyɛ eye wo wɔ mepɛ mepe wopɛ wope ɛdeɛn edeen deɛn deen adɛn aden " +
+    "adɛ nkokɔ nkoko akokɔ akoko nsuo nsu hyew ɔhyew ohyew aduane aduan aane daabi meda medaase ase " +
+    "mepa kyɛw kyew ɛho eho ho sɛ nti ɛnti enti firi fi nyinaa paa kakra bɛyɛ beye menyɛ menye menim " +
+    "mente nte kɔ ko bra mframa nnipa ɔkwan okwan me na no mmoa mo ɛnnɛ nnɛ ɛnora kyerɛ kyere boa " +
+    "menkɔ wobɛ ɛwɔ ewo hwɛ hwe hwehwɛ nkurofoɔ ɔyare oyare yare dɔɔso bebree pii ɛsɛ ese ɛhe ehe " +
+    "ɛberɛ bere sɛnea senea adwuma ofie fie ɛfie efie wɔn won yɛn yen mmɔfra"
+  ).split(" "),
+);
+// Words that are also everyday English, so they only count alongside real Twi words.
+const TWI_WEAK = new Set([
+  "me",
+  "no",
+  "na",
+  "ho",
+  "ase",
+  "fi",
+  "ko",
+  "mo",
+  "ye",
+  "won",
+  "sen",
+  "boa",
+]);
+// Ewe and Ga share Twi's ɛ and ɔ; a few very common words tell them apart.
+const EWE_WORDS = new Set([
+  "nye",
+  "le",
+  "dzo",
+  "nukae",
+  "wòle",
+  "be",
+  "koklo",
+  "koklowo",
+  "akpe",
+  "woezɔ",
+  "mawɔ",
+  "ŋdi",
+]);
+const GA_WORDS = new Set([
+  "lɛ",
+  "le",
+  "mi",
+  "ni",
+  "akɛ",
+  "ake",
+  "kɛ",
+  "ke",
+  "nɔ",
+  "ji",
+  "mɛni",
+  "meni",
+  "oyiwaladɔŋŋ",
+]);
+
+/** "tw" when the text is Twi, otherwise "auto" (GPT handles English and every other language). */
+export function detectLang(text: string): SpeechLang {
+  const t = text.normalize("NFC").toLowerCase();
+  if (/[ɖʋƒɣ]|[àèìòù]/.test(t)) return "auto"; // Ewe letters and tone marks
+  const words = t.match(/[\p{L}']+/gu) ?? [];
+  if (!words.length) return "auto";
+  const strong = words.filter((w) => TWI_WORDS.has(w) && !TWI_WEAK.has(w)).length;
+  const weak = words.filter((w) => TWI_WEAK.has(w)).length;
+  const ga = words.filter((w) => GA_WORDS.has(w)).length;
+  const ewe = words.filter((w) => EWE_WORDS.has(w)).length;
+  if (Math.max(ga, ewe) >= 2 && Math.max(ga, ewe) >= strong) return "auto";
+  // ɛ and ɔ never appear in English; with Ewe and Ga ruled out above, they mean Twi
+  // (even when the transcriber misheard the words themselves).
+  if (/[ɛɔ]/.test(t)) return "tw";
+  if (strong >= 1 && words.length <= 2) return "tw"; // "Akwaaba", "Medaase"
+  if (strong >= 2 && (strong + weak) / words.length >= 0.3) return "tw";
+  return "auto";
 }
 
 export const langName = (id: SpeechLang) =>

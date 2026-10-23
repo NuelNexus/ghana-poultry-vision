@@ -10,7 +10,7 @@ import {
   transcribe,
   type ChatMessage,
 } from "../openai.server";
-import { KHAYA_CODES, isSpeechLang, langName, usesKhaya, type SpeechLang } from "../ai-languages";
+import { KHAYA_CODES, detectLang, langName, type SpeechLang } from "../ai-languages";
 import { khayaEnabled, khayaSpeak, khayaTranscribe, khayaTranslate } from "../khaya.server";
 import { twiSpeak, twiVoiceOnline, wakeTwiVoice } from "../twi-tts.server";
 import { twiSuggest, twiWordsEnabled } from "../twi-nlp.server";
@@ -188,23 +188,29 @@ they wrote in ${name}: a translation model turns your English into ${name} for t
 }
 
 /** Speech to text, with Khaya for the Ghanaian languages and OpenAI otherwise. */
-async function hear(audio: Uint8Array, mimeType: string, lang: SpeechLang) {
-  if (khayaEnabled() && usesKhaya(lang) && mimeType.includes("wav")) {
+/**
+ * Speech to text in whatever language was spoken. OpenAI's transcriber writes it
+ * down first; if that turns out to be Twi and there is a Khaya key, Khaya (trained
+ * on Ghanaian speech) transcribes it again.
+ */
+async function hear(audio: Uint8Array, mimeType: string) {
+  const text = await transcribe(audio, mimeType, "auto");
+  if (khayaEnabled() && mimeType.includes("wav") && detectLang(text) === "tw") {
     try {
-      const text = await khayaTranscribe(audio, lang);
-      if (text) return text;
+      const better = await khayaTranscribe(audio, "tw");
+      if (better) return better;
     } catch {
-      /* fall back to OpenAI */
+      /* keep OpenAI's */
     }
   }
-  return transcribe(audio, mimeType, lang);
+  return text;
 }
 
 /**
  * Ama's voice. Twi: the farm Pi's stable-twi-tts voice first, then Khaya, then
  * OpenAI. Ga, Ewe, Hausa: Khaya, then OpenAI. Everything else: OpenAI.
  */
-async function voiceFor(text: string, lang: SpeechLang) {
+async function voiceFor(text: string, lang: SpeechLang = detectLang(text)) {
   const clean = stripBold(text).replace(/^\s*[-*•]\s+/gm, "");
   if (lang === "tw") {
     try {
@@ -213,7 +219,7 @@ async function voiceFor(text: string, lang: SpeechLang) {
       /* Pi offline or slow: next option */
     }
   }
-  if (khayaEnabled() && usesKhaya(lang)) {
+  if (khayaEnabled() && lang === "tw") {
     try {
       return { audio: toBase64(await khayaSpeak(clean, lang)), mimeType: "audio/wav" };
     } catch {
@@ -249,11 +255,6 @@ export const wakeTwiVoiceFn = createServerFn({ method: "POST" })
 
 // Chat history ---------------------------------------------------------------
 // Every conversation (text and voice) is saved per user, so they can come back to it.
-
-const langSchema = z
-  .string()
-  .optional()
-  .transform((v): SpeechLang => (isSpeechLang(v) ? v : "auto"));
 
 type ConversationRow = { id: string; title: string; created_at: string; updated_at: string };
 export type StoredMessage = {
@@ -355,17 +356,18 @@ export const askAssistant = createServerFn({ method: "POST" })
     z.object({
       messages: historySchema.min(1),
       conversationId: z.string().uuid().optional(),
-      lang: langSchema,
     }),
   )
   .handler(async ({ data, context }) => {
     const last = data.messages[data.messages.length - 1];
+    // Twi -> the Ghanaian stack; anything else -> GPT, answering in the farmer's language.
+    const lang = detectLang(last.content);
     const [farm, conversationId] = await Promise.all([
       loadSnapshot().then(describeFarm),
       conversationFor(context.user.id, data.conversationId, last.content),
     ]);
-    const { reply, english, youEnglish } = await answer(farm, data.messages, data.lang, false);
-    const language = english || youEnglish ? langName(data.lang) : null;
+    const { reply, english, youEnglish } = await answer(farm, data.messages, lang, false);
+    const language = lang === "tw" ? langName(lang) : null;
     await saveMessages(conversationId, [
       ...(last.role === "user"
         ? [
@@ -390,67 +392,34 @@ export const transcribeSpeech = createServerFn({ method: "POST" })
     z.object({
       audio: z.string().min(1).max(8_000_000), // base64, about 6 MB (a few minutes of speech)
       mimeType: z.string().max(100),
-      lang: langSchema,
     }),
   )
   .handler(async ({ data }) => ({
-    text: await hear(fromBase64(data.audio), data.mimeType, data.lang),
+    text: await hear(fromBase64(data.audio), data.mimeType),
   }));
 
 // Spoken replies for the text chat ("Voice replies" on): audio as base64.
 export const speakReply = createServerFn({ method: "POST" })
   .middleware([requireUser])
-  .inputValidator(z.object({ text: z.string().min(1).max(4000), lang: langSchema }))
-  .handler(({ data }) => voiceFor(data.text, data.lang));
+  .inputValidator(z.object({ text: z.string().min(1).max(4000) }))
+  .handler(({ data }) => voiceFor(data.text));
 
-// Voice mode in Twi, Ga, Ewe and Hausa (with a Khaya key). OpenAI's live voice
-// can't use Khaya, so these calls go turn by turn: the browser sends what the
-// farmer said once they pause, and gets back her words and her voice.
-export const voiceTurn = createServerFn({ method: "POST" })
+// A Twi turn inside the live voice call. The call is OpenAI's realtime model;
+// when the farmer's words come back as Twi, the browser holds its reply and asks
+// here instead: Ama answers through the Twi stack and the GhanaNLP voice speaks.
+export const twiReply = createServerFn({ method: "POST" })
   .middleware([requireUser])
-  .inputValidator(
-    z.object({
-      audio: z.string().min(1).max(8_000_000), // base64 16 kHz WAV
-      lang: langSchema,
-      conversationId: z.string().uuid().optional(),
-      history: historySchema.max(12),
-    }),
-  )
-  .handler(async ({ data, context }) => {
-    const [you, farm] = await Promise.all([
-      hear(fromBase64(data.audio), "audio/wav", data.lang),
-      loadSnapshot().then(describeFarm),
-    ]);
-    if (!you.trim()) return { you: "" };
+  .inputValidator(z.object({ text: z.string().min(1).max(4000), history: historySchema.max(12) }))
+  .handler(async ({ data }) => {
+    const farm = describeFarm(await loadSnapshot());
     const turn = await answer(
       farm,
-      [...data.history, { role: "user", content: you }],
-      data.lang,
+      [...data.history, { role: "user", content: data.text }],
+      "tw",
       true,
     );
-    const [voice, conversationId] = await Promise.all([
-      voiceFor(turn.reply, data.lang),
-      conversationFor(context.user.id, data.conversationId, `Voice: ${you}`),
-    ]);
-    const language = langName(data.lang);
-    await saveMessages(conversationId, [
-      {
-        role: "user",
-        content: you,
-        mode: "voice",
-        language,
-        english: turn.youEnglish && turn.youEnglish !== you ? turn.youEnglish : null,
-      },
-      { role: "assistant", content: turn.reply, mode: "voice", language, english: turn.english },
-    ]);
-    return {
-      you,
-      youEnglish: turn.youEnglish,
-      ama: turn.reply,
-      amaEnglish: turn.english,
-      ...voice,
-      conversationId,
-    };
+    const voice = await voiceFor(turn.reply, "tw");
+    return { ama: turn.reply, amaEnglish: turn.english, youEnglish: turn.youEnglish, ...voice };
   });
 
 // Speech to speech -----------------------------------------------------------
@@ -461,10 +430,14 @@ export const voiceTurn = createServerFn({ method: "POST" })
 
 export const createVoiceSession = createServerFn({ method: "POST" })
   .middleware([requireUser])
-  .inputValidator(z.object({ lang: langSchema }))
+  // twiRouting: the browser decides who answers each turn (Twi -> twiReply), so the
+  // realtime model waits to be asked instead of answering on its own.
+  .inputValidator(z.object({ twiRouting: z.boolean().default(false) }))
   .handler(async ({ data }) => {
     const farm = describeFarm(await loadSnapshot());
-    return createRealtimeClientSecret(systemPrompt(farm, true, data.lang), data.lang);
+    return createRealtimeClientSecret(systemPrompt(farm, true), "auto", {
+      manualResponse: data.twiRouting,
+    });
   });
 
 // Each finished voice turn is saved into that call's conversation, with English

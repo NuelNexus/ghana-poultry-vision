@@ -38,7 +38,6 @@ export type FocusStyle = "default" | "strong";
 export type TargetSize = "default" | "large";
 export type StatusColors = "default" | "cvd";
 /** Language the farmer speaks to Ama in (see src/lib/ai-languages.ts). */
-export type AiLang = "auto" | "en" | "tw" | "ga" | "ee" | "ha" | "fr";
 
 export interface ThemeSettings {
   v: 1;
@@ -72,7 +71,6 @@ export interface ThemeSettings {
   statusColors: StatusColors;
   /** Ama reads her text-chat replies aloud. */
   aiSpeak: boolean;
-  aiLang: AiLang;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -606,7 +604,6 @@ export const DEFAULT_SETTINGS: ThemeSettings = {
   stillImages: false,
   statusColors: "default",
   aiSpeak: false,
-  aiLang: "auto",
 };
 
 /** Settings a preset owns (colour); everything else is personal and survives preset changes. */
@@ -660,7 +657,6 @@ export function sanitize(raw: unknown): ThemeSettings {
     stillImages: typeof r.stillImages === "boolean" ? r.stillImages : d.stillImages,
     statusColors: pick(r.statusColors, ["default", "cvd"] as const, d.statusColors),
     aiSpeak: typeof r.aiSpeak === "boolean" ? r.aiSpeak : d.aiSpeak,
-    aiLang: pick(r.aiLang, ["auto", "en", "tw", "ga", "ee", "ha", "fr"] as const, d.aiLang),
   };
 }
 

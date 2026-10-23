@@ -7,7 +7,6 @@ import {
   Fan,
   Flame,
   History,
-  Languages,
   Lightbulb,
   Loader2,
   Mic,
@@ -34,15 +33,14 @@ import {
   speakReply,
   suggestTwiWords,
   transcribeSpeech,
-  voiceTurn,
+  twiReply,
   wakeTwiVoiceFn,
 } from "@/lib/api/assistant.functions";
-import { SPEECH_LANGS, langName, usesKhaya, type SpeechLang } from "@/lib/ai-languages";
+import { detectLang } from "@/lib/ai-languages";
 import {
   MIC_CONSTRAINTS,
   Recorder,
   ReplyPlayer,
-  TurnListener,
   blobToBase64,
   micErrorMessage,
   micUnavailableReason,
@@ -100,7 +98,7 @@ const sensorsQuery = {
 function AiAssistant() {
   // Re-render when the temperature unit or clock preference changes.
   useDisplayPrefs();
-  useWakeTwiVoice(useTheme().settings.aiLang);
+  useWakeTwiVoice();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const mode: Mode = search.mode ?? "chat";
@@ -418,50 +416,23 @@ function BlobAvatar({ size = 28 }: { size?: number }) {
   );
 }
 
-/** "I'm speaking: Twi" picker. Steers transcription and the language she answers in. */
-function LangSelect({ className }: { className?: string }) {
-  const { settings, update } = useTheme();
-  return (
-    <label className={cn("ai-lang", className)}>
-      <Languages className="size-4 shrink-0 text-ink-3" aria-hidden />
-      <span className="sr-only">Language you speak to Ama</span>
-      <select
-        value={settings.aiLang}
-        onChange={(e) => update({ aiLang: e.target.value as SpeechLang })}
-        className="ai-lang-select"
-      >
-        {SPEECH_LANGS.map((l) => (
-          <option key={l.id} value={l.id}>
-            {l.id === "auto" ? "Any language" : l.native}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-// Which speech engines the server can use: a GhanaNLP Khaya key (Twi, Ga, Ewe,
-// Hausa) and the farm Pi's stable-twi-tts voice (Twi), which comes and goes.
+// Which speech engines the server can use: the GhanaNLP Twi voice (Pi or this PC),
+// a Khaya key, and the DistilABENA word helper. The Pi's voice comes and goes.
 const enginesQuery = {
   queryKey: ["ai-speech-engines"],
   queryFn: () => getSpeechEngines(),
   staleTime: 60_000,
   refetchInterval: 60_000,
 };
-function useKhaya(lang: SpeechLang) {
+/** True when Twi has its own voice (stable-twi-tts or Khaya); otherwise GPT speaks Twi too. */
+function useTwiVoice() {
   const engines = useQuery(enginesQuery);
-  return Boolean(engines.data?.khaya) && usesKhaya(lang);
+  return Boolean(engines.data?.twiVoice || engines.data?.khaya);
 }
-/** Voice mode goes turn by turn when a Ghanaian voice (Khaya or the Pi) will speak. */
-function useTurnVoice(lang: SpeechLang) {
+/** While the AI tab is open, keep the Pi polling fast (it slows down after 5 minutes). */
+function useWakeTwiVoice() {
   const engines = useQuery(enginesQuery);
-  const khaya = Boolean(engines.data?.khaya) && usesKhaya(lang);
-  return khaya || (Boolean(engines.data?.twiVoice) && lang === "tw");
-}
-/** While the tab is open in Twi, keep the Pi polling fast (it slows down after 5 minutes). */
-function useWakeTwiVoice(lang: SpeechLang) {
-  const engines = useQuery(enginesQuery);
-  const on = lang === "tw" && Boolean(engines.data?.twiVoice);
+  const on = Boolean(engines.data?.twiVoice);
   useEffect(() => {
     if (!on) return;
     const wake = () => void wakeTwiVoiceFn().catch(() => {});
@@ -654,7 +625,8 @@ function TextChat() {
   const { settings, update } = useTheme();
   const qc = useQueryClient();
   const sensors = useQuery(sensorsQuery);
-  const khaya = useKhaya(settings.aiLang);
+  // With a Khaya key, dictation is sent as WAV so Khaya can re-hear it if it's Twi.
+  const khaya = Boolean(useQuery(enginesQuery).data?.khaya);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -692,7 +664,7 @@ function TextChat() {
     try {
       let req = audioCache.current.get(m.id);
       if (!req) {
-        req = speakReply({ data: { text: m.content.slice(0, 4000), lang: settings.aiLang } });
+        req = speakReply({ data: { text: m.content.slice(0, 4000) } });
         audioCache.current.set(m.id, req);
         req.catch(() => audioCache.current.delete(m.id));
       }
@@ -754,7 +726,7 @@ function TextChat() {
       // Khaya needs WAV; if this browser can't convert, OpenAI takes the original.
       const audio = (khaya && (await toWav16k(blob))) || blob;
       const { text } = await transcribeSpeech({
-        data: { audio: await blobToBase64(audio), mimeType: audio.type, lang: settings.aiLang },
+        data: { audio: await blobToBase64(audio), mimeType: audio.type },
       });
       if (!text.trim()) setError("Didn’t catch that. Try again, a little slower.");
       else {
@@ -792,7 +764,6 @@ function TextChat() {
             english: m.english?.slice(0, 4000) ?? null,
           })),
           conversationId: conversationId ?? undefined,
-          lang: settings.aiLang,
         },
       });
       const msg: Msg = { id: newId(), role: "assistant", content: reply, english };
@@ -865,7 +836,8 @@ function TextChat() {
   // Twi word helper (DistilABENA on the server's TWI_NLP_URL) -------------------
   // While typing Twi: finish the current word, suggest the next one, or fill a ___ blank.
   const engines = useQuery(enginesQuery);
-  const twiWords = settings.aiLang === "tw" && Boolean(engines.data?.twiWords);
+  // Shown only once what's typed looks like Twi.
+  const twiWords = Boolean(engines.data?.twiWords) && detectLang(input) === "tw";
   const [hints, setHints] = useState<{ words: string[]; label: string } | null>(null);
   useEffect(() => {
     const text = input;
@@ -933,7 +905,6 @@ function TextChat() {
           )}
         </div>
         <div className="flex min-w-0 items-center gap-1.5">
-          <LangSelect />
           <button
             type="button"
             className={cn("ai-speak-toggle", settings.aiSpeak && "is-on")}
@@ -1192,286 +1163,29 @@ const REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 const SILENT_WAV =
   "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
 
-/** Live OpenAI call by default; turn by turn when Khaya or the Pi gives Ama a Ghanaian voice. */
-function VoiceChat({ active }: { active: boolean }) {
-  const { settings } = useTheme();
-  const turn = useTurnVoice(settings.aiLang);
-  return turn ? <TurnVoiceChat active={active} /> : <LiveVoiceChat active={active} />;
-}
-
-// Turn-by-turn voice (Khaya, or the Pi's stable-twi-tts voice) ---------------------
-// The mic stays open; when the farmer pauses, what they said goes to the server
-// (it is transcribed and translated, Ama answers, and the Pi or Khaya speaks it in
-// a Ghanaian voice) and she replies. Slower than the live call, but far more natural Twi.
+// Live speech to speech over OpenAI Realtime ---------------------------------------
+// Language decides who answers. With a Twi voice available (stable-twi-tts on the
+// Pi or this PC, or Khaya), the realtime model doesn't reply on its own: once the
+// farmer's words are transcribed, Twi goes to the Twi stack (twiReply, played in
+// the GhanaNLP voice) and anything else is handed back to the realtime model.
+// Without a Twi voice it is a plain live GPT call, as before.
 
 type TurnHistory = { role: "user" | "assistant"; content: string; english: string | null };
 
-function TurnVoiceChat({ active }: { active: boolean }) {
-  const { settings } = useTheme();
-  const lang = settings.aiLang;
-  const langRef = useRef(lang);
-  langRef.current = lang;
-  const qc = useQueryClient();
-  const avatar = useRef<ExplorerAvatarHandle>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const listener = useRef<TurnListener | null>(null);
-  const gen = useRef(0);
-  const conv = useRef<string | null>(null);
-  const history = useRef<TurnHistory[]>([]);
-  const audioUrl = useRef<string | null>(null);
-  const turns = useRef(0);
-  const [state, setState] = useState<VoiceState>("off");
-  const [error, setError] = useState<string | null>(null);
-  const [you, setYou] = useState("");
-  const [ama, setAma] = useState("");
-  const [trans, setTrans] = useState<{ you: string | null; ama: string | null } | null>(null);
-
-  const hangUp = useCallback(() => {
-    gen.current++;
-    listener.current?.stop();
-    listener.current = null;
-    const a = audioRef.current;
-    if (a) {
-      a.onended = null;
-      a.pause();
-    }
-    if (conv.current) void qc.invalidateQueries({ queryKey: conversationsQuery.queryKey });
-    avatar.current?.play("idle");
-    setState("off");
-  }, [qc]);
-  useEffect(() => hangUp, [hangUp]);
-  useEffect(() => {
-    if (!active) hangUp();
-  }, [active, hangUp]);
-  useEffect(
-    () => () => {
-      if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
-    },
-    [],
-  );
-
-  const listenAgain = (my: number) => {
-    if (my !== gen.current || !listener.current) return;
-    listener.current.paused = false;
-    setState("listening");
-    avatar.current?.play("idle");
-  };
-
-  const onUtterance = async (wav: Blob, my: number) => {
-    const l = listener.current;
-    if (!l || my !== gen.current) return;
-    l.paused = true;
-    setState("thinking");
-    avatar.current?.play("walking");
-    try {
-      const r = await voiceTurn({
-        data: {
-          audio: await blobToBase64(wav),
-          lang: langRef.current,
-          conversationId: conv.current ?? undefined,
-          history: history.current.slice(-12),
-        },
-      });
-      if (my !== gen.current) return;
-      if (!("ama" in r) || !r.you) {
-        setError("Didn’t catch that. Say it again, a little slower.");
-        listenAgain(my);
-        return;
-      }
-      setError(null);
-      conv.current = r.conversationId;
-      history.current.push(
-        {
-          role: "user",
-          content: r.you.slice(0, 4000),
-          english: r.youEnglish?.slice(0, 4000) ?? null,
-        },
-        {
-          role: "assistant",
-          content: r.ama.slice(0, 4000),
-          english: r.amaEnglish?.slice(0, 4000) ?? null,
-        },
-      );
-      setYou(r.you);
-      setAma(r.ama);
-      setTrans({ you: r.youEnglish, ama: r.amaEnglish });
-
-      const a = audioRef.current;
-      if (!a) return listenAgain(my);
-      if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
-      const bytes = Uint8Array.from(atob(r.audio), (c) => c.charCodeAt(0));
-      audioUrl.current = URL.createObjectURL(new Blob([bytes], { type: r.mimeType }));
-      a.src = audioUrl.current;
-      a.onended = () => listenAgain(my);
-      setState("speaking");
-      avatar.current?.play(turns.current++ % 2 ? "talking2" : "talking");
-      await a.play().catch(() => {
-        setError("Your browser blocked Ama’s voice. Her reply is written above.");
-        listenAgain(my);
-      });
-    } catch (err) {
-      if (my !== gen.current) return;
-      setError(err instanceof Error ? err.message : String(err));
-      listenAgain(my);
-    }
-  };
-
-  /** Stop her mid-reply and listen again. */
-  const interrupt = () => {
-    const a = audioRef.current;
-    if (a) {
-      a.onended = null;
-      a.pause();
-    }
-    listenAgain(gen.current);
-  };
-
-  const start = async () => {
-    if (listener.current) return;
-    const why = micUnavailableReason();
-    if (why) {
-      setError(why);
-      return;
-    }
-    // Unlock playback and the audio context inside this tap (iPhone), before any await.
-    const audio = audioRef.current;
-    if (audio) {
-      audio.src = SILENT_WAV;
-      void audio.play().catch(() => {});
-    }
-    const my = ++gen.current;
-    conv.current = null;
-    history.current = [];
-    setError(null);
-    setYou("");
-    setAma("");
-    setTrans(null);
-    setState("connecting");
-    let l: TurnListener | null = null;
-    try {
-      l = new TurnListener();
-      listener.current = l;
-      l.onSpeechStart = () => {
-        if (my !== gen.current) return;
-        setState("hearing");
-        setError(null);
-      };
-      l.onSpeechEnd = () => {
-        if (my === gen.current) setState((s) => (s === "hearing" ? "listening" : s));
-      };
-      l.onUtterance = (wav) => void onUtterance(wav, my);
-      await l.start();
-      if (my !== gen.current) return l.stop();
-      setState("listening");
-    } catch (err) {
-      l?.stop();
-      if (listener.current === l) listener.current = null;
-      if (my !== gen.current) return;
-      hangUp();
-      setError(micErrorMessage(err));
-    }
-  };
-
-  const on = state !== "off";
-  const name = langName(lang);
-  const label = {
-    off: "Tap to talk",
-    connecting: "Starting the mic…",
-    listening: `Listening… speak ${name}`,
-    hearing: "Hearing you…",
-    thinking: "Thinking…",
-    speaking: "Speaking… tap to interrupt",
-  }[state];
-  const dot: Status = (
-    {
-      off: "brand",
-      connecting: "neutral",
-      listening: "crit",
-      hearing: "crit",
-      thinking: "warn",
-      speaking: "ok",
-    } as const
-  )[state];
-
-  return (
-    <div className="ai-fade relative h-full">
-      <div className="absolute inset-0">
-        <ExplorerAvatar ref={avatar} className="h-full w-full" />
-      </div>
-
-      {(you || ama) && (
-        <div className="ai-turn">
-          {you && (
-            <div className="ai-float">
-              <p className="ai-float-label">You · {name}</p>
-              <p className="mt-0.5 text-ink">{you}</p>
-              {trans?.you && trans.you.trim() !== you.trim() && (
-                <p className="ai-float-en">English: {trans.you}</p>
-              )}
-            </div>
-          )}
-          {ama && (
-            <div className="ai-float">
-              <p className="ai-float-label">Ama</p>
-              <p className="mt-0.5 text-ink">{ama}</p>
-              {trans?.ama && trans.ama.trim() !== ama.trim() && (
-                <p className="ai-float-en">English: {trans.ama}</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-      <p className="sr-only" aria-live="polite">
-        {ama}
-      </p>
-
-      <audio ref={audioRef} playsInline className="hidden" />
-      <div className="ai-mic-dock">
-        {error && (
-          <p role="alert" className="ai-float ai-float--error">
-            {error}
-          </p>
-        )}
-        <button
-          type="button"
-          onClick={() => (state === "speaking" ? interrupt() : on ? hangUp() : void start())}
-          className={cn("ai-mic", state === "hearing" && "ai-mic--rec")}
-          aria-label={
-            state === "speaking"
-              ? "Stop Ama and speak"
-              : on
-                ? "End voice conversation"
-                : "Start voice conversation"
-          }
-          aria-pressed={on}
-        >
-          {state === "connecting" || state === "thinking" ? (
-            <Loader2 className="size-7 animate-spin" aria-hidden />
-          ) : on ? (
-            <Square className="size-6" fill="currentColor" aria-hidden />
-          ) : (
-            <Mic className="size-7" strokeWidth={1.75} aria-hidden />
-          )}
-        </button>
-        <span className="ai-mic-label" aria-live="polite">
-          <StatusDot status={dot} pulse={state === "hearing" || state === "listening"} />
-          {label}
-        </span>
-        <LangSelect className="ai-lang--float" />
-      </div>
-    </div>
-  );
-}
-
-// Live speech to speech over OpenAI Realtime ---------------------------------------
-
-function LiveVoiceChat({ active }: { active: boolean }) {
-  const { settings } = useTheme();
-  const lang = settings.aiLang;
+function VoiceChat({ active }: { active: boolean }) {
+  const twiRouting = useTwiVoice();
   const qc = useQueryClient();
   const avatar = useRef<ExplorerAvatarHandle>(null);
   // Her voice plays through this element; it lives in the page so phones keep it.
   const audioRef = useRef<HTMLAudioElement>(null);
+  // Twi replies (GhanaNLP voice) play through their own element.
+  const twiAudioRef = useRef<HTMLAudioElement>(null);
+  const twiUrl = useRef<string | null>(null);
+  const twiSeq = useRef(0);
+  const twiPending = useRef(""); // Twi words not yet answered (cut off by more speech)
+  const manual = useRef(false); // this call's session waits for response.create
+  const answered = useRef<string | null>(null); // last transcript item we routed
+  const history = useRef<TurnHistory[]>([]);
   // Every call is saved as one conversation in the chat history.
   const voiceConv = useRef<string | null>(null);
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
@@ -1534,20 +1248,32 @@ function LiveVoiceChat({ active }: { active: boolean }) {
       c.audio.pause();
       c.audio.srcObject = null;
     }
+    twiSeq.current++;
+    const t = twiAudioRef.current;
+    if (t) {
+      t.onended = null;
+      t.pause();
+    }
     void saveChain.current.then(() => qc.invalidateQueries({ queryKey: ["ai-conversations"] }));
     avatar.current?.play("idle");
     setState("off");
   }, [qc]);
+  useEffect(
+    () => () => {
+      if (twiUrl.current) URL.revokeObjectURL(twiUrl.current);
+    },
+    [],
+  );
 
   // Pre-mint the session secret while voice mode is open, so tapping the mic
   // only has to do the WebRTC handshake. Secrets live 120 s; use them within 90.
-  const warm = useRef<{ p: Promise<VoiceSession>; at: number; lang: SpeechLang } | null>(null);
+  const warm = useRef<{ p: Promise<VoiceSession>; at: number; twi: boolean } | null>(null);
   const takeSession = () => {
     const w = warm.current;
     warm.current = null;
-    return w && w.lang === lang && Date.now() - w.at < 90_000
+    return w && w.twi === twiRouting && Date.now() - w.at < 90_000
       ? w.p
-      : createVoiceSession({ data: { lang } });
+      : createVoiceSession({ data: { twiRouting } });
   };
   useEffect(() => {
     if (!active) {
@@ -1557,23 +1283,92 @@ function LiveVoiceChat({ active }: { active: boolean }) {
     if (micUnavailableReason()) return;
     const prewarm = () => {
       if (call.current) return;
-      const p = createVoiceSession({ data: { lang } });
+      const p = createVoiceSession({ data: { twiRouting } });
       p.catch(() => {
         if (warm.current?.p === p) warm.current = null;
       });
-      warm.current = { p, at: Date.now(), lang };
+      warm.current = { p, at: Date.now(), twi: twiRouting };
     };
     prewarm();
     const t = window.setInterval(prewarm, 85_000);
     return () => window.clearInterval(t);
-  }, [active, lang]);
+  }, [active, twiRouting]);
 
-  // A new language only applies to the next call; end the current one so it takes effect.
-  const langRef = useRef(lang);
-  useEffect(() => {
-    if (langRef.current !== lang && call.current) hangUp();
-    langRef.current = lang;
-  }, [lang, hangUp]);
+  const send = (event: Record<string, unknown>) => {
+    const dc = call.current?.dc;
+    if (dc?.readyState === "open") dc.send(JSON.stringify(event));
+  };
+
+  /** A Twi turn: answered by the Twi stack and spoken in the GhanaNLP voice. */
+  const twiTurn = async (said: string, my: number) => {
+    // If the farmer paused mid-thought and carried on, the cut-off part is
+    // answered together with the rest instead of being lost.
+    const text = `${twiPending.current} ${said}`.trim();
+    twiPending.current = text;
+    const seq = ++twiSeq.current;
+    setState("thinking");
+    avatar.current?.play("walking");
+    setAma("");
+    setTrans(null);
+    try {
+      const r = await twiReply({
+        data: { text: text.slice(0, 4000), history: history.current.slice(-12) },
+      });
+      if (my !== gen.current || seq !== twiSeq.current) return;
+      twiPending.current = "";
+      setYou(text);
+      setAma(r.ama);
+      setAmaFinal(r.ama);
+      setTrans({ language: "Twi", you: r.youEnglish ?? "", ama: r.amaEnglish ?? "" });
+      history.current.push(
+        {
+          role: "user",
+          content: text.slice(0, 4000),
+          english: r.youEnglish?.slice(0, 4000) ?? null,
+        },
+        {
+          role: "assistant",
+          content: r.ama.slice(0, 4000),
+          english: r.amaEnglish?.slice(0, 4000) ?? null,
+        },
+      );
+      saveTurn(text, r.ama, {
+        language: "Twi",
+        you_english: r.youEnglish ?? "",
+        ama_english: r.amaEnglish ?? "",
+      });
+      // Tell the live model what she said, so the rest of the call follows on.
+      send({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "assistant",
+          content: [{ type: "output_text", text: r.ama }],
+        },
+      });
+      const a = twiAudioRef.current;
+      if (!a) return setState("listening");
+      if (twiUrl.current) URL.revokeObjectURL(twiUrl.current);
+      const bytes = Uint8Array.from(atob(r.audio), (c) => c.charCodeAt(0));
+      twiUrl.current = URL.createObjectURL(new Blob([bytes], { type: r.mimeType }));
+      a.src = twiUrl.current;
+      a.onended = () => {
+        if (my !== gen.current || seq !== twiSeq.current) return;
+        setState("listening");
+        avatar.current?.play("idle");
+      };
+      setState("speaking");
+      avatar.current?.play(turns.current++ % 2 ? "talking2" : "talking");
+      await a.play().catch(() => {
+        setError("Your browser blocked Ama’s voice. Her reply is written above.");
+        setState("listening");
+      });
+    } catch {
+      if (my !== gen.current || seq !== twiSeq.current) return;
+      // The Twi stack is unreachable: let the live model answer instead.
+      send({ type: "response.create" });
+    }
+  };
 
   /** Save one finished turn (in order), with translations when we have them. */
   const saveTurn = (
@@ -1611,12 +1406,20 @@ function LiveVoiceChat({ active }: { active: boolean }) {
 
   const onEvent = (e: RealtimeEvent) => {
     switch (e.type) {
-      case "input_audio_buffer.speech_started":
+      case "input_audio_buffer.speech_started": {
+        // Talking over a Twi reply stops it, like the live voice.
+        const t = twiAudioRef.current;
+        if (t && !t.paused) {
+          twiSeq.current++;
+          t.onended = null;
+          t.pause();
+        }
         youItem.current = e.item_id ?? null;
         setYou("");
         setState("hearing");
         avatar.current?.play("idle");
         break;
+      }
       case "input_audio_buffer.speech_stopped":
         setState("thinking");
         avatar.current?.play("walking");
@@ -1626,8 +1429,24 @@ function LiveVoiceChat({ active }: { active: boolean }) {
         break;
       case "conversation.item.input_audio_transcription.completed":
         if (e.item_id === youItem.current) {
-          setYou(e.transcript ?? "");
-          youText.current = e.transcript ?? "";
+          const said = e.transcript ?? "";
+          setYou(said);
+          youText.current = said;
+          // Route this turn: Twi to the Twi stack, anything else to the live model.
+          if (manual.current && answered.current !== e.item_id) {
+            answered.current = e.item_id ?? null;
+            if (said.trim() && detectLang(said) === "tw") void twiTurn(said, gen.current);
+            else {
+              twiPending.current = "";
+              send({ type: "response.create" });
+            }
+          }
+        }
+        break;
+      case "conversation.item.input_audio_transcription.failed":
+        if (manual.current && e.item_id === youItem.current && answered.current !== e.item_id) {
+          answered.current = e.item_id ?? null;
+          send({ type: "response.create" });
         }
         break;
       case "response.created":
@@ -1662,6 +1481,18 @@ function LiveVoiceChat({ active }: { active: boolean }) {
           )
           .then((a) => {
             saveTurn(youSaid, text, a);
+            history.current.push(
+              {
+                role: "user",
+                content: youSaid.slice(0, 4000),
+                english: a.you_english.slice(0, 4000),
+              },
+              {
+                role: "assistant",
+                content: text.slice(0, 4000),
+                english: a.ama_english.slice(0, 4000),
+              },
+            );
             if (my !== gen.current || seq !== replySeq.current) return;
             setTrans({ language: a.language, you: a.you_english, ama: a.ama_english });
             if (speakingSince.current != null) scheduleGestures(a.segments);
@@ -1714,8 +1545,17 @@ function LiveVoiceChat({ active }: { active: boolean }) {
     audio.srcObject = null;
     audio.src = SILENT_WAV;
     void audio.play().catch(() => {});
+    const twiAudio = twiAudioRef.current;
+    if (twiAudio) {
+      twiAudio.src = SILENT_WAV;
+      void twiAudio.play().catch(() => {});
+    }
     const my = ++gen.current;
     voiceConv.current = null;
+    history.current = [];
+    twiPending.current = "";
+    answered.current = null;
+    manual.current = twiRouting;
     setError(null);
     setYou("");
     setAma("");
@@ -1843,6 +1683,7 @@ function LiveVoiceChat({ active }: { active: boolean }) {
       </p>
 
       <audio ref={audioRef} autoPlay playsInline className="hidden" />
+      <audio ref={twiAudioRef} playsInline className="hidden" />
       <div className="ai-mic-dock">
         {error && (
           <p role="alert" className="ai-float ai-float--error">
@@ -1868,7 +1709,6 @@ function LiveVoiceChat({ active }: { active: boolean }) {
           <StatusDot status={dot} pulse={state === "hearing" || state === "listening"} />
           {label}
         </span>
-        <LangSelect className="ai-lang--float" />
       </div>
     </div>
   );
@@ -1979,19 +1819,6 @@ textarea.ai-input {
   background: var(--pg-surface);
 }
 @media (min-width: 768px) { .ai-toolbar { padding: 6px 20px; } }
-.ai-lang {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 4px 0 10px;
-  border: 1px solid var(--pg-line-strong); border-radius: 999px; background: var(--pg-surface);
-}
-.ai-lang:focus-within { border-color: var(--pg-focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pg-focus) 22%, transparent); }
-.ai-lang-select {
-  appearance: none; -webkit-appearance: none; border: 0; background: transparent; outline: none;
-  font-size: 13px; line-height: 18px; font-weight: 500; color: var(--pg-ink);
-  padding: 0 22px 0 0; min-height: 34px; cursor: pointer; max-width: 9.5rem;
-  background-image: var(--pg-select-arrow); background-repeat: no-repeat; background-position: right 4px center;
-}
-@media (max-width: 767px) { .ai-lang { min-height: 40px; } .ai-lang-select { font-size: 16px; max-width: 7.5rem; } }
-.ai-lang--float { box-shadow: 0 1px 2px rgb(28 33 28 / 0.08); }
 .ai-speak-toggle {
   display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px;
   border-radius: 999px; border: 1px solid var(--pg-line-strong); background: var(--pg-surface);

@@ -51,12 +51,10 @@ import {
   isCustomised,
   paletteVars,
   type FontId,
-  type AiLang,
   type MonoId,
   type Preset,
   type ThemeSettings,
 } from "@/lib/theme";
-import { SPEECH_LANGS } from "@/lib/ai-languages";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/profile")({
@@ -1040,7 +1038,6 @@ function ToggleRow({
 
 function AccessibilitySection() {
   const { settings, update, choosePreset } = useTheme();
-  const langId = useId();
   const set =
     <K extends keyof ThemeSettings>(k: K) =>
     (v: ThemeSettings[K]) =>
@@ -1219,24 +1216,6 @@ function AccessibilitySection() {
               on="Ama speaks her replies"
               off="Text only"
             />
-            <SettingRow
-              label="Language you speak"
-              hint="Helps Ama hear Twi, Ga, Ewe and Hausa correctly when you use the mic."
-              labelId={`${langId}-l`}
-            >
-              <Select
-                aria-labelledby={`${langId}-l`}
-                className="w-full sm:w-56"
-                value={settings.aiLang}
-                onChange={(e) => update({ aiLang: e.target.value as AiLang })}
-              >
-                {SPEECH_LANGS.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.id === "auto" ? "Any language (auto-detect)" : l.native}
-                  </option>
-                ))}
-              </Select>
-            </SettingRow>
           </div>
         </Card>
       </div>
