@@ -37,8 +37,8 @@ from commit messages and file lists; they weren't re-tested for this document.
 - **Change:** new `HatchLoop` component (SVG + CSS). It uses the bunny's look (flat white
   shapes, dot eye, brown ground shadow, hop, dust puffs) and path (off-screen left to
   off-screen right). A 12 s loop: egg rolls → wobbles and cracks (the top of the shell flies
-  off) → chick hops on → grows into a hen → hops off. With "reduce motion" on it plays in one
-  spot by fading between stages. The bunny's 155 lines of CSS were removed.
+  off) → chick hops on → grows into a hen → hops off. It always travels, like the bunny did,
+  even with "reduce motion" on (see D14). The bunny's 155 lines of CSS were removed.
 - **Files:** `src/components/HatchLoop.tsx` (new), `src/routes/login.tsx`, `src/styles.css`.
 - **Tested:** frames captured at 1.5, 3.9, 4.6, 5.6, 7, 8 s (T3).
 

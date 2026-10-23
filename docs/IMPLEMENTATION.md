@@ -168,7 +168,7 @@ text, Ama's replies from the last 10 minutes, and short snippets (≤200 charact
 
 - **Background:** `.auth-bg` in `src/styles.css` uses `#fef5b1` and `public/auth-bg.svg`.
 - **Animation:** `HatchLoop` (`src/components/HatchLoop.tsx`), see `DECISIONS.md` D14 for the
-  timeline and the reduced-motion version.
+  timeline and why it ignores the reduced-motion setting.
 
 ## 9. Configuration
 

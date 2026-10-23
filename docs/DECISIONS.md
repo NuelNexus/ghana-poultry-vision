@@ -54,9 +54,12 @@ in a loop. Then: match the bunny's style and move left to right.
   its white dust puffs. Same path: from 20vw off the left edge, across to the right, then loop.
 - **One 12 s crossing** (the bunny took 6 s): the egg rolls (0–30%), wobbles and cracks
   (30–38%), the chick hops on (38–64%) and grows into a hen that hops off (62–100%).
-- **Reduced motion:** with "reduce motion" on, the story still plays but in one spot, fading
-  between stages, with no rolling, hopping or travelling. The headless test browser on this PC
-  reports reduce-motion, which is how this case was found.
+- **Reduced motion:** a first version played in one spot when the device asked for reduced
+  motion. Windows does that whenever "Animation effects" is off, which is the case on the
+  owner's PC, so it looked stuck on the left. The bunny ignored that setting and always moved,
+  and the owner asked for the same behaviour, so the animation now always travels left to
+  right. It's small, slow and sits at the very bottom, away from the form. To bring the
+  still version back, add a `@media (prefers-reduced-motion: reduce)` block in `HatchLoop.tsx`.
 
 ## D13. Sign-in background drawn locally (Oct 2026)
 

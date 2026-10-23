@@ -50,8 +50,9 @@ and 8 s.
 off → the chick hops on → the hen hops on (white, red comb), moving left to right.
 
 **Found while testing:**
-- The headless browser on this PC reports "reduce motion", which first froze the animation.
-  Reduced motion now shows the stages in one place instead of nothing.
+- The browser on this PC reports "reduce motion" (Windows "Animation effects" off), which kept
+  the first version still on the left. It now always moves: with reduce-motion on, it went
+  from x = 37 px to 1,541 px over 10 s, left to right.
 - The chick was too pale against the yellow background, so its colour was strengthened.
 
 ### T4. Sign-in background

@@ -121,13 +121,7 @@ const HATCH_CSS = `
   70%, 99% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; }
 }
-/* Reduced motion: no rolling, hopping or travelling; the egg -> chick -> hen story still
-   plays in one spot by gently fading between the stages. */
-@media (prefers-reduced-motion: reduce) {
-  .hl-run { animation: none; left: 16px; width: auto; }
-  .hl-hop, .hl-shadow, .hl-cap { animation: none; }
-  .hl-puffs { display: none; }
-  .hl-egg { animation: hl-egg-still 12s linear infinite; }
-}
-@keyframes hl-egg-still { 0%, 35% { opacity: 1; } 37%, 100% { opacity: 0; } }
+/* Always moves, like the bunny did, even when the device asks for reduced motion
+   (Windows turns that on when "Animation effects" is off). It is small, slow and
+   at the very bottom of the page, away from the form. */
 `;
