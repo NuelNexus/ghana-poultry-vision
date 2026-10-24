@@ -4,7 +4,7 @@
 // tokens (styles.css) so every theme and dark mode works.
 
 import type { ReactNode } from "react";
-import type { AiStatus } from "@/lib/api/types";
+import type { AiStatus, SensorHealth, SensorState } from "@/lib/api/types";
 import {
   formatFan,
   formatLight,
@@ -286,6 +286,34 @@ function Gauge({
   );
 }
 
+/** What a faulty sensor's gauge says instead of its usual note. */
+const FAULT_NOTE: Record<Exclude<SensorState, "ok">, string> = {
+  missing: "Not responding, check wiring",
+  implausible: "Bad readings, check wiring",
+  stuck: "Frozen, check the sensor",
+  not_wired: "Not connected",
+};
+
+const SENSOR_PART: Record<keyof SensorHealth, string> = {
+  temperature: "DHT22",
+  humidity: "DHT22",
+  gas_index: "MQ-135",
+  light: "LDR",
+};
+
+/**
+ * Faulty sensors from the Pi's health check, grouped by part:
+ * [{ part: "DHT22", state: "missing" }]. Not-wired sensors aren't faults.
+ */
+export function sensorFaults(health: SensorHealth | null | undefined) {
+  const out = new Map<string, Exclude<SensorState, "ok" | "not_wired">>();
+  for (const [k, v] of Object.entries(health ?? {}) as [keyof SensorHealth, SensorState][]) {
+    if (v && v !== "ok" && v !== "not_wired" && !out.has(SENSOR_PART[k]))
+      out.set(SENSOR_PART[k], v);
+  }
+  return [...out].map(([part, state]) => ({ part, state }));
+}
+
 /** Humidity, gas, light and the fan relay as a strip of gauges. */
 export function SensorGauges({
   humidity,
@@ -293,6 +321,7 @@ export function SensorGauges({
   light,
   fanOn,
   stale,
+  health,
   className,
 }: {
   humidity: number | null;
@@ -300,8 +329,13 @@ export function SensorGauges({
   light: number | null;
   fanOn: boolean | null;
   stale?: boolean;
+  health?: SensorHealth | null;
   className?: string;
 }) {
+  const fault = (k: keyof SensorHealth) => {
+    const s = health?.[k];
+    return s && s !== "ok" ? FAULT_NOTE[s] : null;
+  };
   const rhTone: Tone =
     humidity == null || stale
       ? "off"
@@ -328,7 +362,7 @@ export function SensorGauges({
         stale={stale}
         value={humidity != null ? formatNumber(humidity, { maximumFractionDigits: 0 }) : dash}
         unit={humidity != null ? "% RH" : undefined}
-        note={`Aim ${RH_BAND[0]}–${RH_BAND[1]} %`}
+        note={fault("humidity") ?? `Aim ${RH_BAND[0]}–${RH_BAND[1]} %`}
       >
         {humidity != null && (
           <Meter
@@ -346,13 +380,14 @@ export function SensorGauges({
         stale={stale}
         value={gas != null ? formatNumber(gas) : dash}
         note={
-          gas == null
+          fault("gas_index") ??
+          (gas == null
             ? "No reading"
             : gas >= GAS_CRIT
               ? "High, ventilate"
               : gas >= GAS_WARN
                 ? "Rising"
-                : "Clean air"
+                : "Clean air")
         }
       >
         {gas != null && (
@@ -373,7 +408,7 @@ export function SensorGauges({
         source="LDR"
         stale={stale}
         value={light != null ? formatLight(light) : dash}
-        note={light != null ? "Relative, not lux" : "No reading"}
+        note={fault("light") ?? (light != null ? "Relative, not lux" : "No reading")}
       >
         {light != null && <LightSteps level={light} stale={stale} />}
       </Gauge>

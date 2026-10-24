@@ -8,6 +8,26 @@ from commit messages and file lists; they weren't re-tested for this document.
 
 ## Unreleased — relay fan, readout redesign, sign-up tiles
 
+### Model v4: trained on this farm's sensors, including when they break
+- **Problem:** v3 was trained on clean readings that were always there. On the Pi a pulled
+  DHT22 wire became 0 °C (forward-filled), garbage reads went straight in, and unwired gas/light
+  sensors were replaced with made-up clean air, so a sensor fault looked like a critical house.
+- **Change:** the simulator now uses the farm's parts read the way the agent reads them (MQ-135
+  and LDR via ADS1115, DO pins or not wired; relay or PWM fan) and breaks them: flaky, unplugged,
+  frozen and garbage DHT22 reads, unplugged or floating gas input, unplugged LDR. Every reading is
+  checked (`sensor_health`, `clean_window`); faulty values are dropped, a dead DHT22 falls back to
+  its last good reading and its age (`SensorMemory`), and the model gets trust inputs per sensor
+  (26 features, 26 → 128 → 128 → 64). The agent sends each sensor's health; the readout shows a
+  "Sensor problem" strip and per-gauge notes. Fake clean-air stand-ins removed.
+- **Result** (300 unseen episodes per situation, v3 → v4): healthy sensors 91.3 → 91.1 %;
+  DHT22 unplugged 49.8 → 77.2 % (false critical 71.9 → 13.6 %); DHT22 garbage 49.2 → 83.7 %
+  (74.1 → 6.2 %); MQ-135 floating 51.1 → 71.3 % (69.2 → 14.9 %). Full table in edge/README.md.
+- **Files:** `edge/poultrygrid/{features,simulator,legacy_v3,sensors}.py`, `edge/agent.py`,
+  `edge/train.py`, `edge/models/poultrygrid_v4.npz`, `src/components/{coop-readout,ai-status}.tsx`,
+  `src/lib/api/types.ts`.
+- **Checked:** benchmark above; agent run with a DHT22 that dies mid-run (reports the fault, keeps
+  the fan on); `tsc`. Not run on the real Pi; numbers are from simulated data.
+
 ### The Pi drives the fan through a relay
 - **Problem:** the agent, model and app assumed a PWM fan with a tachometer (low / medium /
   high, rpm). The real build is a DHT22, MQ-135, LDR and a relay-switched fan.

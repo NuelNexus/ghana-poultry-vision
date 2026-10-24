@@ -30,11 +30,10 @@ import numpy as np
 
 from poultrygrid import MODEL_VERSION
 from poultrygrid.features import (
-    CAUSE_ADVICE, STATUS_LABELS, STATUS_TITLES, WINDOW, extract_features, fan_policy,
-    forward_fill, growth_phase, target_temperature,
+    CAUSE_ADVICE, STATUS_LABELS, STATUS_TITLES, WINDOW, SensorMemory, clean_window, extract_features,
+    fan_policy, growth_phase, target_temperature,
 )
 from poultrygrid.model_np import CoopModel
-from poultrygrid.sensors import stand_in_gas_light
 
 HERE = Path(__file__).parent
 log = logging.getLogger("poultrygrid")
@@ -86,7 +85,7 @@ class Config:
             interval_s=float(e("PG_INTERVAL_S", "30")),
             bird_age_days=float(e("PG_BIRD_AGE_DAYS")) if e("PG_BIRD_AGE_DAYS") else None,
             batch_start_date=e("PG_BATCH_START_DATE") or None,
-            model_path=Path(e("PG_MODEL_PATH", str(HERE / "models" / "poultrygrid_v3.npz"))),
+            model_path=Path(e("PG_MODEL_PATH", str(HERE / "models" / "poultrygrid_v4.npz"))),
             outbox_path=Path(e("PG_OUTBOX_PATH", str(HERE / "outbox.sqlite3"))),
             mq135_baseline_v=float(e("PG_MQ135_BASELINE_V", "0.6")),
             ldr_invert=e("PG_LDR_INVERT", "1") == "1",
@@ -189,6 +188,7 @@ class Agent:
         self.cfg, self.hw, self.dry_run = cfg, hw, dry_run
         self.model = CoopModel(cfg.model_path)
         self.window: collections.deque = collections.deque(maxlen=WINDOW)
+        self.memory = SensorMemory(cfg.interval_s)
         self.smoother = StatusSmoother()
         self.outbox = Outbox(cfg.outbox_path)
         self.client = AppClient(cfg)
@@ -199,16 +199,18 @@ class Agent:
     def tick(self) -> dict:
         r = self.hw.read()
         self.window.append(r.row())
+        self.memory.update(r.row())
         rows = list(self.window)
         rows = [rows[0]] * (WINDOW - len(rows)) + rows  # pad until the window fills
-        filled = forward_fill(rows)
-        no_gas_light = getattr(self.hw, "mode", None) == "none"
-        if no_gas_light:  # sensors not wired: feed the model neutral values, report them as missing
-            filled[:, 1], filled[:, 3] = stand_in_gas_light()
+        # Raw readings go straight in: the model was trained on failed reads, dead,
+        # frozen and garbage sensors, and is told which ones it can trust.
+        cleaned, health = clean_window(rows)
+        if getattr(self.hw, "mode", None) == "none":  # PG_SENSOR_MODE=none: not wired, not broken
+            health["gas_index"] = health["light"] = "not_wired"
         age = self.cfg.age_days(self.server_age)
         if hasattr(self.hw, "age"):  # keep the simulated flock in step with the app's batch date
             self.hw.age = age
-        feats = extract_features(filled, age)
+        feats = extract_features(rows, age, self.memory)
 
         raw = self.model.predict(feats)
         probs = np.array([raw["probabilities"][k] for k in STATUS_LABELS])
@@ -222,14 +224,17 @@ class Agent:
             self.hw.set_fan(level == "on", force=self.fan_override is not None)
         fan_on = bool(self.hw.fan_on)
 
-        latest = filled[-1]
+        latest = cleaned[-1]  # faulty values are already blanked, so they're sent as missing
+        faults = {k: v for k, v in health.items() if v not in ("ok", "not_wired")}
         self.seq += 1
         payload = {
             "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             "seq": self.seq,
-            "humidity": _r(latest[0]), "gas_index": None if no_gas_light else _r(latest[1]),
-            "temperature": _r(latest[2]), "light": None if no_gas_light else _r(latest[3]), "fan_on": fan_on,
+            "humidity": _r(latest[0]), "gas_index": _r(latest[1]),
+            "temperature": _r(latest[2]), "light": _r(latest[3]), "fan_on": fan_on,
             "bird_age_days": round(age, 1),
+            # Per sensor: ok, missing, implausible, stuck or not_wired.
+            "sensors": health,
             "ai": {
                 "status": STATUS_LABELS[status], "status_code": status,
                 "confidence": round(float(self.smoother.ema[status]), 3),
@@ -242,11 +247,12 @@ class Agent:
                 "model_version": self.model.version,
             },
         }
-        log.info("%s %.0f%% | T=%.1f°C RH=%.0f%% gas=%.1f light=%.0f | fan=%s%s | %s",
-                 STATUS_TITLES[status].upper(), payload["ai"]["confidence"] * 100, latest[2], latest[0],
-                 latest[1], latest[3], "on" if fan_on else "off",
+        log.info("%s %.0f%% | T=%s°C RH=%s%% gas=%s light=%s | fan=%s%s | %s%s",
+                 STATUS_TITLES[status].upper(), payload["ai"]["confidence"] * 100,
+                 *(_show(v) for v in (latest[2], latest[0], latest[1], latest[3])), "on" if fan_on else "off",
                  "" if (level == "on") == fan_on else f" (wants {level}, relay holding)",
-                 ", ".join(c["label"] for c in causes) or "all good")
+                 ", ".join(c["label"] for c in causes) or "all good",
+                 " | sensor fault: " + ", ".join(f"{k} {v}" for k, v in faults.items()) if faults else "")
         self._send(payload)
         return payload
 
@@ -273,6 +279,10 @@ class Agent:
                 self.outbox.remove_upto(self.outbox.peek(1)[0][0])  # drop the bad one, don't jam the queue
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             log.warning("Offline, %d readings buffered (%s)", len(self.outbox), e)
+
+
+def _show(v):
+    return "-" if v is None or np.isnan(v) else f"{v:.1f}"
 
 
 def _r(v, nd=1):

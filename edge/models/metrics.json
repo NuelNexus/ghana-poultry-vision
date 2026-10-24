@@ -1,63 +1,572 @@
 {
-  "model_version": "poultrygrid-v3.0",
-  "test_samples": 34650,
-  "epochs_trained": 36,
-  "temperature": 1.076,
+  "model_version": "poultrygrid-v4.0",
+  "test_samples": 69300,
+  "epochs_trained": 23,
+  "temperature": 1.275,
   "status_labels": [
     "Healthy",
     "Warning",
     "Critical"
   ],
-  "v3": {
-    "accuracy": 0.9177,
-    "macro_f1": 0.9104,
-    "critical_recall": 0.9763,
+  "v4_mixed_test": {
+    "accuracy": 0.8413,
+    "macro_f1": 0.8392,
+    "critical_recall": 0.9456,
+    "false_critical": 0.0584,
     "confusion_matrix": [
       [
-        6295,
-        545,
-        0
+        14780,
+        1787,
+        189
       ],
       [
-        1530,
-        13390,
-        482
+        5260,
+        21325,
+        2488
       ],
       [
-        1,
-        293,
-        12114
-      ]
-    ]
-  },
-  "original_ai_for_poultry_on_same_data": {
-    "accuracy": 0.7772,
-    "macro_f1": 0.7592,
-    "critical_recall": 0.8465,
-    "confusion_matrix": [
-      [
-        4352,
-        1894,
-        594
-      ],
-      [
-        1486,
-        12074,
-        1842
-      ],
-      [
-        352,
-        1553,
-        10503
+        274,
+        1003,
+        22194
       ]
     ]
   },
   "cause_f1": {
-    "heat_stress": 0.9667,
-    "cold_stress": 0.9263,
-    "ammonia": 0.8976,
-    "high_humidity": 0.9559,
-    "low_humidity": 0.8802,
-    "poor_ventilation": 0.9205
+    "heat_stress": 0.9634,
+    "cold_stress": 0.8946,
+    "ammonia": 0.6229,
+    "high_humidity": 0.948,
+    "low_humidity": 0.8608,
+    "poor_ventilation": 0.7575
+  },
+  "benchmark_vs_v3": {
+    "clean (ADS1115, relay)": {
+      "v4": {
+        "accuracy": 0.9115,
+        "macro_f1": 0.9095,
+        "critical_recall": 0.9752,
+        "false_critical": 0.0303,
+        "confusion_matrix": [
+          [
+            4635,
+            453,
+            0
+          ],
+          [
+            927,
+            9975,
+            500
+          ],
+          [
+            2,
+            162,
+            6446
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.9129,
+        "macro_f1": 0.9113,
+        "critical_recall": 0.9747,
+        "false_critical": 0.0257,
+        "confusion_matrix": [
+          [
+            4753,
+            335,
+            0
+          ],
+          [
+            1086,
+            9893,
+            423
+          ],
+          [
+            0,
+            167,
+            6443
+          ]
+        ]
+      }
+    },
+    "gas/light on DO pins": {
+      "v4": {
+        "accuracy": 0.7979,
+        "macro_f1": 0.7967,
+        "critical_recall": 0.9635,
+        "false_critical": 0.0652,
+        "confusion_matrix": [
+          [
+            4384,
+            395,
+            3
+          ],
+          [
+            2972,
+            7151,
+            1037
+          ],
+          [
+            11,
+            250,
+            6897
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.7957,
+        "macro_f1": 0.7985,
+        "critical_recall": 0.8766,
+        "false_critical": 0.0118,
+        "confusion_matrix": [
+          [
+            4471,
+            311,
+            0
+          ],
+          [
+            3338,
+            7634,
+            188
+          ],
+          [
+            0,
+            883,
+            6275
+          ]
+        ]
+      }
+    },
+    "gas/light not wired": {
+      "v4": {
+        "accuracy": 0.7405,
+        "macro_f1": 0.733,
+        "critical_recall": 0.8984,
+        "false_critical": 0.0307,
+        "confusion_matrix": [
+          [
+            4191,
+            207,
+            0
+          ],
+          [
+            4481,
+            5346,
+            451
+          ],
+          [
+            426,
+            430,
+            7568
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.7325,
+        "macro_f1": 0.7267,
+        "critical_recall": 0.8845,
+        "false_critical": 0.0196,
+        "confusion_matrix": [
+          [
+            4250,
+            148,
+            0
+          ],
+          [
+            4772,
+            5219,
+            287
+          ],
+          [
+            512,
+            461,
+            7451
+          ]
+        ]
+      }
+    },
+    "4-pin PWM fan": {
+      "v4": {
+        "accuracy": 0.9196,
+        "macro_f1": 0.9197,
+        "critical_recall": 0.9773,
+        "false_critical": 0.0319,
+        "confusion_matrix": [
+          [
+            6017,
+            545,
+            1
+          ],
+          [
+            647,
+            7577,
+            486
+          ],
+          [
+            0,
+            178,
+            7649
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.9234,
+        "macro_f1": 0.9236,
+        "critical_recall": 0.9741,
+        "false_critical": 0.0282,
+        "confusion_matrix": [
+          [
+            6092,
+            471,
+            0
+          ],
+          [
+            665,
+            7615,
+            430
+          ],
+          [
+            1,
+            202,
+            7624
+          ]
+        ]
+      }
+    },
+    "DHT22 flaky (40% reads fail)": {
+      "v4": {
+        "accuracy": 0.904,
+        "macro_f1": 0.8966,
+        "critical_recall": 0.9758,
+        "false_critical": 0.0249,
+        "confusion_matrix": [
+          [
+            4100,
+            477,
+            0
+          ],
+          [
+            1171,
+            9361,
+            386
+          ],
+          [
+            0,
+            184,
+            7421
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.9074,
+        "macro_f1": 0.9006,
+        "critical_recall": 0.9719,
+        "false_critical": 0.0212,
+        "confusion_matrix": [
+          [
+            4178,
+            398,
+            1
+          ],
+          [
+            1199,
+            9392,
+            327
+          ],
+          [
+            0,
+            214,
+            7391
+          ]
+        ]
+      }
+    },
+    "DHT22 unplugged": {
+      "v4": {
+        "accuracy": 0.7723,
+        "macro_f1": 0.7679,
+        "critical_recall": 0.8429,
+        "false_critical": 0.1359,
+        "confusion_matrix": [
+          [
+            3550,
+            739,
+            232
+          ],
+          [
+            1216,
+            7756,
+            1854
+          ],
+          [
+            338,
+            880,
+            6535
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.498,
+        "macro_f1": 0.4634,
+        "critical_recall": 0.9943,
+        "false_critical": 0.7186,
+        "confusion_matrix": [
+          [
+            1460,
+            131,
+            2930
+          ],
+          [
+            394,
+            2334,
+            8098
+          ],
+          [
+            0,
+            44,
+            7709
+          ]
+        ]
+      }
+    },
+    "DHT22 frozen": {
+      "v4": {
+        "accuracy": 0.7615,
+        "macro_f1": 0.7534,
+        "critical_recall": 0.8289,
+        "false_critical": 0.1283,
+        "confusion_matrix": [
+          [
+            3493,
+            796,
+            386
+          ],
+          [
+            1424,
+            7768,
+            1598
+          ],
+          [
+            388,
+            918,
+            6329
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.7622,
+        "macro_f1": 0.7498,
+        "critical_recall": 0.8337,
+        "false_critical": 0.1218,
+        "confusion_matrix": [
+          [
+            3247,
+            981,
+            447
+          ],
+          [
+            1359,
+            7995,
+            1436
+          ],
+          [
+            330,
+            940,
+            6365
+          ]
+        ]
+      }
+    },
+    "DHT22 garbage values": {
+      "v4": {
+        "accuracy": 0.837,
+        "macro_f1": 0.8275,
+        "critical_recall": 0.9168,
+        "false_critical": 0.0619,
+        "confusion_matrix": [
+          [
+            3699,
+            980,
+            55
+          ],
+          [
+            1183,
+            8179,
+            871
+          ],
+          [
+            125,
+            552,
+            7456
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.4924,
+        "macro_f1": 0.4431,
+        "critical_recall": 0.983,
+        "false_critical": 0.741,
+        "confusion_matrix": [
+          [
+            1352,
+            143,
+            3239
+          ],
+          [
+            354,
+            2028,
+            7851
+          ],
+          [
+            37,
+            101,
+            7995
+          ]
+        ]
+      }
+    },
+    "MQ-135 unplugged": {
+      "v4": {
+        "accuracy": 0.7857,
+        "macro_f1": 0.784,
+        "critical_recall": 0.9217,
+        "false_critical": 0.0464,
+        "confusion_matrix": [
+          [
+            4596,
+            506,
+            106
+          ],
+          [
+            3129,
+            6509,
+            612
+          ],
+          [
+            147,
+            451,
+            7044
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.7582,
+        "macro_f1": 0.7612,
+        "critical_recall": 0.9123,
+        "false_critical": 0.0149,
+        "confusion_matrix": [
+          [
+            4967,
+            241,
+            0
+          ],
+          [
+            4443,
+            5576,
+            231
+          ],
+          [
+            281,
+            389,
+            6972
+          ]
+        ]
+      }
+    },
+    "MQ-135 floating input": {
+      "v4": {
+        "accuracy": 0.7128,
+        "macro_f1": 0.7025,
+        "critical_recall": 0.9308,
+        "false_critical": 0.1493,
+        "confusion_matrix": [
+          [
+            3881,
+            591,
+            401
+          ],
+          [
+            3237,
+            5110,
+            1849
+          ],
+          [
+            199,
+            357,
+            7475
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.5106,
+        "macro_f1": 0.4559,
+        "critical_recall": 0.9878,
+        "false_critical": 0.6918,
+        "confusion_matrix": [
+          [
+            1149,
+            518,
+            3206
+          ],
+          [
+            266,
+            2712,
+            7218
+          ],
+          [
+            1,
+            97,
+            7933
+          ]
+        ]
+      }
+    },
+    "LDR unplugged": {
+      "v4": {
+        "accuracy": 0.9119,
+        "macro_f1": 0.9072,
+        "critical_recall": 0.9773,
+        "false_critical": 0.0266,
+        "confusion_matrix": [
+          [
+            4769,
+            503,
+            0
+          ],
+          [
+            950,
+            8067,
+            391
+          ],
+          [
+            0,
+            191,
+            8229
+          ]
+        ]
+      },
+      "v3": {
+        "accuracy": 0.9177,
+        "macro_f1": 0.9132,
+        "critical_recall": 0.9761,
+        "false_critical": 0.0184,
+        "confusion_matrix": [
+          [
+            4929,
+            343,
+            0
+          ],
+          [
+            1088,
+            8050,
+            270
+          ],
+          [
+            0,
+            201,
+            8219
+          ]
+        ]
+      }
+    }
   }
 }

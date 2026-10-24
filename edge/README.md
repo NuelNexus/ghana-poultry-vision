@@ -27,31 +27,49 @@ Status changes create alerts automatically, and the alerts close again once cond
 
 ## What changed from the original model
 
-| | Original | v3 (relay fan) |
+| | Original | v4 (current) |
 |-|-|-|
-| Training data | 12k rows drawn independently; labels computed from the *same* values the model sees | 3,000 simulated coop episodes (230k samples) over time with weather, flock age, brooder heat, airflow, wet litter, heatwaves, heater and fan failures, and an on/off relay fan. Labels come from the true state; the model sees noisy sensor readings |
-| Inputs | 5 instantaneous readings | 20 features: the 4 sensors + relay state, share of the last 5 and 10 readings the fan was on, 5-minute means, trends (slopes), temperature variance, flock age and age-specific comfort band, gas per unit airflow |
+| Training data | 12k rows drawn independently; labels computed from the *same* values the model sees | 6,000 simulated coop episodes (462k samples) over time with weather, flock age, brooder heat, airflow, wet litter, heatwaves, heater and fan failures. The sensors are this farm's parts read the way the agent reads them: MQ-135 and LDR through an ADS1115, the DO pins or not wired; relay or 4-pin PWM fan. Two thirds of episodes include sensor faults (below). Labels come from the true state; the model sees noisy, sometimes broken readings |
+| Inputs | 5 instantaneous readings | 26 features: the 4 sensors + fan state, share of the last 5 and 10 readings the fan was on, 5-minute means, trends (slopes), temperature variance, flock age and age-specific comfort band, gas per unit airflow, how far each sensor can be trusted, whether gas comes from the on/off DO pin, and how many minutes old the last fresh DHT22 reading is |
+| Broken sensors | Not handled: a dead sensor read as 0 °C, garbage went straight in | Every reading is checked first (missing, out of range, frozen). Faulty values are dropped, a dead DHT22 is replaced with its last good reading and that reading's age, and the agent reports each sensor's health to the app |
 | Flock age | Ignored (fixed 26 °C target) | Age-aware: a 3-day-old chick at 26 °C is in danger; a 5-week bird at 26 °C is fine |
 | Outputs | Status only | Status + which of 6 causes + calibrated confidence |
 | Fan logic | Critical → high, always | Heat, gas and damp switch the fan on; cold chicks keep it off. The relay holds each state for at least 60 s |
 | Evaluation | Random row split | Split by episode (no leakage), plus macro-F1 and critical recall |
-| On the Pi | PyTorch + scikit-learn + pickle | Numpy only; the model is a 32 KB `.npz` file |
+| On the Pi | PyTorch + scikit-learn + pickle | Numpy only; the model is a 108 KB `.npz` file (26 → 128 → 128 → 64) |
 | Stability | Raw prediction each reading | EMA + hysteresis: escalate after 2 readings (1 if very sure it's critical), de-escalate after 4 |
 | Network loss | n/a | Readings buffered in SQLite and sent in order when back online |
 
-### Results (held-out test episodes, `models/metrics.json`)
+### Results: v4 against v3, sensor by sensor (`models/metrics.json`)
 
-Both models were trained on the same realistic data:
+300 unseen simulated episodes per situation. v3 is fed the way the v3 agent fed it
+(dropouts forward-filled, garbage passed through, unwired sensors replaced with
+clean air). *Accuracy* is the share of readings with the right status; *false
+critical* is how often a house that isn't critical gets called critical.
 
-| | v3 | Original network |
-|-|-|-|
-| Accuracy | **91.8 %** | 77.7 % |
-| Macro F1 | **91.0 %** | 75.9 % |
-| Critical recall | **97.6 %** | 84.7 % |
+| Situation | v3 accuracy | v4 accuracy | v3 false critical | v4 false critical |
+|-|-|-|-|-|
+| All sensors fine (ADS1115, relay) | 91.3 % | 91.1 % | 2.6 % | 3.0 % |
+| 4-pin PWM fan | 92.3 % | 92.0 % | 2.8 % | 3.2 % |
+| DHT22 flaky (40 % of reads fail) | 90.7 % | 90.4 % | 2.1 % | 2.5 % |
+| Gas/light on the DO pins | 79.6 % | 79.8 % | 1.2 % | 6.5 % |
+| Gas/light not wired | 73.2 % | 74.1 % | 2.0 % | 3.1 % |
+| **DHT22 unplugged** | 49.8 % | **77.2 %** | 71.9 % | **13.6 %** |
+| DHT22 frozen | 76.2 % | 76.1 % | 12.2 % | 12.8 % |
+| **DHT22 sending garbage** | 49.2 % | **83.7 %** | 74.1 % | **6.2 %** |
+| MQ-135 unplugged | 75.8 % | 78.6 % | 1.5 % | 4.6 % |
+| **MQ-135 floating input** | 51.1 % | **71.3 %** | 69.2 % | **14.9 %** |
+| LDR unplugged | 91.8 % | 91.2 % | 1.8 % | 2.7 % |
 
-The original's 97 % only held on its own data, where the labels were thresholds on the inputs.
-Per-cause F1 ranges from 0.88 (air too dry) to 0.97 (heat stress). v3 scores a little
-below the PWM model it replaced (93.8 %) because an on/off fan with no tach tells it less.
+With healthy sensors v4 is as good as v3 (about 91 %); nothing more can be squeezed
+out of the same readings. The gain is when hardware fails: a pulled DHT22 wire, a
+corrupted read or a floating gas input used to make v3 call a critical alarm about
+70 % of the time, wrongly; v4 recognises the fault, works from what it still
+trusts, and the app shows which sensor needs attention. With the DO pins, v4 catches
+more real emergencies (critical recall 96 % against 88 %) at the cost of more false
+alarms. When the DHT22 is dead, nothing can measure heat, so v4 leans cautious and
+keeps the fan on. On a mix like the field (two thirds of episodes with some fault)
+v4 scores 84.1 % accuracy and 94.6 % critical recall.
 
 > These numbers come from simulated data. Real-world accuracy depends on how
 > closely the simulator matches your house. Once the Pi has logged a few weeks of
@@ -183,7 +201,7 @@ heater failures happen at random, so every status shows up in the app.
 ```bash
 cd edge
 pip install -r requirements-train.txt
-python train.py            # ~1 min on a laptop CPU; writes models/poultrygrid_v3.npz + metrics.json
+python train.py            # ~4 min on a laptop CPU; writes models/poultrygrid_v4.npz + metrics.json
 ```
 
 The labelling rules, comfort bands and fan policy live in `poultrygrid/features.py`.

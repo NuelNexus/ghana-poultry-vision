@@ -1,0 +1,432 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1560 1040" width="1560" height="1040" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<style>
+  .title{font-size:26px;font-weight:700;fill:#1d1d1d}
+  .sub{font-size:14px;fill:#555}
+  .name{font-size:15px;font-weight:700;fill:#1d1d1d}
+  .silk{font-size:9.5px;font-weight:700;font-family:Consolas,monospace}
+  .small{font-size:11px;fill:#333}
+  .tag{font-size:11.5px;font-weight:600;font-family:Consolas,monospace}
+  .leg{font-size:13px;fill:#1d1d1d}
+  .note{font-size:12.5px;fill:#333}
+</style>
+<defs>
+  <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+    <path d="M20 0H0V20" fill="none" stroke="#e7e3d8" stroke-width="1"/>
+  </pattern>
+  <pattern id="mesh" width="6" height="6" patternUnits="userSpaceOnUse">
+    <rect width="6" height="6" fill="#c7cbd1"/>
+    <path d="M0 0L6 6M6 0L0 6" stroke="#8d939b" stroke-width="0.8"/>
+  </pattern>
+  <pattern id="grille" width="8" height="8" patternUnits="userSpaceOnUse">
+    <rect width="8" height="8" fill="#f4f4f2"/>
+    <rect x="1.5" y="1.5" width="5" height="5" fill="#cfd2d4"/>
+  </pattern>
+  <linearGradient id="pcbG" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#2f8f4e"/><stop offset="1" stop-color="#1f6b39"/>
+  </linearGradient>
+  <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#e9ebee"/><stop offset="1" stop-color="#9ea4ab"/>
+  </linearGradient>
+</defs>
+<rect width="1560" height="1040" fill="#f7f5ef"/>
+<rect width="1560" height="1040" fill="url(#grid)"/>
+<text x="40" y="46" class="title">PoultryGrid edge unit: wiring</text>
+<text x="40" y="70" class="sub">Raspberry Pi 4 · DHT22 · ADS1115 · MQ-135 · LDR module · 5 V relay module · 12 V fan. Tags show where each wire lands on the Pi (physical pin numbers).</text>
+<rect x="250" y="452" width="600" height="390" rx="18" fill="url(#pcbG)" stroke="#164d29" stroke-width="2"/>
+<circle cx="268" cy="470" r="9" fill="#d9c27a"/><circle cx="268" cy="470" r="5" fill="#f7f5ef"/>
+<circle cx="730" cy="470" r="9" fill="#d9c27a"/><circle cx="730" cy="470" r="5" fill="#f7f5ef"/>
+<circle cx="268" cy="824" r="9" fill="#d9c27a"/><circle cx="268" cy="824" r="5" fill="#f7f5ef"/>
+<circle cx="730" cy="824" r="9" fill="#d9c27a"/><circle cx="730" cy="824" r="5" fill="#f7f5ef"/>
+<rect x="291" y="469" width="360" height="36" fill="#0d0d0d" rx="2"/>
+<rect x="294" y="490" width="12" height="12" fill="#151515"/>
+<rect x="297.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="294" y="472" width="12" height="12" fill="#151515"/>
+<rect x="297.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="312" y="490" width="12" height="12" fill="#151515"/>
+<rect x="315.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="312" y="472" width="12" height="12" fill="#151515"/>
+<rect x="315.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="330" y="490" width="12" height="12" fill="#151515"/>
+<rect x="333.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="330" y="472" width="12" height="12" fill="#151515"/>
+<rect x="333.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="348" y="490" width="12" height="12" fill="#151515"/>
+<rect x="351.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="348" y="472" width="12" height="12" fill="#151515"/>
+<rect x="351.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="366" y="490" width="12" height="12" fill="#151515"/>
+<rect x="369.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="366" y="472" width="12" height="12" fill="#151515"/>
+<rect x="369.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="384" y="490" width="12" height="12" fill="#151515"/>
+<rect x="387.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="384" y="472" width="12" height="12" fill="#151515"/>
+<rect x="387.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="402" y="490" width="12" height="12" fill="#151515"/>
+<rect x="405.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="402" y="472" width="12" height="12" fill="#151515"/>
+<rect x="405.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="420" y="490" width="12" height="12" fill="#151515"/>
+<rect x="423.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="420" y="472" width="12" height="12" fill="#151515"/>
+<rect x="423.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="438" y="490" width="12" height="12" fill="#151515"/>
+<rect x="441.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="438" y="472" width="12" height="12" fill="#151515"/>
+<rect x="441.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="456" y="490" width="12" height="12" fill="#151515"/>
+<rect x="459.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="456" y="472" width="12" height="12" fill="#151515"/>
+<rect x="459.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="474" y="490" width="12" height="12" fill="#151515"/>
+<rect x="477.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="474" y="472" width="12" height="12" fill="#151515"/>
+<rect x="477.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="492" y="490" width="12" height="12" fill="#151515"/>
+<rect x="495.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="492" y="472" width="12" height="12" fill="#151515"/>
+<rect x="495.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="510" y="490" width="12" height="12" fill="#151515"/>
+<rect x="513.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="510" y="472" width="12" height="12" fill="#151515"/>
+<rect x="513.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="528" y="490" width="12" height="12" fill="#151515"/>
+<rect x="531.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="528" y="472" width="12" height="12" fill="#151515"/>
+<rect x="531.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="546" y="490" width="12" height="12" fill="#151515"/>
+<rect x="549.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="546" y="472" width="12" height="12" fill="#151515"/>
+<rect x="549.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="564" y="490" width="12" height="12" fill="#151515"/>
+<rect x="567.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="564" y="472" width="12" height="12" fill="#151515"/>
+<rect x="567.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="582" y="490" width="12" height="12" fill="#151515"/>
+<rect x="585.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="582" y="472" width="12" height="12" fill="#151515"/>
+<rect x="585.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="600" y="490" width="12" height="12" fill="#151515"/>
+<rect x="603.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="600" y="472" width="12" height="12" fill="#151515"/>
+<rect x="603.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="618" y="490" width="12" height="12" fill="#151515"/>
+<rect x="621.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="618" y="472" width="12" height="12" fill="#151515"/>
+<rect x="621.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="636" y="490" width="12" height="12" fill="#151515"/>
+<rect x="639.4" y="493.4" width="5.2" height="5.2" fill="#d4af37"/>
+<rect x="636" y="472" width="12" height="12" fill="#151515"/>
+<rect x="639.4" y="475.4" width="5.2" height="5.2" fill="#d4af37"/>
+<text x="294" y="522" class="silk" fill="#ffffff">1</text>
+<text x="294" y="463" class="silk" fill="#ffffff">2</text>
+<text x="636" y="522" class="silk" fill="#ffffff">39</text>
+<text x="636" y="463" class="silk" fill="#ffffff">40</text>
+<rect x="420" y="600" width="110" height="110" rx="6" fill="url(#metal)" stroke="#6d737a"/>
+<text x="475" y="660" text-anchor="middle" class="small" fill="#333">BCM2711</text>
+<rect x="560" y="610" width="70" height="90" rx="3" fill="#1b1b1b"/>
+<text x="595" y="660" text-anchor="middle" class="silk" fill="#bbbbbb">RAM</text>
+<rect x="660" y="560" width="46" height="46" rx="3" fill="#1b1b1b"/>
+<rect x="760" y="482" width="112" height="92" rx="4" fill="url(#metal)" stroke="#6d737a"/>
+<rect x="774" y="504" width="80" height="48" rx="3" fill="#1b1b1b"/>
+<text x="814" y="532" text-anchor="middle" class="silk" fill="#cccccc">ETHERNET</text>
+<rect x="760" y="602" width="112" height="88" rx="4" fill="url(#metal)" stroke="#6d737a"/>
+<rect x="770" y="622" width="84" height="16" fill="#1565c0"/>
+<rect x="770" y="654" width="84" height="16" fill="#1565c0"/>
+<text x="814" y="686" text-anchor="middle" class="silk" fill="#333">USB 3</text>
+<rect x="760" y="707" width="112" height="88" rx="4" fill="url(#metal)" stroke="#6d737a"/>
+<rect x="770" y="727" width="84" height="16" fill="#1b1b1b"/>
+<rect x="770" y="759" width="84" height="16" fill="#1b1b1b"/>
+<text x="814" y="791" text-anchor="middle" class="silk" fill="#333">USB 2</text>
+<rect x="300" y="826" width="50" height="28" rx="3" fill="url(#metal)" stroke="#6d737a"/>
+<text x="325.0" y="818" text-anchor="middle" class="silk" fill="#ffffff">USB-C power</text>
+<rect x="390" y="826" width="40" height="28" rx="3" fill="url(#metal)" stroke="#6d737a"/>
+<text x="410.0" y="818" text-anchor="middle" class="silk" fill="#ffffff">HDMI0</text>
+<rect x="450" y="826" width="40" height="28" rx="3" fill="url(#metal)" stroke="#6d737a"/>
+<text x="470.0" y="818" text-anchor="middle" class="silk" fill="#ffffff">HDMI1</text>
+<rect x="520" y="826" width="30" height="28" rx="3" fill="url(#metal)" stroke="#6d737a"/>
+<text x="535.0" y="818" text-anchor="middle" class="silk" fill="#ffffff">AV</text>
+<text x="280" y="782" class="name" fill="#ffffff" style="fill:#ffffff">Raspberry Pi 4 Model B</text>
+<text x="280" y="800" class="small" style="fill:#d7f0dd">40-pin GPIO header along the top edge, pin 1 at the left</text>
+<text x="40" y="128" class="name">DHT22</text>
+<rect x="40" y="140" width="110" height="170" rx="6" fill="#1d4f91" stroke="#123565"/>
+<rect x="55" y="150" width="80" height="120" rx="4" fill="url(#grille)" stroke="#9fa5aa"/>
+<rect x="55" y="270" width="80" height="14" fill="#f4f4f2" stroke="#9fa5aa"/>
+<rect x="65" y="296" width="10" height="14" fill="#151515"/>
+<rect x="68" y="302" width="4" height="12" fill="#d4af37"/>
+<text x="70" y="286" text-anchor="middle" class="silk" fill="#ffffff">+</text>
+<rect x="90" y="296" width="10" height="14" fill="#151515"/>
+<rect x="93" y="302" width="4" height="12" fill="#d4af37"/>
+<text x="95" y="286" text-anchor="middle" class="silk" fill="#ffffff">out</text>
+<rect x="115" y="296" width="10" height="14" fill="#151515"/>
+<rect x="118" y="302" width="4" height="12" fill="#d4af37"/>
+<text x="120" y="286" text-anchor="middle" class="silk" fill="#ffffff">−</text>
+<text x="180" y="128" class="name">LDR module</text>
+<rect x="180" y="140" width="125" height="150" rx="6" fill="#1d4f91" stroke="#123565"/>
+<circle cx="242" cy="185" r="22" fill="#f1e2c6" stroke="#8a6d3b"/>
+<path d="M228 178 q5 -8 10 0 t10 0 t10 0 M228 192 q5 -8 10 0 t10 0 t10 0" fill="none" stroke="#b5402b" stroke-width="2.5"/>
+<rect x="200" y="222" width="22" height="22" rx="3" fill="#2a6fd6"/><circle cx="211" cy="233" r="6" fill="#e8e8e8"/>
+<rect x="250" y="226" width="34" height="14" fill="#1b1b1b"/>
+<rect x="195" y="276" width="10" height="14" fill="#151515"/>
+<rect x="198" y="282" width="4" height="12" fill="#d4af37"/>
+<text x="200" y="266" text-anchor="middle" class="silk" fill="#ffffff">VCC</text>
+<rect x="220" y="276" width="10" height="14" fill="#151515"/>
+<rect x="223" y="282" width="4" height="12" fill="#d4af37"/>
+<text x="225" y="266" text-anchor="middle" class="silk" fill="#ffffff">GND</text>
+<rect x="245" y="276" width="10" height="14" fill="#151515"/>
+<rect x="248" y="282" width="4" height="12" fill="#d4af37"/>
+<text x="250" y="266" text-anchor="middle" class="silk" fill="#ffffff">DO</text>
+<rect x="270" y="276" width="10" height="14" fill="#151515"/>
+<rect x="273" y="282" width="4" height="12" fill="#d4af37"/>
+<text x="275" y="266" text-anchor="middle" class="silk" fill="#ffffff">AO</text>
+<text x="340" y="148" class="name">ADS1115 (16-bit ADC, I²C 0x48)</text>
+<rect x="333" y="160" width="252" height="100" rx="6" fill="#5b3a8c" stroke="#3b2560"/>
+<rect x="433" y="185" width="52" height="40" rx="2" fill="#1b1b1b"/>
+<text x="459" y="210" text-anchor="middle" class="silk" fill="#bbbbbb">ADS</text>
+<rect x="340" y="248" width="10" height="14" fill="#151515"/>
+<rect x="343" y="254" width="4" height="12" fill="#d4af37"/>
+<text x="345" y="246" text-anchor="middle" class="silk" fill="#ffffff">VDD</text>
+<rect x="365" y="248" width="10" height="14" fill="#151515"/>
+<rect x="368" y="254" width="4" height="12" fill="#d4af37"/>
+<text x="370" y="246" text-anchor="middle" class="silk" fill="#ffffff">GND</text>
+<rect x="390" y="248" width="10" height="14" fill="#151515"/>
+<rect x="393" y="254" width="4" height="12" fill="#d4af37"/>
+<text x="395" y="246" text-anchor="middle" class="silk" fill="#ffffff">SCL</text>
+<rect x="415" y="248" width="10" height="14" fill="#151515"/>
+<rect x="418" y="254" width="4" height="12" fill="#d4af37"/>
+<text x="420" y="246" text-anchor="middle" class="silk" fill="#ffffff">SDA</text>
+<rect x="440" y="248" width="10" height="14" fill="#151515"/>
+<rect x="443" y="254" width="4" height="12" fill="#d4af37"/>
+<text x="445" y="246" text-anchor="middle" class="silk" fill="#ffffff">ADDR</text>
+<rect x="465" y="248" width="10" height="14" fill="#151515"/>
+<rect x="468" y="254" width="4" height="12" fill="#d4af37"/>
+<text x="470" y="246" text-anchor="middle" class="silk" fill="#ffffff">ALRT</text>
+<rect x="490" y="248" width="10" height="14" fill="#151515"/>
+<rect x="493" y="254" width="4" height="12" fill="#d4af37"/>
+<text x="495" y="246" text-anchor="middle" class="silk" fill="#ffffff">A0</text>
+<rect x="515" y="248" width="10" height="14" fill="#151515"/>
+<rect x="518" y="254" width="4" height="12" fill="#d4af37"/>
+<text x="520" y="246" text-anchor="middle" class="silk" fill="#ffffff">A1</text>
+<rect x="540" y="248" width="10" height="14" fill="#151515"/>
+<rect x="543" y="254" width="4" height="12" fill="#d4af37"/>
+<text x="545" y="246" text-anchor="middle" class="silk" fill="#ffffff">A2</text>
+<rect x="565" y="248" width="10" height="14" fill="#151515"/>
+<rect x="568" y="254" width="4" height="12" fill="#d4af37"/>
+<text x="570" y="246" text-anchor="middle" class="silk" fill="#ffffff">A3</text>
+<text x="640" y="108" class="name">MQ-135 gas sensor</text>
+<rect x="640" y="120" width="180" height="170" rx="6" fill="#1d4f91" stroke="#123565"/>
+<circle cx="730" cy="190" r="58" fill="#b9bec5" stroke="#7d838b" stroke-width="3"/>
+<circle cx="730" cy="190" r="48" fill="url(#mesh)" stroke="#7d838b"/>
+<rect x="655" y="250" width="22" height="22" rx="3" fill="#2a6fd6"/><circle cx="666" cy="261" r="6" fill="#e8e8e8"/>
+<circle cx="800" cy="138" r="4" fill="#ff4d4d"/><circle cx="800" cy="152" r="4" fill="#4dff88"/>
+<rect x="685" y="276" width="10" height="14" fill="#151515"/>
+<rect x="688" y="282" width="4" height="12" fill="#d4af37"/>
+<text x="690" y="266" text-anchor="middle" class="silk" fill="#ffffff">VCC</text>
+<rect x="710" y="276" width="10" height="14" fill="#151515"/>
+<rect x="713" y="282" width="4" height="12" fill="#d4af37"/>
+<text x="715" y="266" text-anchor="middle" class="silk" fill="#ffffff">GND</text>
+<rect x="735" y="276" width="10" height="14" fill="#151515"/>
+<rect x="738" y="282" width="4" height="12" fill="#d4af37"/>
+<text x="740" y="266" text-anchor="middle" class="silk" fill="#ffffff">DO</text>
+<rect x="760" y="276" width="10" height="14" fill="#151515"/>
+<rect x="763" y="282" width="4" height="12" fill="#d4af37"/>
+<text x="765" y="266" text-anchor="middle" class="silk" fill="#ffffff">AO</text>
+<line x1="610" y1="392" x2="700" y2="392" stroke="#9a9a9a" stroke-width="2.5"/>
+<rect x="631.0" y="384" width="48" height="16" rx="7" fill="#e3c99a" stroke="#8a6d3b"/>
+<rect x="639.0" y="384" width="4" height="16" fill="#8b4513"/>
+<rect x="648.0" y="384" width="4" height="16" fill="#1d1d1d"/>
+<rect x="657.0" y="384" width="4" height="16" fill="#f77f00"/>
+<rect x="666.0" y="384" width="4" height="16" fill="#c9a227"/>
+<text x="655.0" y="378" text-anchor="middle" class="small">R1 10 kΩ</text>
+<line x1="610" y1="392" x2="610" y2="448" stroke="#9a9a9a" stroke-width="2.5"/>
+<rect x="602" y="396.0" width="16" height="48" rx="7" fill="#e3c99a" stroke="#8a6d3b"/>
+<rect x="602" y="404.0" width="16" height="4" fill="#d62828"/>
+<rect x="602" y="413.0" width="16" height="4" fill="#1d1d1d"/>
+<rect x="602" y="422.0" width="16" height="4" fill="#f77f00"/>
+<rect x="602" y="431.0" width="16" height="4" fill="#c9a227"/>
+<text x="624" y="424.0" class="small">R2 20 kΩ</text>
+<text x="1000" y="486" class="name">5 V relay module (1 channel)</text>
+<rect x="1000" y="500" width="230" height="170" rx="6" fill="#1d4f91" stroke="#123565"/>
+<rect x="1055" y="525" width="110" height="90" rx="4" fill="#1f5fbf" stroke="#0f3a7a"/>
+<text x="1110" y="562" text-anchor="middle" class="silk" fill="#ffffff">SRD-05VDC</text>
+<text x="1110" y="576" text-anchor="middle" class="silk" fill="#ffffff">-SL-C</text>
+<circle cx="1030" cy="640" r="5" fill="#ff4d4d"/>
+<rect x="1060" y="630" width="30" height="18" fill="#1b1b1b"/>
+<rect x="988" y="545" width="16" height="10" fill="#151515"/>
+<rect x="988" y="548" width="12" height="4" fill="#d4af37"/>
+<text x="1010" y="554" class="silk" fill="#ffffff">VCC</text>
+<rect x="988" y="575" width="16" height="10" fill="#151515"/>
+<rect x="988" y="578" width="12" height="4" fill="#d4af37"/>
+<text x="1010" y="584" class="silk" fill="#ffffff">GND</text>
+<rect x="988" y="605" width="16" height="10" fill="#151515"/>
+<rect x="988" y="608" width="12" height="4" fill="#d4af37"/>
+<text x="1010" y="614" class="silk" fill="#ffffff">IN</text>
+<rect x="1190" y="520" width="44" height="130" rx="3" fill="#1e88e5" stroke="#0d47a1"/>
+<circle cx="1212" cy="545" r="10" fill="url(#metal)" stroke="#555"/>
+<path d="M1205 545H1219" stroke="#555" stroke-width="2.5"/>
+<text x="1184" y="549" text-anchor="end" class="silk" fill="#ffffff">NO</text>
+<circle cx="1212" cy="585" r="10" fill="url(#metal)" stroke="#555"/>
+<path d="M1205 585H1219" stroke="#555" stroke-width="2.5"/>
+<text x="1184" y="589" text-anchor="end" class="silk" fill="#ffffff">COM</text>
+<circle cx="1212" cy="625" r="10" fill="url(#metal)" stroke="#555"/>
+<path d="M1205 625H1219" stroke="#555" stroke-width="2.5"/>
+<text x="1184" y="629" text-anchor="end" class="silk" fill="#ffffff">NC</text>
+<text x="1330" y="406" class="name">12 V DC fan</text>
+<rect x="1330" y="420" width="170" height="170" rx="14" fill="#202020" stroke="#000"/>
+<circle cx="1415.0" cy="505.0" r="74" fill="#2c2c2c"/>
+<path d="M1415.0 505.0 q30 -18 48 -58 q-28 6 -48 58z" fill="#3d3d3d" stroke="#151515" transform="rotate(0.0 1415.0 505.0)"/>
+<path d="M1415.0 505.0 q30 -18 48 -58 q-28 6 -48 58z" fill="#3d3d3d" stroke="#151515" transform="rotate(51.42857142857143 1415.0 505.0)"/>
+<path d="M1415.0 505.0 q30 -18 48 -58 q-28 6 -48 58z" fill="#3d3d3d" stroke="#151515" transform="rotate(102.85714285714286 1415.0 505.0)"/>
+<path d="M1415.0 505.0 q30 -18 48 -58 q-28 6 -48 58z" fill="#3d3d3d" stroke="#151515" transform="rotate(154.28571428571428 1415.0 505.0)"/>
+<path d="M1415.0 505.0 q30 -18 48 -58 q-28 6 -48 58z" fill="#3d3d3d" stroke="#151515" transform="rotate(205.71428571428572 1415.0 505.0)"/>
+<path d="M1415.0 505.0 q30 -18 48 -58 q-28 6 -48 58z" fill="#3d3d3d" stroke="#151515" transform="rotate(257.14285714285717 1415.0 505.0)"/>
+<path d="M1415.0 505.0 q30 -18 48 -58 q-28 6 -48 58z" fill="#3d3d3d" stroke="#151515" transform="rotate(308.57142857142856 1415.0 505.0)"/>
+<circle cx="1415.0" cy="505.0" r="22" fill="#151515"/><circle cx="1415.0" cy="505.0" r="9" fill="#e0e0e0"/>
+<circle cx="1342" cy="432" r="5" fill="#f7f5ef"/>
+<circle cx="1488" cy="432" r="5" fill="#f7f5ef"/>
+<circle cx="1342" cy="578" r="5" fill="#f7f5ef"/>
+<circle cx="1488" cy="578" r="5" fill="#f7f5ef"/>
+<path d="M1380,584 C1380,601.0 1380,601.0 1380,618" fill="none" stroke="#00000040" stroke-width="6.0" stroke-linecap="round"/>
+<path d="M1380,584 C1380,601.0 1380,601.0 1380,618" fill="none" stroke="#d62828" stroke-width="3.5" stroke-linecap="round"/>
+<path d="M1410,584 C1410,601.0 1410,601.0 1410,618" fill="none" stroke="#00000040" stroke-width="6.0" stroke-linecap="round"/>
+<path d="M1410,584 C1410,601.0 1410,601.0 1410,618" fill="none" stroke="#1d1d1d" stroke-width="3.5" stroke-linecap="round"/>
+<text x="1320" y="872" class="name">12 V supply for the fan</text>
+<rect x="1320" y="760" width="200" height="90" rx="8" fill="#2b2b2b" stroke="#000"/>
+<text x="1420" y="800" text-anchor="middle" class="small" style="fill:#e0e0e0">12 V ⎓ 2 A</text>
+<text x="1420" y="818" text-anchor="middle" class="small" style="fill:#9a9a9a">match the fan's current</text>
+<rect x="1350" y="750" width="20" height="14" fill="#d62828"/>
+<rect x="1390" y="750" width="20" height="14" fill="#1d1d1d"/>
+<text x="1360" y="778" text-anchor="middle" class="silk" fill="#ffffff">+</text>
+<text x="1400" y="778" text-anchor="middle" class="silk" fill="#ffffff">−</text>
+<path d="M70,314 C70,405.0 300,405.0 300,496" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M70,314 C70,405.0 300,405.0 300,496" fill="none" stroke="#f77f00" stroke-width="5" stroke-linecap="round"/>
+<path d="M95,314 C95,405.0 354,405.0 354,496" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M95,314 C95,405.0 354,405.0 354,496" fill="none" stroke="#e9c46a" stroke-width="5" stroke-linecap="round"/>
+<path d="M120,314 C120,396.0 336,396.0 336,478" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M120,314 C120,396.0 336,396.0 336,478" fill="none" stroke="#1d1d1d" stroke-width="5" stroke-linecap="round"/>
+<path d="M200,294 C200,395.0 444,395.0 444,496" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M200,294 C200,395.0 444,395.0 444,496" fill="none" stroke="#f77f00" stroke-width="5" stroke-linecap="round"/>
+<path d="M225,294 C225,395.0 516,395.0 516,496" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M225,294 C225,395.0 516,395.0 516,496" fill="none" stroke="#1d1d1d" stroke-width="5" stroke-linecap="round"/>
+<path d="M275,294 C275,350 520,350 520,266" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M275,294 C275,350 520,350 520,266" fill="none" stroke="#9aa0a6" stroke-width="5" stroke-linecap="round"/>
+<path d="M345,266 C345,381.0 444,381.0 444,496" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M345,266 C345,381.0 444,381.0 444,496" fill="none" stroke="#f77f00" stroke-width="5" stroke-linecap="round"/>
+<path d="M370,266 C370,381.0 372,381.0 372,496" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M370,266 C370,381.0 372,381.0 372,496" fill="none" stroke="#1d1d1d" stroke-width="5" stroke-linecap="round"/>
+<path d="M395,266 C395,381.0 336,381.0 336,496" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M395,266 C395,381.0 336,381.0 336,496" fill="none" stroke="#2a9d8f" stroke-width="5" stroke-linecap="round"/>
+<path d="M420,266 C420,381.0 318,381.0 318,496" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M420,266 C420,381.0 318,381.0 318,496" fill="none" stroke="#1f77b4" stroke-width="5" stroke-linecap="round"/>
+<path d="M445,266 C445,300 370,300 370,266" fill="none" stroke="#00000040" stroke-width="6.0" stroke-linecap="round"/>
+<path d="M445,266 C445,300 370,300 370,266" fill="none" stroke="#1d1d1d" stroke-width="3.5" stroke-linecap="round"/>
+<path d="M690,294 C690,386.0 300,386.0 300,478" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M690,294 C690,386.0 300,386.0 300,478" fill="none" stroke="#d62828" stroke-width="5" stroke-linecap="round"/>
+<path d="M715,294 C715,386.0 408,386.0 408,478" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M715,294 C715,386.0 408,386.0 408,478" fill="none" stroke="#1d1d1d" stroke-width="5" stroke-linecap="round"/>
+<path d="M765,294 C765,360 700,360 700,392" fill="none" stroke="#55555555" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M765,294 C765,360 700,360 700,392" fill="none" stroke="#f4f1de" stroke-width="5" stroke-linecap="round"/>
+<path d="M610,392 C540,392 495,330 495,266" fill="none" stroke="#55555555" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M610,392 C540,392 495,330 495,266" fill="none" stroke="#f4f1de" stroke-width="5" stroke-linecap="round"/>
+<path d="M610,448 C610,463.0 588,463.0 588,478" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M610,448 C610,463.0 588,463.0 588,478" fill="none" stroke="#1d1d1d" stroke-width="5" stroke-linecap="round"/>
+<circle cx="610" cy="392" r="5" fill="#ffffff" stroke="#6b5310" stroke-width="1"/>
+<path d="M318,478 L318,433 Q318,425 326,425 L936,425 Q944,425 944,433 L944,542 Q944,550 952,550 L988,550" fill="none" stroke="#00000040" stroke-width="7.0" stroke-linecap="round"/>
+<path d="M318,478 L318,433 Q318,425 326,425 L936,425 Q944,425 944,433 L944,542 Q944,550 952,550 L988,550" fill="none" stroke="#d62828" stroke-width="4.5" stroke-linecap="round"/>
+<path d="M462,478 L462,441 Q462,433 470,433 L944,433 Q952,433 952,441 L952,572 Q952,580 960,580 L988,580" fill="none" stroke="#00000040" stroke-width="7.0" stroke-linecap="round"/>
+<path d="M462,478 L462,441 Q462,433 470,433 L944,433 Q952,433 952,441 L952,572 Q952,580 960,580 L988,580" fill="none" stroke="#1d1d1d" stroke-width="4.5" stroke-linecap="round"/>
+<path d="M390,478 L390,449 Q390,441 398,441 L952,441 Q960,441 960,449 L960,602 Q960,610 968,610 L988,610" fill="none" stroke="#00000040" stroke-width="7.0" stroke-linecap="round"/>
+<path d="M390,478 L390,449 Q390,441 398,441 L952,441 Q960,441 960,449 L960,602 Q960,610 968,610 L988,610" fill="none" stroke="#8e44ad" stroke-width="4.5" stroke-linecap="round"/>
+<path d="M1360,760 C1360,645 1274,585 1234,585" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M1360,760 C1360,645 1274,585 1234,585" fill="none" stroke="#d62828" stroke-width="5" stroke-linecap="round"/>
+<path d="M1234,545 C1284,545 1380,628 1380,618" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M1234,545 C1284,545 1380,628 1380,618" fill="none" stroke="#d62828" stroke-width="5" stroke-linecap="round"/>
+<path d="M1410,618 C1410,689.0 1400,689.0 1400,760" fill="none" stroke="#00000040" stroke-width="7.5" stroke-linecap="round"/>
+<path d="M1410,618 C1410,689.0 1400,689.0 1400,760" fill="none" stroke="#1d1d1d" stroke-width="5" stroke-linecap="round"/>
+<circle cx="300" cy="496" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="300" cy="478" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="318" cy="496" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="318" cy="478" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="336" cy="496" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="336" cy="478" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="354" cy="496" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="372" cy="496" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="390" cy="478" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="408" cy="478" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="444" cy="496" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="462" cy="478" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="516" cy="496" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<circle cx="588" cy="478" r="4" fill="#c9a227" stroke="#6b5310" stroke-width="1"/>
+<rect x="37.8" y="325" width="64.4" height="20" rx="5" fill="#fff4e6" stroke="#00000055"/>
+<text x="70.0" y="339.5" text-anchor="middle" class="tag" fill="#1d1d1d">P1 3.3V</text>
+<rect x="59.2" y="347" width="71.6" height="20" rx="5" fill="#fff8e1" stroke="#00000055"/>
+<text x="95.0" y="361.5" text-anchor="middle" class="tag" fill="#1d1d1d">P7 GPIO4</text>
+<rect x="95.4" y="369" width="57.2" height="20" rx="5" fill="#eeeeee" stroke="#00000055"/>
+<text x="124.0" y="383.5" text-anchor="middle" class="tag" fill="#1d1d1d">P6 GND</text>
+<rect x="164.2" y="307" width="71.6" height="20" rx="5" fill="#fff4e6" stroke="#00000055"/>
+<text x="200.0" y="321.5" text-anchor="middle" class="tag" fill="#1d1d1d">P17 3.3V</text>
+<rect x="203.8" y="329" width="64.4" height="20" rx="5" fill="#eeeeee" stroke="#00000055"/>
+<text x="236.0" y="343.5" text-anchor="middle" class="tag" fill="#1d1d1d">P25 GND</text>
+<rect x="278.6" y="307" width="42.8" height="20" rx="5" fill="#f1f3f4" stroke="#00000055"/>
+<text x="300.0" y="321.5" text-anchor="middle" class="tag" fill="#1d1d1d">→ A1</text>
+<rect x="324.2" y="289" width="35.6" height="20" rx="5" fill="#fff4e6" stroke="#00000055"/>
+<text x="342.0" y="303.5" text-anchor="middle" class="tag" fill="#1d1d1d">P17</text>
+<rect x="357.8" y="311" width="28.4" height="20" rx="5" fill="#eeeeee" stroke="#00000055"/>
+<text x="372.0" y="325.5" text-anchor="middle" class="tag" fill="#1d1d1d">P9</text>
+<rect x="381.4" y="289" width="57.2" height="20" rx="5" fill="#e0f2f1" stroke="#00000055"/>
+<text x="410.0" y="303.5" text-anchor="middle" class="tag" fill="#1d1d1d">P5 SCL</text>
+<rect x="403.4" y="311" width="57.2" height="20" rx="5" fill="#e3f2fd" stroke="#00000055"/>
+<text x="432.0" y="325.5" text-anchor="middle" class="tag" fill="#1d1d1d">P3 SDA</text>
+<rect x="665.0" y="307" width="50.0" height="20" rx="5" fill="#ffebee" stroke="#00000055"/>
+<text x="690.0" y="321.5" text-anchor="middle" class="tag" fill="#1d1d1d">P2 5V</text>
+<rect x="689.8" y="329" width="64.4" height="20" rx="5" fill="#eeeeee" stroke="#00000055"/>
+<text x="722.0" y="343.5" text-anchor="middle" class="tag" fill="#1d1d1d">P14 GND</text>
+<rect x="727.8" y="361" width="64.4" height="20" rx="5" fill="#f8f8f8" stroke="#00000055"/>
+<text x="760.0" y="375.5" text-anchor="middle" class="tag" fill="#1d1d1d">AO → R1</text>
+<rect x="508.6" y="397" width="42.8" height="20" rx="5" fill="#f8f8f8" stroke="#00000055"/>
+<text x="530.0" y="411.5" text-anchor="middle" class="tag" fill="#1d1d1d">→ A0</text>
+<rect x="640.0" y="444" width="100.4" height="20" rx="5" fill="#eeeeee" stroke="#00000055"/>
+<text x="690.2" y="458.5" text-anchor="middle" class="tag" fill="#1d1d1d">R2 → P34 GND</text>
+<rect x="772.2" y="407" width="215.6" height="20" rx="5" fill="#f3e5f5" stroke="#00000055"/>
+<text x="880.0" y="421.5" text-anchor="middle" class="tag" fill="#1d1d1d">P4 5V · P20 GND · P12 GPIO18</text>
+<rect x="1204.0" y="619" width="86.0" height="20" rx="5" fill="#ffebee" stroke="#00000055"/>
+<text x="1247.0" y="633.5" text-anchor="middle" class="tag" fill="#1d1d1d">NO → fan +</text>
+<rect x="1176.8" y="689" width="93.2" height="20" rx="5" fill="#ffebee" stroke="#00000055"/>
+<text x="1223.4" y="703.5" text-anchor="middle" class="tag" fill="#1d1d1d">COM ← 12V +</text>
+<rect x="1416.2" y="679" width="107.6" height="20" rx="5" fill="#eeeeee" stroke="#00000055"/>
+<text x="1470.0" y="693.5" text-anchor="middle" class="tag" fill="#1d1d1d">fan − → 12V −</text>
+<rect x="30" y="878" width="1500" height="140" rx="10" fill="#ffffff" stroke="#d8d3c5"/>
+<text x="50" y="906" class="name">Wire colours</text>
+<line x1="50" y1="930" x2="84" y2="930" stroke="#00000055" stroke-width="8" stroke-linecap="round"/>
+<line x1="50" y1="930" x2="84" y2="930" stroke="#d62828" stroke-width="5.5" stroke-linecap="round"/>
+<text x="94" y="934.5" class="leg">5 V</text>
+<line x1="278" y1="930" x2="312" y2="930" stroke="#00000055" stroke-width="8" stroke-linecap="round"/>
+<line x1="278" y1="930" x2="312" y2="930" stroke="#f77f00" stroke-width="5.5" stroke-linecap="round"/>
+<text x="322" y="934.5" class="leg">3.3 V</text>
+<line x1="506" y1="930" x2="540" y2="930" stroke="#00000055" stroke-width="8" stroke-linecap="round"/>
+<line x1="506" y1="930" x2="540" y2="930" stroke="#1d1d1d" stroke-width="5.5" stroke-linecap="round"/>
+<text x="550" y="934.5" class="leg">GND</text>
+<line x1="50" y1="956" x2="84" y2="956" stroke="#00000055" stroke-width="8" stroke-linecap="round"/>
+<line x1="50" y1="956" x2="84" y2="956" stroke="#e9c46a" stroke-width="5.5" stroke-linecap="round"/>
+<text x="94" y="960.5" class="leg">DHT22 data (GPIO 4)</text>
+<line x1="278" y1="956" x2="312" y2="956" stroke="#00000055" stroke-width="8" stroke-linecap="round"/>
+<line x1="278" y1="956" x2="312" y2="956" stroke="#2a9d8f" stroke-width="5.5" stroke-linecap="round"/>
+<text x="322" y="960.5" class="leg">I²C SCL (GPIO 3)</text>
+<line x1="506" y1="956" x2="540" y2="956" stroke="#00000055" stroke-width="8" stroke-linecap="round"/>
+<line x1="506" y1="956" x2="540" y2="956" stroke="#1f77b4" stroke-width="5.5" stroke-linecap="round"/>
+<text x="550" y="960.5" class="leg">I²C SDA (GPIO 2)</text>
+<line x1="50" y1="982" x2="84" y2="982" stroke="#00000055" stroke-width="8" stroke-linecap="round"/>
+<line x1="50" y1="982" x2="84" y2="982" stroke="#8e44ad" stroke-width="5.5" stroke-linecap="round"/>
+<text x="94" y="986.5" class="leg">Relay IN (GPIO 18)</text>
+<line x1="278" y1="982" x2="312" y2="982" stroke="#00000055" stroke-width="8" stroke-linecap="round"/>
+<line x1="278" y1="982" x2="312" y2="982" stroke="#f4f1de" stroke-width="5.5" stroke-linecap="round"/>
+<text x="322" y="986.5" class="leg">MQ-135 analog (via divider)</text>
+<line x1="506" y1="982" x2="540" y2="982" stroke="#00000055" stroke-width="8" stroke-linecap="round"/>
+<line x1="506" y1="982" x2="540" y2="982" stroke="#9aa0a6" stroke-width="5.5" stroke-linecap="round"/>
+<text x="550" y="986.5" class="leg">LDR analog</text>
+<text x="740" y="908" class="note">• MQ-135 runs on 5 V: never wire its AO or DO straight to the Pi. AO → R1 10 kΩ → A0, and R2 20 kΩ from A0 to GND.</text>
+<text x="740" y="930" class="note">• ADS1115 ADDR to GND sets I²C address 0x48. Turn on I²C: sudo raspi-config nonint do_i2c 0, then reboot.</text>
+<text x="740" y="952" class="note">• No ADS1115? Use DO pins instead: MQ-135 DO → GPIO 17 (pin 11) through the same 10k/20k divider; LDR DO → GPIO 27 (pin 13).</text>
+<text x="740" y="974" class="note">• Fan uses the relay's NO + COM contacts, so it's off whenever the Pi is off. Mains fans need a mains-rated relay and an enclosure.</text>
+<text x="740" y="996" class="note">• Any GND pin works (6, 9, 14, 20, 25, 30, 34, 39). Bare 4-pin DHT22: add 10 kΩ from DATA to 3.3 V.</text>
+</svg>

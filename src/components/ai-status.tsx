@@ -18,6 +18,7 @@ import {
   SeverityMark,
   StaleStrip,
   VerdictTile,
+  sensorFaults,
   statusTone,
 } from "@/components/coop-readout";
 import { cn } from "@/lib/utils";
@@ -139,6 +140,8 @@ export function AiStatusPanel({
   const causes = status !== "healthy" && r.ai_causes ? r.ai_causes : [];
   const [top, ...others] = causes;
   const phase = r.growth_phase ? (PHASE_LABEL[r.growth_phase] ?? r.growth_phase) : null;
+  const health = r.payload?.sensors;
+  const faults = sensorFaults(health);
   const title =
     headline ?? (top ? top.label : status === "healthy" ? "Conditions look good" : meta.label);
 
@@ -154,6 +157,19 @@ export function AiStatusPanel({
           {formatDateTime(r.created_at)}). These are its last known values. Check its power and
           network.
         </StaleStrip>
+      )}
+
+      {faults.length > 0 && !stale && (
+        <div className="border-b border-hairline bg-warn-tint px-4 py-2 text-[12px] leading-4 text-ink md:px-5">
+          <span className="font-semibold text-warn">Sensor problem:</span>{" "}
+          {faults
+            .map(
+              (f) =>
+                `${f.part} ${f.state === "missing" ? "not responding" : f.state === "stuck" ? "frozen" : "sending bad readings"}`,
+            )
+            .join(", ")}
+          . The AI works around it using the other sensors. Check the wiring.
+        </div>
       )}
 
       <header className="flex items-start gap-3.5 px-4 pt-4 md:px-5 md:pt-5">
@@ -250,6 +266,7 @@ export function AiStatusPanel({
         light={r.light}
         fanOn={r.fan_on}
         stale={stale}
+        health={health}
       />
 
       {children}

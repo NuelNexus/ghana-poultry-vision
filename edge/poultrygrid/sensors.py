@@ -14,7 +14,8 @@ levels. Without one, their comparator outputs (DO) only say "over the
 threshold you set with the module's screw" or not, so the readings are coarse.
 PG_SENSOR_MODE=auto (default) uses the ADS1115 if it answers, else DO.
 PG_SENSOR_MODE=none is for before the MQ-135 and LDR are wired: gas and light
-are sent as missing, and the model sees clean air and normal daylight instead.
+are sent as missing, and the v4 model (trained without them too) works from
+the DHT22 and the fan alone.
 """
 
 from __future__ import annotations
@@ -33,12 +34,6 @@ log = logging.getLogger("poultrygrid")
 # triggered MQ-135 reads as a gas warning, not an instant critical.
 GAS_DO_TRIGGERED, GAS_DO_CLEAR = 16.0, 4.0
 LIGHT_DO_BRIGHT, LIGHT_DO_DARK = 30.0, 3.0
-
-
-def stand_in_gas_light() -> tuple[float, float]:
-    """What the model sees when the gas and light sensors aren't connected: clean
-    air, and day or night light like the simulated coop it was trained on."""
-    return GAS_DO_CLEAR, LIGHT_DO_BRIGHT if 6 <= time.localtime().tm_hour < 18 else LIGHT_DO_DARK
 
 
 @dataclass

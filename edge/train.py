@@ -1,10 +1,14 @@
-"""Train the PoultryGrid v3 (relay fan) coop-condition model and export it for the Pi.
+"""Train the PoultryGrid v4 coop-condition model and export it for the Pi.
 
     pip install -r requirements-train.txt
-    python train.py                  # writes models/poultrygrid_v3.npz + metrics.json
+    python train.py                  # writes models/poultrygrid_v4.npz + metrics.json
 
-Also trains the original AI_For_Poultry network (5 raw inputs -> 16 -> 16 -> 3)
-on the same data so the improvement is measured, not claimed.
+v4 is trained on the farm's own parts (DHT22, MQ-135 and LDR through an
+ADS1115, the DO pins or not wired, relay or PWM fan) including the ways they
+fail: flaky, unplugged, frozen or garbage DHT22 reads, an unplugged or
+floating gas input, an unplugged LDR. It is then benchmarked against v3
+(models/poultrygrid_v3.npz, fed the way the v3 agent fed it) in each of those
+situations, so the improvement is measured, not claimed.
 """
 
 from __future__ import annotations
@@ -22,13 +26,13 @@ from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, recall_s
 from poultrygrid import MODEL_VERSION
 from poultrygrid.features import CAUSES, FEATURE_NAMES, STATUS_TITLES
 from poultrygrid.model_np import CoopModel
-from poultrygrid.simulator import build_dataset
+from poultrygrid.simulator import SCENARIOS, build_dataset
 
 HERE = Path(__file__).parent
 
 
 class CoopNet(nn.Module):
-    def __init__(self, n_in: int, hidden=(64, 64, 32)):
+    def __init__(self, n_in: int, hidden=(128, 128, 64)):
         super().__init__()
         layers, prev = [], n_in
         for h in hidden:
@@ -41,17 +45,6 @@ class CoopNet(nn.Module):
     def forward(self, x):
         h = self.trunk(x)
         return self.status(h), self.causes(h)
-
-
-class OriginalNet(nn.Module):
-    """The model from engieworks15-dotcom/AI_For_Poultry, unchanged."""
-
-    def __init__(self):
-        super().__init__()
-        self.net = nn.Sequential(nn.Linear(5, 16), nn.ReLU(), nn.Linear(16, 16), nn.ReLU(), nn.Linear(16, 3))
-
-    def forward(self, x):
-        return self.net(x)
 
 
 def split_by_episode(eps, seed):
@@ -123,25 +116,6 @@ def train_model(X, ys, yc, tr, va, epochs, seed):
     return model, mean, std, float(t.detach().clamp(0.5, 5.0)), epoch + 1
 
 
-def train_original(raw, ys, tr, seed):
-    torch.manual_seed(seed)
-    mean, std = raw[tr].mean(0), raw[tr].std(0) + 1e-6
-    Xtr = torch.tensor((raw[tr] - mean) / std, dtype=torch.float32)
-    ytr = torch.tensor(ys[tr], dtype=torch.long)
-    model = OriginalNet()
-    opt = torch.optim.Adam(model.parameters(), lr=0.01)
-    ce = nn.CrossEntropyLoss()
-    for _ in range(50):
-        perm = torch.randperm(len(Xtr))
-        for i in range(0, len(perm), 256):
-            idx = perm[i:i + 256]
-            opt.zero_grad()
-            ce(model(Xtr[idx]), ytr[idx]).backward()
-            opt.step()
-    model.eval()
-    return lambda a: model(torch.tensor((a - mean) / std, dtype=torch.float32)).argmax(1).numpy()
-
-
 def export_npz(model: CoopNet, mean, std, temperature, path: Path):
     linears = [m for m in model.trunk if isinstance(m, nn.Linear)]
     arrays = {f"w{i}": l.weight.detach().numpy() for i, l in enumerate(linears)}
@@ -159,22 +133,38 @@ def export_npz(model: CoopNet, mean, std, temperature, path: Path):
     np.savez_compressed(path, meta=json.dumps(meta), **arrays)
 
 
+def summary(y, yhat):
+    """Accuracy, macro F1, critical recall, and how often a non-critical house is called critical."""
+    not_crit = y != 2
+    return {
+        "accuracy": round(accuracy_score(y, yhat), 4),
+        "macro_f1": round(f1_score(y, yhat, average="macro", labels=[0, 1, 2], zero_division=0), 4),
+        "critical_recall": round(recall_score(y, yhat, labels=[2], average="macro", zero_division=0), 4),
+        "false_critical": round(float((yhat[not_crit] == 2).mean()) if not_crit.any() else 0.0, 4),
+        "confusion_matrix": confusion_matrix(y, yhat, labels=[0, 1, 2]).tolist(),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--episodes", type=int, default=3000)
+    ap.add_argument("--episodes", type=int, default=6000)
     ap.add_argument("--epochs", type=int, default=80)
+    ap.add_argument("--bench-episodes", type=int, default=300, help="test episodes per benchmark scenario")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", type=Path, default=HERE / "models")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
 
-    print(f"Simulating {args.episodes} coop episodes...")
-    X, ys, yc, raw, eps = build_dataset(args.episodes, args.seed)
+    print(f"Simulating {args.episodes} coop episodes with the farm's sensors and their faults...")
+    d = build_dataset(args.episodes, args.seed)
+    X, ys, yc, eps = d["X"], d["y"], d["yc"], d["eps"]
     tr, va, te = split_by_episode(eps, args.seed)
     print(f"{len(X)} samples  train={tr.sum()} val={va.sum()} test={te.sum()}  (split by episode, no leakage)")
 
+    t0 = time.time()
     model, mean, std, temperature, epochs = train_model(X, ys, yc, tr, va, args.epochs, args.seed)
-    path = args.out / "poultrygrid_v3.npz"
+    print(f"Trained {epochs} epochs in {time.time() - t0:.0f} s")
+    path = args.out / "poultrygrid_v4.npz"
     export_npz(model, mean, std, temperature, path)
 
     # Evaluate the exported numpy model, i.e. exactly what runs on the Pi.
@@ -186,15 +176,22 @@ def main():
         tp, _ = model(torch.tensor((X[te] - mean) / std, dtype=torch.float32))
     assert (tp.argmax(1).numpy() == pred).mean() > 0.999, "numpy export disagrees with torch"
 
-    base_pred = train_original(raw, ys, tr, args.seed)(raw[te])
-
-    def summary(y, yhat):
-        return {
-            "accuracy": round(accuracy_score(y, yhat), 4),
-            "macro_f1": round(f1_score(y, yhat, average="macro"), 4),
-            "critical_recall": round(recall_score(y, yhat, labels=[2], average="macro"), 4),
-            "confusion_matrix": confusion_matrix(y, yhat).tolist(),
-        }
+    v3_path = args.out / "poultrygrid_v3.npz"
+    v3 = CoopModel(v3_path) if v3_path.exists() else None
+    bench = {}
+    print(f"\nBenchmark, {args.bench_episodes} unseen episodes per situation:")
+    print(f"{'':34}{'v3 acc':>8}{'v4 acc':>8}{'v3 crit':>9}{'v4 crit':>9}{'v3 false':>10}{'v4 false':>10}")
+    for i, name in enumerate(SCENARIOS):
+        b = build_dataset(args.bench_episodes, args.seed + 1000 + i, scenario=name, legacy=v3 is not None)
+        row = {"v4": summary(b["y"], CoopModel.predict_proba(np_model, b["X"])[0].argmax(1))}
+        if v3 is not None:
+            row["v3"] = summary(b["y"], v3.predict_proba(b["X_v3"])[0].argmax(1))
+        bench[name] = row
+        o = row.get("v3", {k: float("nan") for k in row["v4"]})
+        n = row["v4"]
+        print(f"{name:34}{o['accuracy'] * 100:7.1f}%{n['accuracy'] * 100:7.1f}%"
+              f"{o['critical_recall'] * 100:8.1f}%{n['critical_recall'] * 100:8.1f}%"
+              f"{o['false_critical'] * 100:9.1f}%{n['false_critical'] * 100:9.1f}%")
 
     metrics = {
         "model_version": MODEL_VERSION,
@@ -202,18 +199,16 @@ def main():
         "epochs_trained": epochs,
         "temperature": round(temperature, 3),
         "status_labels": STATUS_TITLES,
-        "v3": summary(ys[te], pred),
-        "original_ai_for_poultry_on_same_data": summary(ys[te], base_pred),
+        "v4_mixed_test": summary(ys[te], pred),
         "cause_f1": {cid: round(f1_score(yc[te][:, i], cause_pred[:, i], zero_division=0), 4)
                      for i, cid in enumerate(CAUSES)},
+        "benchmark_vs_v3": bench,
     }
     (args.out / "metrics.json").write_text(json.dumps(metrics, indent=2))
-
-    v3, base = metrics["v3"], metrics["original_ai_for_poultry_on_same_data"]
-    print(f"\n{'':28}{'v3':>10}{'original':>10}")
-    for k in ("accuracy", "macro_f1", "critical_recall"):
-        print(f"{k:28}{v3[k] * 100:9.2f}%{base[k] * 100:9.2f}%")
-    print("\nCause F1:", json.dumps(metrics["cause_f1"]))
+    m = metrics["v4_mixed_test"]
+    print(f"\nMixed test set (clean + faulty, like the field): accuracy {m['accuracy'] * 100:.2f}%, "
+          f"macro F1 {m['macro_f1'] * 100:.2f}%, critical recall {m['critical_recall'] * 100:.2f}%")
+    print("Cause F1:", json.dumps(metrics["cause_f1"]))
     print(f"\nSaved {path} ({path.stat().st_size / 1024:.1f} KB) and metrics.json")
 
 

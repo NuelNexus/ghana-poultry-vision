@@ -33,8 +33,9 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 |---|---|
 | `agent.py` | Main Pi loop every ~30 s: reads sensors, runs the numpy model, drives the fan, posts to `/api/public/devices/ingest`, keeps an SQLite outbox when offline. |
 | `poultrygrid/sensors.py` | DHT22, MQ-135 and LDR (ADS1115 or DO pins), fan relay. |
-| `poultrygrid/features.py`, `model_np.py` | 21 features (incl. 5-min trends, age-aware comfort band) and numpy-only inference. |
-| `poultrygrid/simulator.py`, `train.py` | Coop simulator and training script for the health model (`models/poultrygrid_v2.npz`). |
+| `poultrygrid/legacy_v3.py` | How the v3 model was fed, kept only so `train.py` can benchmark v4 against it. |
+| `poultrygrid/features.py`, `model_np.py` | Sensor health checks, 26 features (incl. 5-min trends, age-aware comfort band, per-sensor trust) and numpy-only inference. |
+| `poultrygrid/simulator.py`, `train.py` | Coop simulator (the farm's sensors and their faults) and training script with the v3/v4 benchmark (`models/poultrygrid_v4.npz`). |
 | `test_sensors.py` | Hardware check script for the sensors. |
 | `twi_tts.py` | Twi voice (GhanaNLP stable-twi-tts, female `twi-1`). Modes: `worker` (polls the app for jobs), `serve` (HTTP `/synthesize`), `say`, `bench`. Number/English handling, lenient phoneme table, sentence cache. |
 | `twi_nlp.py` | DistilABENA v2 word helper: `POST /suggest` for next-word / fill-the-blank Twi suggestions. |

@@ -64,8 +64,16 @@ export interface Reading {
   growth_phase: string | null;
   target_temp: number | null;
   model_version: string | null;
+  /** The reading as the Pi sent it; `sensors` is the agent's health check (agent v4+). */
+  payload?: { sensors?: SensorHealth } | null;
   created_at: string;
 }
+
+/** Per sensor, from the Pi: "ok", "missing", "implausible", "stuck" or "not_wired". */
+export type SensorState = "ok" | "missing" | "implausible" | "stuck" | "not_wired";
+export type SensorHealth = Partial<
+  Record<"temperature" | "humidity" | "gas_index" | "light", SensorState>
+>;
 
 export interface Device {
   id: string;

@@ -114,19 +114,21 @@ Any Pi 3, 4, 5 or Zero 2 W running Raspberry Pi OS Bookworm will do.
    app, which is sent back with every response. If the Pi is offline, it falls back to
    `PG_BATCH_START_DATE` or `PG_BIRD_AGE_DAYS`. Age matters: 26 °C is dangerous for
    3-day-old chicks but fine for 5-week-old birds.
-4. **Build 20 features** (`poultrygrid/features.py`): the latest and 5-reading average of
+4. **Check every sensor, then build 26 features** (`poultrygrid/features.py`). Readings that
+   are missing, out of range or frozen are dropped; a dead DHT22 is replaced with its last good
+   reading and how old it is, and each sensor's health goes to the app. Then: the latest and 5-reading average of
    each sensor, whether the relay is on and how much of the last 5 and 10 readings it was on, the age-based target temperature (33 °C at day 0
    down to 20 °C at day 42), how far the house is above or below the comfort band (humid
    heat counts as hotter), trends in temperature, humidity and gas, temperature
-   variability, and gas per unit of airflow.
+   variability, gas per unit of airflow, and how far each sensor can be trusted.
 5. **Run the model** (`poultrygrid/model_np.py`). This is a small neural network
-   (20 → 64 → 64 → 32) with two outputs:
+   (26 → 128 → 128 → 64), trained on this farm's sensors including when they break, with two outputs:
    - **Status**: Healthy, Warning or Critical, with a calibrated confidence
    - **Causes**: which of 6 problems are present (heat stress, too cold for the flock's age,
      ammonia build-up, humidity too high, air too dry, poor ventilation),
      each with a piece of advice
 
-   On the Pi it runs on numpy alone, with no PyTorch, from a 32 KB `.npz` file.
+   On the Pi it runs on numpy alone, with no PyTorch, from a 108 KB `.npz` file.
 6. **Smooth the status** so it doesn't flicker. Probabilities are averaged over time.
    A worse status has to hold for 2 readings in a row before it is shown, and a better one
    for 4. If the model is more than 90 % sure the house is critical, that status is shown
