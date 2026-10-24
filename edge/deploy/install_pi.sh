@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the PoultryGrid agent on Raspberry Pi OS (Bookworm, Pi 3/4/5/Zero 2 W).
+# Install the PoultryGrid agent on Raspberry Pi OS (Bookworm or Trixie, Pi 3/4/5/Zero 2 W).
 #   git clone https://github.com/NuelNexus/ghana-poultry-vision.git
 #   sudo ghana-poultry-vision/edge/deploy/install_pi.sh
 set -euo pipefail
@@ -10,8 +10,10 @@ APP=/opt/poultrygrid
 
 echo "==> System packages"
 apt-get update -qq
-apt-get install -y -qq python3-venv python3-dev libgpiod2 i2c-tools swig liblgpio-dev >/dev/null || \
-  apt-get install -y -qq python3-venv python3-dev libgpiod2 i2c-tools >/dev/null
+# libgpiod2 on Bookworm became libgpiod3 on Trixie
+GPIOD=$(apt-cache show libgpiod3 &>/dev/null && echo libgpiod3 || echo libgpiod2)
+apt-get install -y -qq python3-venv python3-dev $GPIOD i2c-tools swig liblgpio-dev >/dev/null || \
+  apt-get install -y -qq python3-venv python3-dev $GPIOD i2c-tools >/dev/null
 raspi-config nonint do_i2c 0 2>/dev/null || true
 
 echo "==> User and folders"
