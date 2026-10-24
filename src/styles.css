@@ -475,6 +475,26 @@ body:has(.pg-drawer[data-state="open"]) :is(.pg-dock, .pg-dock-bubble) {
 }
 
 /* Voice help dock while the auth card is on screen: match it too. */
+/* Phones: the egg-chick-hen animation owns the bottom edge and the form fills the
+   middle, so the voice pill gets its own strip at the very top of the page, above
+   the logo. It scrolls away with the page instead of floating over the form; its
+   menu and reply bubble open downwards. */
+@media (max-width: 640px) {
+  body:has(.auth-bg) .auth-bg {
+    padding-top: 68px;
+  }
+  body:has(.auth-bg) .pg-dock {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    bottom: auto;
+    flex-direction: column-reverse;
+  }
+  body:has(.auth-bg) .pg-dock-bubble {
+    position: absolute;
+    top: calc(max(12px, env(safe-area-inset-top)) + 58px);
+    bottom: auto;
+  }
+}
 body:has(.auth-bg) .pg-dock-row,
 body:has(.auth-bg) .pg-dock-menu,
 body:has(.auth-bg) .pg-dock-bubble {
