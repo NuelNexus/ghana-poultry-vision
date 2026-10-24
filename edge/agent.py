@@ -34,6 +34,7 @@ from poultrygrid.features import (
     forward_fill, growth_phase, target_temperature,
 )
 from poultrygrid.model_np import CoopModel
+from poultrygrid.sensors import stand_in_gas_light
 
 HERE = Path(__file__).parent
 log = logging.getLogger("poultrygrid")
@@ -201,6 +202,9 @@ class Agent:
         rows = list(self.window)
         rows = [rows[0]] * (WINDOW - len(rows)) + rows  # pad until the window fills
         filled = forward_fill(rows)
+        no_gas_light = getattr(self.hw, "mode", None) == "none"
+        if no_gas_light:  # sensors not wired: feed the model neutral values, report them as missing
+            filled[:, 1], filled[:, 3] = stand_in_gas_light()
         age = self.cfg.age_days(self.server_age)
         if hasattr(self.hw, "age"):  # keep the simulated flock in step with the app's batch date
             self.hw.age = age
@@ -223,8 +227,8 @@ class Agent:
         payload = {
             "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             "seq": self.seq,
-            "humidity": _r(latest[0]), "gas_index": _r(latest[1]), "temperature": _r(latest[2]),
-            "light": _r(latest[3]), "fan_on": fan_on,
+            "humidity": _r(latest[0]), "gas_index": None if no_gas_light else _r(latest[1]),
+            "temperature": _r(latest[2]), "light": None if no_gas_light else _r(latest[3]), "fan_on": fan_on,
             "bird_age_days": round(age, 1),
             "ai": {
                 "status": STATUS_LABELS[status], "status_code": status,

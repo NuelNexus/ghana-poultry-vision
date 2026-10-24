@@ -13,6 +13,8 @@ The Pi has no analog inputs. With an ADS1115 the MQ-135 and LDR give real
 levels. Without one, their comparator outputs (DO) only say "over the
 threshold you set with the module's screw" or not, so the readings are coarse.
 PG_SENSOR_MODE=auto (default) uses the ADS1115 if it answers, else DO.
+PG_SENSOR_MODE=none is for before the MQ-135 and LDR are wired: gas and light
+are sent as missing, and the model sees clean air and normal daylight instead.
 """
 
 from __future__ import annotations
@@ -31,6 +33,12 @@ log = logging.getLogger("poultrygrid")
 # triggered MQ-135 reads as a gas warning, not an instant critical.
 GAS_DO_TRIGGERED, GAS_DO_CLEAR = 16.0, 4.0
 LIGHT_DO_BRIGHT, LIGHT_DO_DARK = 30.0, 3.0
+
+
+def stand_in_gas_light() -> tuple[float, float]:
+    """What the model sees when the gas and light sensors aren't connected: clean
+    air, and day or night light like the simulated coop it was trained on."""
+    return GAS_DO_CLEAR, LIGHT_DO_BRIGHT if 6 <= time.localtime().tm_hour < 18 else LIGHT_DO_DARK
 
 
 @dataclass
@@ -118,8 +126,10 @@ class PiHardware:
         self._dht = adafruit_dht.DHT22(getattr(board, f"D{cfg.dht_pin}"), use_pulseio=False)
         self._dht_last = None  # (temperature, humidity, monotonic time)
         self._gas = self._ldr = self._gas_do = self._ldr_do = None
-        self.mode = "digital"
-        if cfg.sensor_mode in ("auto", "ads1115"):
+        self.mode = "none" if cfg.sensor_mode == "none" else "digital"
+        if self.mode == "none":
+            log.warning("PG_SENSOR_MODE=none: MQ-135 and LDR not connected; gas and light are reported as missing")
+        elif cfg.sensor_mode in ("auto", "ads1115"):
             try:
                 self._gas, self._ldr = open_ads1115()
                 self._gas.voltage  # noqa: B018  fails here if nothing answers on I2C
@@ -159,7 +169,9 @@ class PiHardware:
             return self._dht_last[:2]
         return None, None
 
-    def _gas_light(self) -> tuple[float | None, float]:
+    def _gas_light(self) -> tuple[float | None, float | None]:
+        if self.mode == "none":
+            return None, None
         if self.mode == "ads1115":
             base = self.cfg.mq135_baseline_v
             v_gas = self._gas.voltage

@@ -72,6 +72,9 @@ light levels. Without one it reads the modules' DO pins, which only say "over
 the threshold set with the module's screw" or not, so the gas index becomes 4
 (clear) or 16 (triggered) and the light is dark or bright. `PG_SENSOR_MODE=auto`
 (the default) uses the ADS1115 if it answers and falls back to DO otherwise.
+Nothing wired to the DO pins reads as "gas detected", so until the MQ-135 and
+LDR are connected set `PG_SENSOR_MODE=none`: gas and light are sent as missing
+and the model is given clean air and normal day/night light in their place.
 
 Most relay boards switch on when IN is pulled low (`PG_RELAY_ACTIVE_LOW=1`, the
 default). The agent waits at least `PG_RELAY_MIN_SWITCH_S` (60 s) between
