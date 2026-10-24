@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Start the whole Pi setup on boot: the web app (port 8080), the edge AI agent and
-# Ama's Twi voice.
+# Start the whole Pi setup on boot: the web app (port 8080, and HTTPS on 8443
+# for the microphone on other devices), the edge AI agent and Ama's Twi voice.
 #   sudo scripts/setup-autostart.sh            # everything
 #   sudo scripts/setup-autostart.sh --no-tts   # skip the Twi voice (80 MB model)
 # Re-run it after changing the edge code to push the new version to /opt/poultrygrid.
@@ -17,9 +17,12 @@ echo "==> Web app service"
 pkill -u "$USER_NAME" -f "$REPO/node_modules/.bin/vite dev" 2>/dev/null || true
 sed -e "s|@USER@|$USER_NAME|" -e "s|@REPO@|$REPO|" -e "s|@NODE_DIR@|$(dirname "$NPM")|g" \
     "$REPO/edge/deploy/poultrygrid-web.service" > /etc/systemd/system/poultrygrid-web.service
+echo "==> HTTPS on port 8443 (microphone on phones and other computers)"
+sed -e "s|@USER@|$USER_NAME|" -e "s|@REPO@|$REPO|g" -e "s|@NODE_DIR@|$(dirname "$NPM")|g" \
+    "$REPO/edge/deploy/poultrygrid-https.service" > /etc/systemd/system/poultrygrid-https.service
 systemctl daemon-reload
-systemctl enable poultrygrid-web
-systemctl restart poultrygrid-web
+systemctl enable poultrygrid-web poultrygrid-https
+systemctl restart poultrygrid-web poultrygrid-https
 
 echo "==> Edge AI agent (installs/updates /opt/poultrygrid, keeps /etc/poultrygrid/agent.env)"
 bash "$REPO/edge/deploy/install_pi.sh"
@@ -41,4 +44,5 @@ fi
 echo
 echo "Everything starts on boot now."
 echo "  App:   http://$(hostname -I | awk '{print $1}'):8080"
+echo "  HTTPS: https://$(hostname -I | awk '{print $1}'):8443   (or https://$(hostname).local:8443)"
 echo "  Logs:  journalctl -u poultrygrid-web -f    journalctl -u poultrygrid-agent -f    journalctl -u poultrygrid-tts -f"

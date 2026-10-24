@@ -30,6 +30,18 @@ is in [`docs/`](docs/README.md).
 npm run dev
 ```
 
+### HTTPS for the microphone on other devices
+
+Browsers only allow the microphone on HTTPS (or `localhost`). On the Pi,
+`scripts/setup-autostart.sh` also starts `poultrygrid-https`: HTTPS on port 8443 in front of the
+app, with a certificate from a private certificate authority made on the Pi
+(`scripts/make-cert.sh`, files in `.certs/`, re-issued when the IP changes). Open
+`https://<pi-ip>:8443` or `https://<hostname>.local:8443`. The first visit shows a security
+warning; to remove it for good, open `https://<pi-ip>:8443/poultrygrid-ca.crt` on the device and
+install it (Android: Settings > Security > Encryption & credentials > Install a certificate > CA
+certificate; iPhone: install the profile, then Settings > General > About > Certificate Trust
+Settings and turn it on). Port 8080 stays plain HTTP for the Pi agent.
+
 Open the app and create an account. **The first account becomes the farm admin.**
 Later sign-ups join as workers (read-only, can resolve alerts). To promote someone:
 

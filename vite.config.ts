@@ -12,4 +12,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    // Let phones reach the Pi by name (https://<pi>.local:8443, see scripts/https-proxy.mjs).
+    server: { allowedHosts: [".local"] },
+  },
 });
