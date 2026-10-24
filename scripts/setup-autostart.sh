@@ -22,7 +22,7 @@ systemctl enable poultrygrid-web
 systemctl restart poultrygrid-web
 
 echo "==> Edge AI agent (installs/updates /opt/poultrygrid, keeps /etc/poultrygrid/agent.env)"
-"$REPO/edge/deploy/install_pi.sh"
+bash "$REPO/edge/deploy/install_pi.sh"
 # Wait for the web app before the agent starts posting (it buffers readings either way)
 mkdir -p /etc/systemd/system/poultrygrid-agent.service.d
 cat > /etc/systemd/system/poultrygrid-agent.service.d/after-web.conf <<CONF
@@ -35,7 +35,7 @@ systemctl restart poultrygrid-agent
 
 if [[ "${1:-}" != "--no-tts" && "$(uname -m)" == "aarch64" ]]; then
   echo "==> Ama's Twi voice"
-  "$REPO/edge/deploy/install_tts.sh"
+  bash "$REPO/edge/deploy/install_tts.sh"
 fi
 
 echo
