@@ -17,28 +17,58 @@ import type {
 } from "./types";
 
 // Data access for the dashboard pages, backed by Neon.
+//
+// Every account is its own farm: it only sees the farms it owns, the devices
+// and cameras it registered, and the houses, readings, alerts and hatchery
+// batches that hang off those. The fragments below take the placeholder that
+// holds the signed-in user's id (e.g. "$1").
 
+const myFarms = (u: string) => `(select id from farms where owner_id = ${u})`;
+const myDevices = (u: string) => `(select id from devices where owner_id = ${u})`;
+const myAlert = (u: string) =>
+  `(alerts.farm_id in ${myFarms(u)} or alerts.device_id in ${myDevices(u)})`;
+
+/** The account's farm: the one it names (if it owns it), else its first, else a new one. */
 async function ensureFarm(farmId: string | undefined, ownerId: string) {
-  if (farmId) return farmId;
+  if (farmId) {
+    const own = await queryOne<{ id: string }>(
+      "select id from farms where id = $1 and owner_id = $2",
+      [farmId, ownerId],
+    );
+    if (!own) throw new Error("Farm not found");
+    return own.id;
+  }
   const existing = await queryOne<{ id: string }>(
-    "select id from farms order by created_at limit 1",
+    "select id from farms where owner_id = $1 order by created_at limit 1",
+    [ownerId],
   );
   if (existing) return existing.id;
   const f = await queryOne<{ id: string }>(
-    "insert into farms (name, owner_id) values ('Main Farm', $1) returning id",
+    "insert into farms (name, owner_id) values ('My Farm', $1) returning id",
     [ownerId],
   );
   return f!.id;
 }
 
-// Latest AI reading per device, most recently reporting device first.
+/** Farm of a house the account owns; throws for anyone else's house. */
+async function ownHouseFarm(houseId: string | null | undefined, userId: string) {
+  if (!houseId) return null;
+  const h = await queryOne<{ farm_id: string }>(
+    `select farm_id from poultry_houses where id = $1 and farm_id in ${myFarms("$2")}`,
+    [houseId, userId],
+  );
+  if (!h) throw new Error("House not found");
+  return h.farm_id;
+}
+
+// Latest AI reading per device the account owns, most recently reporting first. $1 = user id.
 const LATEST_AI_SQL = `
   select * from (
     select distinct on (r.device_id) r.*, d.device_id as device_code, d.last_seen, h.name as house_name
       from sensor_readings r
       join devices d on d.id = r.device_id
       left join poultry_houses h on h.id = r.house_id
-     where r.ai_status is not null
+     where r.ai_status is not null and d.owner_id = $1
      order by r.device_id, r.created_at desc
   ) latest
   order by created_at desc`;
@@ -50,7 +80,8 @@ const windowInput = z.object({ days: z.number().int().min(1).max(366).optional()
 
 export const getDashboard = createServerFn({ method: "GET" })
   .middleware([requireUser])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    const u = context.user.id;
     const [counts, history, recentAlerts, ai] = await Promise.all([
       queryOne<{
         total_birds: number;
@@ -62,21 +93,28 @@ export const getDashboard = createServerFn({ method: "GET" })
         eggs: number;
         hatched: number;
         last_reading_at: string | null;
-      }>(`select
-            (select coalesce(sum(bird_count), 0)::int from poultry_houses) as total_birds,
-            (select count(*)::int from farms) as farms,
-            (select round(avg(temperature), 1) from (select temperature from sensor_readings order by created_at desc limit 20) t) as temperature,
-            (select round(avg(humidity), 1) from (select humidity from sensor_readings order by created_at desc limit 20) t) as humidity,
-            (select count(*)::int from alerts where not coalesce(resolved, false)) as active_alerts,
-            (select count(*)::int from alerts where not coalesce(resolved, false) and severity = 'critical') as open_critical,
-            (select max(created_at) from sensor_readings) as last_reading_at,
-            (select coalesce(sum(egg_count), 0)::int from hatcheries) as eggs,
-            (select coalesce(sum(hatched_count), 0)::int from hatcheries) as hatched`),
-      query<{ temperature: number | null; humidity: number | null; created_at: string }>(
-        "select temperature, humidity, created_at from sensor_readings order by created_at desc limit 24",
+      }>(
+        `select
+            (select coalesce(sum(bird_count), 0)::int from poultry_houses where farm_id in ${myFarms("$1")}) as total_birds,
+            (select count(*)::int from farms where owner_id = $1) as farms,
+            (select round(avg(temperature), 1) from (select temperature from sensor_readings where device_id in ${myDevices("$1")} order by created_at desc limit 20) t) as temperature,
+            (select round(avg(humidity), 1) from (select humidity from sensor_readings where device_id in ${myDevices("$1")} order by created_at desc limit 20) t) as humidity,
+            (select count(*)::int from alerts where not coalesce(resolved, false) and ${myAlert("$1")}) as active_alerts,
+            (select count(*)::int from alerts where not coalesce(resolved, false) and severity = 'critical' and ${myAlert("$1")}) as open_critical,
+            (select max(created_at) from sensor_readings where device_id in ${myDevices("$1")}) as last_reading_at,
+            (select coalesce(sum(egg_count), 0)::int from hatcheries where farm_id in ${myFarms("$1")}) as eggs,
+            (select coalesce(sum(hatched_count), 0)::int from hatcheries where farm_id in ${myFarms("$1")}) as hatched`,
+        [u],
       ),
-      query<Alert>("select * from alerts order by created_at desc limit 5"),
-      query<AiSnapshot>(LATEST_AI_SQL),
+      query<{ temperature: number | null; humidity: number | null; created_at: string }>(
+        `select temperature, humidity, created_at from sensor_readings
+          where device_id in ${myDevices("$1")} order by created_at desc limit 24`,
+        [u],
+      ),
+      query<Alert>(`select * from alerts where ${myAlert("$1")} order by created_at desc limit 5`, [
+        u,
+      ]),
+      query<AiSnapshot>(LATEST_AI_SQL, [u]),
     ]);
     const c = counts!;
     // Missing data stays null so the UI shows "—" instead of a fake 0.
@@ -108,10 +146,17 @@ export const getAiMonitor = createServerFn({ method: "GET" })
       hours: z.number().min(1).max(168).default(6),
     }),
   )
-  .handler(async ({ data }): Promise<AiMonitor> => {
-    const latest = await query<AiSnapshot>(LATEST_AI_SQL);
+  .handler(async ({ data, context }): Promise<AiMonitor> => {
+    const latest = await query<AiSnapshot>(LATEST_AI_SQL, [context.user.id]);
     // Default to the most recently reporting device (LATEST_AI_SQL is newest first).
-    const selected = data.deviceId ?? latest[0]?.device_id;
+    // A device id from the URL only counts if this account owns it.
+    const own = data.deviceId
+      ? await queryOne("select 1 from devices where id = $1 and owner_id = $2", [
+          data.deviceId,
+          context.user.id,
+        ])
+      : null;
+    const selected = (own ? data.deviceId : undefined) ?? latest[0]?.device_id;
     // At most ~MAX_POINTS points, always covering the whole range: ranges longer
     // than MAX_POINTS x 30 s keep the last reading in each date_bin bucket.
     const MAX_POINTS = 720;
@@ -142,16 +187,27 @@ export const getAiMonitor = createServerFn({ method: "GET" })
 
 export const listFarms = createServerFn({ method: "GET" })
   .middleware([requireUser])
-  .handler(() => query<Farm>("select id, name from farms order by name"));
+  .handler(({ context }) =>
+    query<Farm>("select id, name from farms where owner_id = $1 order by name", [context.user.id]),
+  );
 
 export const listHouses = createServerFn({ method: "GET" })
   .middleware([requireUser])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    const u = [context.user.id];
     const [houses, latest] = await Promise.all([
-      query<House>(`select h.*, f.name as farm_name from poultry_houses h
-                    left join farms f on f.id = h.farm_id order by h.created_at`),
-      query<Reading>(`select distinct on (house_id) * from sensor_readings
-                      where house_id is not null order by house_id, created_at desc`),
+      query<House>(
+        `select h.*, f.name as farm_name from poultry_houses h
+           join farms f on f.id = h.farm_id
+          where f.owner_id = $1 order by h.created_at`,
+        u,
+      ),
+      query<Reading>(
+        `select distinct on (house_id) * from sensor_readings
+          where house_id is not null and device_id in ${myDevices("$1")}
+          order by house_id, created_at desc`,
+        u,
+      ),
     ]);
     return {
       houses,
@@ -197,9 +253,13 @@ export const listDevices = createServerFn({ method: "GET" })
   .middleware([requireUser])
   .handler(async ({ context }) => {
     const canSeeKeys = context.user.roles.some((r) => r === "admin" || r === "manager");
-    const rows = await query<Device>(`select d.*, h.name as house_name from devices d
-                                      left join poultry_houses h on h.id = d.house_id
-                                      order by d.created_at desc`);
+    const rows = await query<Device>(
+      `select d.*, h.name as house_name from devices d
+         left join poultry_houses h on h.id = d.house_id
+        where d.owner_id = $1
+        order by d.created_at desc`,
+      [context.user.id],
+    );
     // Offline after 3 missed 30 s check-ins: FRESHNESS_MS.live, the same threshold the UI uses for "live".
     return rows.map((d) => ({
       ...d,
@@ -222,30 +282,29 @@ export const createDevice = createServerFn({ method: "POST" })
       houseId: z.string().uuid().optional(),
     }),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const apiKey = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) =>
       b.toString(16).padStart(2, "0"),
     ).join("");
-    const house = data.houseId
-      ? await queryOne<{ farm_id: string }>("select farm_id from poultry_houses where id = $1", [
-          data.houseId,
-        ])
-      : null;
+    const farmId = await ownHouseFarm(data.houseId, context.user.id);
     try {
       await query(
-        `insert into devices (device_id, api_key, type, location, house_id, farm_id) values ($1, $2, $3, $4, $5, $6)`,
+        `insert into devices (device_id, api_key, type, location, house_id, farm_id, owner_id)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
         [
           data.deviceId,
           apiKey,
           data.type,
           data.location || null,
           data.houseId || null,
-          house?.farm_id ?? null,
+          farmId,
+          context.user.id,
         ],
       );
     } catch (e) {
+      // IDs are global (the Pi signs in with one), so it may be another account's.
       if (String(e).includes("devices_device_id_key"))
-        throw new Error("A device with this ID already exists");
+        throw new Error("That device ID is already taken. Pick another, e.g. PI-YOURFARM-A");
       throw e;
     }
     return { deviceId: data.deviceId, apiKey };
@@ -260,13 +319,19 @@ export const updateDevice = createServerFn({ method: "POST" })
       fanOverride: z.enum(["on", "off"]).nullable().optional(),
     }),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const own = await queryOne("select 1 from devices where id = $1 and owner_id = $2", [
+      data.id,
+      context.user.id,
+    ]);
+    if (!own) throw new Error("Device not found");
     if (data.houseId !== undefined) {
-      await query(
-        `update devices set house_id = $2,
-                farm_id = (select farm_id from poultry_houses where id = $2) where id = $1`,
-        [data.id, data.houseId],
-      );
+      const farmId = await ownHouseFarm(data.houseId, context.user.id);
+      await query("update devices set house_id = $2, farm_id = $3 where id = $1", [
+        data.id,
+        data.houseId,
+        farmId,
+      ]);
     }
     if (data.fanOverride !== undefined) {
       await query("update devices set fan_override = $2 where id = $1", [
@@ -284,20 +349,27 @@ export const updateDevice = createServerFn({ method: "POST" })
 export const listAlerts = createServerFn({ method: "GET" })
   .middleware([requireUser])
   .inputValidator(windowInput)
-  .handler(({ data }) =>
+  .handler(({ data, context }) =>
     data?.days
       ? query<Alert>(
-          "select * from alerts where created_at > now() - make_interval(days => $1) order by created_at desc limit 5000",
-          [data.days],
+          `select * from alerts where ${myAlert("$2")} and created_at > now() - make_interval(days => $1)
+            order by created_at desc limit 5000`,
+          [data.days, context.user.id],
         )
-      : query<Alert>("select * from alerts order by created_at desc limit 100"),
+      : query<Alert>(
+          `select * from alerts where ${myAlert("$1")} order by created_at desc limit 100`,
+          [context.user.id],
+        ),
   );
 
 export const resolveAlert = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .inputValidator(z.object({ id: z.string().uuid() }))
-  .handler(async ({ data }) => {
-    await query("update alerts set resolved = true where id = $1", [data.id]);
+  .handler(async ({ data, context }) => {
+    await query(`update alerts set resolved = true where id = $1 and ${myAlert("$2")}`, [
+      data.id,
+      context.user.id,
+    ]);
     return { ok: true };
   });
 
@@ -305,9 +377,13 @@ export const resolveAlert = createServerFn({ method: "POST" })
 
 export const listHatcheries = createServerFn({ method: "GET" })
   .middleware([requireUser])
-  .handler(() =>
-    query<Hatchery>(`select h.*, f.name as farm_name from hatcheries h
-                                  left join farms f on f.id = h.farm_id order by h.created_at desc`),
+  .handler(({ context }) =>
+    query<Hatchery>(
+      `select h.*, f.name as farm_name from hatcheries h
+         join farms f on f.id = h.farm_id
+        where f.owner_id = $1 order by h.created_at desc`,
+      [context.user.id],
+    ),
   );
 
 export const createHatchery = createServerFn({ method: "POST" })
@@ -347,10 +423,10 @@ export const createHatchery = createServerFn({ method: "POST" })
 export const recordHatch = createServerFn({ method: "POST" })
   .middleware([requireManager])
   .inputValidator(z.object({ id: z.string().uuid(), hatchedCount: z.number().int().min(0) }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const row = await queryOne<{ egg_count: number | null }>(
-      "select egg_count from hatcheries where id = $1",
-      [data.id],
+      `select egg_count from hatcheries where id = $1 and farm_id in ${myFarms("$2")}`,
+      [data.id, context.user.id],
     );
     if (!row) throw new Error("Batch not found");
     if (row.egg_count != null && data.hatchedCount > row.egg_count)
@@ -375,11 +451,13 @@ const streamUrl = z
 
 export const listCameras = createServerFn({ method: "GET" })
   .middleware([requireUser])
-  .handler(() =>
+  .handler(({ context }) =>
     query<Camera>(
       `select c.id, c.name, c.stream_url, c.house_id, h.name as house_name, c.created_at
          from cameras c left join poultry_houses h on h.id = c.house_id
+        where c.owner_id = $1
         order by c.created_at`,
+      [context.user.id],
     ),
   );
 
@@ -392,15 +470,12 @@ export const createCamera = createServerFn({ method: "POST" })
       houseId: z.string().uuid().optional(),
     }),
   )
-  .handler(async ({ data }) => {
-    const house = data.houseId
-      ? await queryOne<{ farm_id: string }>("select farm_id from poultry_houses where id = $1", [
-          data.houseId,
-        ])
-      : null;
+  .handler(async ({ data, context }) => {
+    const farmId = await ownHouseFarm(data.houseId, context.user.id);
     const row = await queryOne<{ id: string }>(
-      `insert into cameras (name, stream_url, house_id, farm_id) values ($1, $2, $3, $4) returning id`,
-      [data.name, data.streamUrl || null, data.houseId || null, house?.farm_id ?? null],
+      `insert into cameras (name, stream_url, house_id, farm_id, owner_id)
+       values ($1, $2, $3, $4, $5) returning id`,
+      [data.name, data.streamUrl || null, data.houseId || null, farmId, context.user.id],
     );
     return { id: row!.id };
   });
@@ -415,12 +490,12 @@ export const updateCamera = createServerFn({ method: "POST" })
       houseId: z.string().uuid().nullable(),
     }),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const farmId = await ownHouseFarm(data.houseId, context.user.id);
     await query(
-      `update cameras set name = $2, stream_url = $3, house_id = $4,
-              farm_id = coalesce((select farm_id from poultry_houses where id = $4), farm_id)
-        where id = $1`,
-      [data.id, data.name, data.streamUrl || null, data.houseId],
+      `update cameras set name = $2, stream_url = $3, house_id = $4, farm_id = coalesce($5, farm_id)
+        where id = $1 and owner_id = $6`,
+      [data.id, data.name, data.streamUrl || null, data.houseId, farmId, context.user.id],
     );
     return { ok: true };
   });
@@ -428,7 +503,7 @@ export const updateCamera = createServerFn({ method: "POST" })
 export const deleteCamera = createServerFn({ method: "POST" })
   .middleware([requireManager])
   .inputValidator(z.object({ id: z.string().uuid() }))
-  .handler(async ({ data }) => {
-    await query("delete from cameras where id = $1", [data.id]);
+  .handler(async ({ data, context }) => {
+    await query("delete from cameras where id = $1 and owner_id = $2", [data.id, context.user.id]);
     return { ok: true };
   });

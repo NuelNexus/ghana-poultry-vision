@@ -523,8 +523,8 @@ function SetupSection() {
             Raspberry Pi edge node
           </h3>
           <p className="pg-t-caption mb-3">
-            DHT22, MQ-135 and LDR (through an ADS1115), fan PWM and tach. Runs the AI model and
-            drives the fan.
+            DHT22, MQ-135 and LDR (through an ADS1115, or their DO pins), and a relay for the fan.
+            Runs the AI model and switches the fan on or off.
           </p>
           <Steps>
             <li>

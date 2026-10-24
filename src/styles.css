@@ -463,21 +463,25 @@
 }
 
 /* Voice help dock while the auth card is on screen: match it too. */
-body:has(.auth-bg) .pg-dock {
+body:has(.auth-bg) .pg-dock-row,
+body:has(.auth-bg) .pg-dock-menu,
+body:has(.auth-bg) .pg-dock-bubble {
   border: 2px solid #000;
   border-radius: 0;
   background: #f8f4e5;
-  box-shadow: 6px 6px 0 #ffa580, 6px 6px 0 2px #000;
-  font-family: "Fjalla One", sans-serif;
-  gap: 4px;
+  color: #2a293e;
+  box-shadow: 4px 4px 0 #ffa580, 4px 4px 0 2px #000;
 }
-body:has(.auth-bg) .pg-dock-btn {
+body:has(.auth-bg) .pg-dock-btn,
+body:has(.auth-bg) .pg-dock-more {
   border-radius: 0;
   color: #2a293e;
+  font-family: "Fjalla One", sans-serif;
   font-weight: 400;
   letter-spacing: 0.5px;
 }
-body:has(.auth-bg) .pg-dock-btn:hover {
+body:has(.auth-bg) .pg-dock-menu .pg-dock-btn:hover,
+body:has(.auth-bg) .pg-dock-more:hover {
   background: #fff;
 }
 body:has(.auth-bg) .pg-dock-btn.is-main {
@@ -490,22 +494,14 @@ body:has(.auth-bg) .pg-dock-btn.is-main:hover {
   color: #fff;
   filter: none;
 }
-body:has(.auth-bg) .pg-dock-btn[aria-pressed="true"] {
+body:has(.auth-bg) .pg-dock-menu .pg-dock-btn[aria-pressed="true"] {
   background: #ffa580;
   color: #000;
-  outline: 2px solid #000;
-  outline-offset: -2px;
 }
-body:has(.auth-bg) .pg-dock-more {
+body:has(.auth-bg) .pg-dock-more[data-tap]::after {
   border-radius: 0;
-  color: #2a293e;
-}
-body:has(.auth-bg) .pg-dock-bubble {
-  border: 2px solid #000;
-  border-radius: 0;
-  background: #fffdf7;
-  color: #2a293e;
-  box-shadow: 6px 6px 0 #95a4ff, 6px 6px 0 2px #000;
+  background: #ffa580;
+  box-shadow: 0 0 0 2px #000;
 }
 body:has(.auth-bg) .pg-dock-x {
   border-radius: 0;

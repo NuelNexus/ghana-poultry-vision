@@ -95,7 +95,7 @@ function LoginPage() {
               <p className="auth-subtitle">
                 {mode === "signin"
                   ? "Access your farm dashboard."
-                  : "The first account becomes the farm admin; later accounts join as workers."}
+                  : "Your account gets its own farm. Devices and data you add are only visible to you."}
               </p>
               <form onSubmit={submit} className="auth-form">
                 {mode === "signup" && (

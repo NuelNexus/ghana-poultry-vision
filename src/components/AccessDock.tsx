@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, ChevronUp, Hand, Loader2, Mic, MoreHorizontal, Square, X } from "lucide-react";
+import { BookOpen, Hand, Loader2, Mic, MoreHorizontal, Square, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/components/LanguageProvider";
 import { dictate, explainPage, speakText, voiceCommand } from "@/lib/api/i18n.functions";
@@ -100,17 +100,23 @@ export function AccessDock() {
   const rec = useRef<Recorder | null>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  // Phones: just Speak, with a small button that opens Explain and Tap to hear,
-  // so the dock covers as little of the page as possible.
-  const [compact, setCompact] = useState(false);
+  // The dock is one small pill (Speak + ⋯) so it covers as little of the page as
+  // possible; ⋯ opens Explain and Tap to hear above it.
   const [more, setMore] = useState(false);
+  const dockRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const m = window.matchMedia("(max-width: 640px)");
-    const on = () => setCompact(m.matches);
-    on();
-    m.addEventListener("change", on);
-    return () => m.removeEventListener("change", on);
-  }, []);
+    if (!more) return;
+    const away = (e: PointerEvent) => {
+      if (!dockRef.current?.contains(e.target as Node)) setMore(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMore(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [more]);
 
   useEffect(() => {
     if (phase === "speaking" && !speaking) setPhase("idle");
@@ -340,49 +346,20 @@ export function AccessDock() {
         </div>
       )}
       {showDock && (
-        <div className="pg-dock" role="toolbar" aria-label="Voice help">
-          <button
-            type="button"
-            className="pg-dock-btn is-main"
-            data-phase={phase}
-            onClick={() => void onSpeak()}
-            aria-label={
-              phase === "listening" ? "Stop listening" : phase === "speaking" ? "Stop" : "Speak"
-            }
-          >
-            {phase === "thinking" ? (
-              <Loader2 className="animate-spin" aria-hidden />
-            ) : phase === "speaking" ? (
-              <Square aria-hidden />
-            ) : (
-              <Mic aria-hidden />
-            )}
-            <span>
-              {phase === "listening" ? "Listening" : phase === "speaking" ? "Stop" : "Speak"}
-            </span>
-          </button>
-          {compact && (
-            <button
-              type="button"
-              className="pg-dock-more"
-              aria-expanded={more}
-              aria-label={more ? "Fewer help buttons" : "More help: Explain, Tap to hear"}
-              onClick={() => setMore((v) => !v)}
-            >
-              {more ? <ChevronUp aria-hidden /> : <MoreHorizontal aria-hidden />}
-            </button>
-          )}
-          {(!compact || more) && (
-            <>
+        <div className="pg-dock" ref={dockRef} role="toolbar" aria-label="Voice help">
+          {more && (
+            <div className="pg-dock-menu" id="pg-dock-menu">
               <button
                 type="button"
                 className="pg-dock-btn"
-                onClick={() => void onExplain()}
+                onClick={() => {
+                  setMore(false);
+                  void onExplain();
+                }}
                 disabled={phase === "thinking" || phase === "listening"}
-                aria-label="Explain this page"
               >
                 <BookOpen aria-hidden />
-                <span>Explain</span>
+                <span>Explain this page</span>
               </button>
               <button
                 type="button"
@@ -398,13 +375,46 @@ export function AccessDock() {
                     .then(([msg]) => say(msg, "tap"))
                     .catch(() => {});
                 }}
-                aria-label="Tap to hear"
               >
                 <Hand aria-hidden />
                 <span>Tap to hear</span>
+                <span className="pg-dock-state">{prefs.tapToHear ? "On" : "Off"}</span>
               </button>
-            </>
+            </div>
           )}
+          <div className="pg-dock-row">
+            <button
+              type="button"
+              className="pg-dock-btn is-main"
+              data-phase={phase}
+              onClick={() => void onSpeak()}
+              aria-label={
+                phase === "listening" ? "Stop listening" : phase === "speaking" ? "Stop" : "Speak"
+              }
+            >
+              {phase === "thinking" ? (
+                <Loader2 className="animate-spin" aria-hidden />
+              ) : phase === "speaking" ? (
+                <Square aria-hidden />
+              ) : (
+                <Mic aria-hidden />
+              )}
+              <span>
+                {phase === "listening" ? "Listening" : phase === "speaking" ? "Stop" : "Speak"}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="pg-dock-more"
+              aria-expanded={more}
+              aria-controls="pg-dock-menu"
+              aria-label={more ? "Close help menu" : "More help: Explain, Tap to hear"}
+              data-tap={prefs.tapToHear || undefined}
+              onClick={() => setMore((v) => !v)}
+            >
+              {more ? <X aria-hidden /> : <MoreHorizontal aria-hidden />}
+            </button>
+          </div>
         </div>
       )}
       <style>{DOCK_CSS}</style>
@@ -573,28 +583,52 @@ function DictationMic() {
 const DOCK_CSS = `
 .pg-dock {
   position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom));
-  z-index: 60; display: flex; flex-direction: column; gap: 6px; padding: 6px;
+  z-index: 60; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  font-family: var(--pg-font-sans, system-ui, sans-serif); pointer-events: none;
+}
+.pg-dock > * { pointer-events: auto; }
+.pg-dock-row {
+  display: flex; align-items: center; gap: 2px; padding: 3px;
   background: var(--pg-surface, #fffdf7); border: 1px solid var(--pg-line-strong, rgba(0,0,0,.18));
-  border-radius: 18px; box-shadow: var(--pg-shadow-pop, 0 8px 24px rgba(0,0,0,.18));
-  font-family: var(--pg-font-sans, system-ui, sans-serif);
+  border-radius: 999px; box-shadow: var(--pg-shadow-pop, 0 8px 24px rgba(0,0,0,.18));
 }
 .pg-dock-btn {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  width: 64px; min-height: 56px; padding: 6px 4px; border-radius: 12px; border: 0;
-  background: transparent; color: var(--pg-ink, #1d1c2b); cursor: pointer;
-  font-size: 11px; line-height: 13px; font-weight: 600; text-align: center;
+  display: flex; align-items: center; gap: 10px; border: 0; background: transparent; cursor: pointer;
+  color: var(--pg-ink, #1d1c2b); font: 600 13px/16px var(--pg-font-sans, system-ui, sans-serif); text-align: left;
 }
-.pg-dock-btn svg { width: 22px; height: 22px; }
-.pg-dock-btn:hover { background: var(--pg-hover, rgba(0,0,0,.06)); }
+.pg-dock-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .pg-dock-btn:disabled { opacity: .5; cursor: default; }
-.pg-dock-btn[aria-pressed="true"] { background: var(--pg-brand-tint, #ffe3d6); color: var(--pg-brand, #b4471b); }
-.pg-dock-btn.is-main { background: var(--pg-brand, #c2410c); color: var(--pg-on-brand, #fff); }
+.pg-dock-btn.is-main {
+  height: 40px; padding: 0 14px 0 12px; gap: 6px; border-radius: 999px;
+  background: var(--pg-brand, #c2410c); color: var(--pg-on-brand, #fff);
+}
 .pg-dock-btn.is-main:hover { filter: brightness(1.08); }
 .pg-dock-btn.is-main[data-phase="listening"] { background: var(--pg-crit, #b91c1c); color: var(--pg-on-crit, #fff); animation: pg-dock-pulse 1.2s ease-in-out infinite; }
 @keyframes pg-dock-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(185,28,28,.45); } 50% { box-shadow: 0 0 0 8px rgba(185,28,28,0); } }
+.pg-dock-more {
+  position: relative; display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--pg-ink-2, #4b4a5c); cursor: pointer;
+}
+.pg-dock-more:hover { background: var(--pg-hover, rgba(0,0,0,.06)); }
+.pg-dock-more svg { width: 18px; height: 18px; }
+/* Tap to hear is on: a dot on ⋯ so it's visible while the menu is closed. */
+.pg-dock-more[data-tap]::after { content: ""; position: absolute; top: 6px; right: 6px; width: 7px; height: 7px;
+  border-radius: 999px; background: var(--pg-brand, #c2410c); box-shadow: 0 0 0 2px var(--pg-surface, #fff); }
+.pg-dock-menu {
+  display: flex; flex-direction: column; min-width: 190px; padding: 4px;
+  background: var(--pg-surface, #fffdf7); border: 1px solid var(--pg-line-strong, rgba(0,0,0,.18));
+  border-radius: 14px; box-shadow: var(--pg-shadow-pop, 0 8px 24px rgba(0,0,0,.18));
+  animation: pg-dock-in .14s ease-out;
+}
+@keyframes pg-dock-in { from { opacity: 0; transform: translateY(4px); } }
+.pg-dock-menu .pg-dock-btn { width: 100%; min-height: 40px; padding: 0 10px; border-radius: 10px; font-weight: 500; }
+.pg-dock-menu .pg-dock-btn:hover { background: var(--pg-hover, rgba(0,0,0,.06)); }
+.pg-dock-menu .pg-dock-btn[aria-pressed="true"] { color: var(--pg-brand, #b4471b); }
+.pg-dock-state { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--pg-ink-3, #6b6a7c); }
+.pg-dock-btn[aria-pressed="true"] .pg-dock-state { color: var(--pg-brand, #b4471b); }
 .pg-dock-bubble {
-  position: fixed; right: calc(max(12px, env(safe-area-inset-right)) + 86px); bottom: max(12px, env(safe-area-inset-bottom));
-  z-index: 60; width: min(340px, calc(100vw - 120px)); max-height: 50vh; overflow: auto;
+  position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 56px);
+  z-index: 60; width: min(340px, calc(100vw - 24px)); max-height: 50vh; overflow: auto;
   padding: 12px 34px 12px 14px; border-radius: 14px;
   background: var(--pg-surface, #fffdf7); color: var(--pg-ink, #1d1c2b);
   border: 1px solid var(--pg-line-strong, rgba(0,0,0,.18)); box-shadow: var(--pg-shadow-pop, 0 8px 24px rgba(0,0,0,.18));
@@ -619,17 +653,11 @@ const DOCK_CSS = `
 .pg-dictate button[data-state="rec"] { background: var(--pg-crit, #b91c1c); color: #fff; animation: pg-dock-pulse 1.2s ease-in-out infinite; }
 .pg-dictate-err { position: absolute; right: 0; top: calc(100% + 4px); white-space: nowrap; padding: 3px 8px; border-radius: 6px;
   background: var(--pg-crit, #b91c1c); color: #fff; font: 12px/16px var(--pg-font-sans, system-ui, sans-serif); }
-html.pg-has-dock body { padding-bottom: 96px; }
-@media (max-width: 640px) { html.pg-has-dock body { padding-bottom: 84px; } }
+html.pg-has-dock body { padding-bottom: 64px; }
 .pg-hear-target { outline: 3px solid var(--pg-focus, #2563eb) !important; outline-offset: 2px; border-radius: 4px; }
-.pg-dock-more { display: grid; place-items: center; height: 26px; border: 0; border-radius: 8px; background: transparent;
-  color: var(--pg-ink-2, #4b4a5c); cursor: pointer; }
-.pg-dock-more:hover { background: var(--pg-hover, rgba(0,0,0,.06)); }
-.pg-dock-more svg { width: 18px; height: 18px; }
 @media (max-width: 640px) {
-  .pg-dock { flex-direction: column-reverse; padding: 4px; gap: 4px; border-radius: 16px; }
-  .pg-dock-btn { width: 56px; min-height: 52px; }
-  .pg-dock-bubble { right: max(12px, env(safe-area-inset-right)); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 76px); width: calc(100vw - 24px); }
+  .pg-dock-btn.is-main { height: 44px; }
+  .pg-dock-more { width: 40px; height: 40px; }
 }
-@media (prefers-reduced-motion: reduce) { .pg-dock-btn.is-main[data-phase="listening"], .pg-dictate button[data-state="rec"] { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .pg-dock-btn.is-main[data-phase="listening"], .pg-dictate button[data-state="rec"], .pg-dock-menu { animation: none; } }
 `;

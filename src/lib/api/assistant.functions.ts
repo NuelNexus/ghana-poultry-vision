@@ -21,34 +21,41 @@ import { AVATAR_ACTIONS, AVATAR_ACTION_IDS, type VoiceSegment } from "../avatar-
 
 // AI assistant tab: live sensor snapshot, text chat, and speech-to-speech.
 
+// Only the signed-in account's devices and alerts ($1 = user id).
 const SNAPSHOT_SQL = `
   select distinct on (r.device_id) r.*, d.device_id as device_code, d.last_seen, h.name as house_name,
          h.bird_count
     from sensor_readings r
     join devices d on d.id = r.device_id
     left join poultry_houses h on h.id = r.house_id
+   where d.owner_id = $1
    order by r.device_id, r.created_at desc`;
 
 type SnapshotRow = AiSnapshot & { bird_count: number | null };
 
-async function loadSnapshot() {
+async function loadSnapshot(userId: string) {
   const [readings, alerts] = await Promise.all([
-    query<SnapshotRow>(SNAPSHOT_SQL),
+    query<SnapshotRow>(SNAPSHOT_SQL, [userId]),
     query<Alert>(
-      "select * from alerts where not coalesce(resolved, false) order by created_at desc limit 10",
+      `select * from alerts
+        where not coalesce(resolved, false)
+          and (farm_id in (select id from farms where owner_id = $1)
+               or device_id in (select id from devices where owner_id = $1))
+        order by created_at desc limit 10`,
+      [userId],
     ),
   ]);
   return { readings, alerts };
 }
 
 /** The live farm state as compact JSON, for prompts elsewhere (voice commands). */
-export async function farmSummary() {
-  return describeFarm(await loadSnapshot());
+export async function farmSummary(userId: string) {
+  return describeFarm(await loadSnapshot(userId));
 }
 
 export const getAssistantSensors = createServerFn({ method: "GET" })
   .middleware([requireUser])
-  .handler(() => loadSnapshot());
+  .handler(({ context }) => loadSnapshot(context.user.id));
 
 // Compact text version of the farm state for the model's system prompt. Only
 // fields the Raspberry Pi really sends are included (see edge/agent.py).
@@ -377,7 +384,7 @@ export const askAssistant = createServerFn({ method: "POST" })
     // Twi -> the Ghanaian stack; anything else -> GPT, answering in the farmer's language.
     const lang = detectLang(last.content);
     const [farm, conversationId] = await Promise.all([
-      loadSnapshot().then(describeFarm),
+      loadSnapshot(context.user.id).then(describeFarm),
       conversationFor(context.user.id, data.conversationId, last.content),
     ]);
     const { reply, english, youEnglish } = await answer(
@@ -444,8 +451,8 @@ export const speakReply = createServerFn({ method: "POST" })
 export const twiReply = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .inputValidator(z.object({ text: z.string().min(1).max(4000), history: historySchema.max(12) }))
-  .handler(async ({ data }) => {
-    const farm = describeFarm(await loadSnapshot());
+  .handler(async ({ data, context }) => {
+    const farm = describeFarm(await loadSnapshot(context.user.id));
     const turn = await answer(
       farm,
       [...data.history, { role: "user", content: data.text }],
@@ -473,8 +480,8 @@ export const createVoiceSession = createServerFn({ method: "POST" })
       uiLang: z.enum(SITE_LANG_IDS).default("en"),
     }),
   )
-  .handler(async ({ data }) => {
-    const farm = describeFarm(await loadSnapshot());
+  .handler(async ({ data, context }) => {
+    const farm = describeFarm(await loadSnapshot(context.user.id));
     // The site language steers speech recognition toward that language's spelling.
     const hint =
       data.uiLang === "en" || data.uiLang === "fr" ? "auto" : siteLang(data.uiLang).speech;

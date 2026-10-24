@@ -183,7 +183,7 @@ export const voiceCommand = createServerFn({ method: "POST" })
     if (!user) takeAnon("command", 200);
     const pages: Record<string, string> = user ? APP_PAGES : PUBLIC_PAGES;
     const l = siteLang(data.lang);
-    const farm = user ? await farmSummary().catch(() => "unavailable") : null;
+    const farm = user ? await farmSummary(user.id).catch(() => "unavailable") : null;
     const raw = await chatCompletion(
       [
         {

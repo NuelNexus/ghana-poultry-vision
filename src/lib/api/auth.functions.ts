@@ -46,13 +46,9 @@ export const signUp = createServerFn({ method: "POST" })
       "insert into users (email, password_hash, full_name, language) values ($1, $2, $3, $4) returning id",
       [data.email.trim(), await hashPassword(data.password), data.fullName.trim(), data.language],
     );
-    // The first account owns the farm; everyone after joins as a worker
-    // until an admin promotes them.
-    await query(
-      `insert into user_roles (user_id, role)
-       select $1, case when exists (select 1 from user_roles where role = 'admin') then 'worker' else 'admin' end::app_role`,
-      [user!.id],
-    );
+    // Every account runs its own farm, so it gets admin rights over its own
+    // devices and data (and sees nobody else's, see farm.functions.ts).
+    await query("insert into user_roles (user_id, role) values ($1, 'admin')", [user!.id]);
     await createSession(user!.id);
     return getSessionUser();
   });
