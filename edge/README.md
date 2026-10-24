@@ -65,6 +65,7 @@ below the PWM model it replaced (93.8 %) because an on/off fan with no tach tell
 | MQ-135 | AO to ADS1115 A0 through a 10k/20k divider (analog, preferred), or DO to GPIO 17 |
 | LDR module | AO to ADS1115 A1 (analog), or DO to GPIO 27 |
 | Fan relay | IN to GPIO 18, VCC to 5 V, GND to GND. The fan's own supply goes through COM and NO |
+| or 4-pin PWM fan | PWM wire (usually blue) to GPIO 18, fan GND to a Pi GND *and* the 12 V supply's GND, fan +12 V from that supply. No relay or MOSFET. Set `PG_FAN_MODE=pwm` |
 
 The Pi has no analog inputs. With an ADS1115 on I²C the agent gets real gas and
 light levels. Without one it reads the modules' DO pins, which only say "over
@@ -78,6 +79,16 @@ switches so the contacts don't chatter; a manager's override from the app skips
 that wait. A relay can't tell whether the blades are turning, so there is no fan
 fault detection: if the fan is on and the house keeps heating up, check it.
 
+A 4-pin PWM fan needs no extra parts: its PWM input is a logic-level signal the
+Pi's 3.3 V GPIO drives directly (the ADS1115 can't help here; it only reads
+analog inputs). The fan still needs its own 12 V supply; never take 12 V near
+the Pi's pins, and join the grounds. With `PG_FAN_MODE=pwm` the agent runs the
+fan at `PG_FAN_PWM_DUTY` (default 100 %) for "on" and 0 % for "off", at 10 kHz
+(the most the Pi's software PWM does; fans are specified for 25 kHz but run
+fine at 10). Many 4-pin fans keep turning slowly at 0 %; if yours must stop
+completely, use the relay instead. A 3-pin or 2-pin fan has no PWM input and
+needs the relay.
+
 Works on a Pi 3, 4, 5 or Zero 2 W with Raspberry Pi OS Bookworm.
 
 ## Test the sensors
@@ -89,7 +100,7 @@ cd edge
 python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -r requirements-pi.txt
 .venv/bin/python test_sensors.py          # i2c, dht, gas, light, relay, with PASS/WARN/FAIL and wiring hints
-.venv/bin/python test_sensors.py relay    # just one (listen for the click)
+.venv/bin/python test_sensors.py fan      # just the fan (relay click or PWM speed change)
 .venv/bin/python test_sensors.py live     # all readings every 2 s
 ```
 

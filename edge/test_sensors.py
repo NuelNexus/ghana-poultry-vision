@@ -1,7 +1,7 @@
 """Check each sensor and the fan on the Pi, one at a time, before running the agent.
 
     python test_sensors.py              # run every test
-    python test_sensors.py dht          # just one: i2c, dht, gas, light, relay
+    python test_sensors.py dht          # just one: i2c, dht, gas, light, relay (or fan)
     python test_sensors.py live         # print all readings every 2 s (Ctrl+C to stop)
 
 Pins and calibration come from agent.env, same as the agent. Each test prints
@@ -247,7 +247,28 @@ def test_light(cfg) -> str:
     return verdict("PASS", "responds to light")
 
 
+def test_pwm_fan(cfg) -> str:
+    heading("PWM fan",
+            f"fan PWM wire (blue)->GPIO{cfg.fan_pwm_pin}, fan GND->Pi GND, fan +12 V from its own supply")
+    from poultrygrid.sensors import FanPWM
+
+    fan = FanPWM(cfg.fan_pwm_pin, cfg.fan_pwm_hz, cfg.fan_pwm_duty, cfg.fan_pwm_invert)
+    try:
+        for on in (True, False, True, False):
+            fan.set(on)
+            print(f"  fan {'ON ' if on else 'OFF'}  ({fan.on_duty:.0%} vs 0 % duty; listen for it speeding up / slowing down)")
+            time.sleep(5)
+    finally:
+        fan.close()
+    hint("never changes speed: check the PWM wire is on the right GPIO and the fan's GND is joined to the Pi's GND",
+         "fast when it should be slow: flip PG_FAN_PWM_INVERT in agent.env",
+         "still turns at 0 %: normal for many 4-pin fans; it only needs a relay if it must stop completely")
+    return verdict("PASS", "duty switched up and down twice; confirm the fan followed it")
+
+
 def test_relay(cfg) -> str:
+    if cfg.fan_mode == "pwm":
+        return test_pwm_fan(cfg)
     low = "LOW" if cfg.relay_active_low else "HIGH"
     heading("Fan relay",
             f"relay IN->GPIO{cfg.fan_relay_pin}, VCC->5V, GND->GND; fan supply through COM and NO "
@@ -289,7 +310,7 @@ def live(cfg):
         hw.close()
 
 
-TESTS = {"i2c": test_i2c, "dht": test_dht, "gas": test_gas, "light": test_light, "relay": test_relay}
+TESTS = {"i2c": test_i2c, "dht": test_dht, "gas": test_gas, "light": test_light, "relay": test_relay, "fan": test_relay}
 
 
 def main():
@@ -307,7 +328,7 @@ def main():
 
     if args.tests == ["live"]:
         return live(cfg)
-    names = args.tests or list(TESTS)
+    names = args.tests or [t for t in TESTS if t != "fan"]
     results = {}
     for name in names:
         try:

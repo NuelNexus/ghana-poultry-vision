@@ -65,9 +65,14 @@ class Config:
     dht_pin: int
     gas_do_pin: int
     ldr_do_pin: int
+    fan_mode: str
     fan_relay_pin: int
     relay_active_low: bool
     relay_min_switch_s: float
+    fan_pwm_pin: int
+    fan_pwm_hz: int
+    fan_pwm_duty: float
+    fan_pwm_invert: bool
     fan_auto: bool
 
     @classmethod
@@ -88,9 +93,14 @@ class Config:
             dht_pin=int(e("PG_DHT_PIN", "4")),
             gas_do_pin=int(e("PG_GAS_DO_PIN", "17")),
             ldr_do_pin=int(e("PG_LDR_DO_PIN", "27")),
+            fan_mode=e("PG_FAN_MODE", "relay"),
             fan_relay_pin=int(e("PG_FAN_RELAY_PIN", "18")),
             relay_active_low=e("PG_RELAY_ACTIVE_LOW", "1") == "1",
             relay_min_switch_s=float(e("PG_RELAY_MIN_SWITCH_S", "60")),
+            fan_pwm_pin=int(e("PG_FAN_PWM_PIN", "18")),
+            fan_pwm_hz=int(e("PG_FAN_PWM_HZ", "10000")),
+            fan_pwm_duty=float(e("PG_FAN_PWM_DUTY", "1.0")),
+            fan_pwm_invert=e("PG_FAN_PWM_INVERT", "0") == "1",
             fan_auto=e("PG_FAN_AUTO", "1") == "1",
         )
 

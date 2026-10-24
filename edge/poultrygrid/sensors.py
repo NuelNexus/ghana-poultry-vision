@@ -6,6 +6,8 @@ Wiring:
                         or straight to GPIO 17 / GPIO 27 using the modules' DO pins
     Fan relay        -> GPIO 18 (relay module IN); the fan runs on its own supply
                         through the relay's COM / NO contacts
+    or 4-pin PWM fan -> PWM wire (blue) to GPIO 18, fan GND to a Pi GND, fan
+                        12 V from its own supply (PG_FAN_MODE=pwm, no relay)
 
 The Pi has no analog inputs. With an ADS1115 the MQ-135 and LDR give real
 levels. Without one, their comparator outputs (DO) only say "over the
@@ -67,6 +69,36 @@ class FanRelay:
         self._relay.close()
 
 
+class FanPWM:
+    """4-pin PWM fan with its PWM wire straight to a GPIO pin; on/off like the relay.
+
+    The model was trained on an on/off fan, so "on" is one fixed duty and "off"
+    is 0 %. Many 4-pin fans keep turning slowly at 0 %; that only adds airflow.
+    """
+
+    def __init__(self, pin: int, hz: int, on_duty: float, invert: bool):
+        from gpiozero import PWMOutputDevice
+
+        # lgpio's software PWM rejects anything above 10 kHz
+        self._pwm = PWMOutputDevice(pin, active_high=not invert, frequency=min(hz, 10000), initial_value=0.0)
+        self.on_duty = max(0.0, min(1.0, on_duty))
+        self.on = False
+
+    def set(self, on: bool, force: bool = False):
+        self._pwm.value = self.on_duty if on else 0.0
+        self.on = on
+
+    def close(self):
+        self._pwm.off()
+        self._pwm.close()
+
+
+def open_fan(cfg):
+    if cfg.fan_mode == "pwm":
+        return FanPWM(cfg.fan_pwm_pin, cfg.fan_pwm_hz, cfg.fan_pwm_duty, cfg.fan_pwm_invert)
+    return FanRelay(cfg.fan_relay_pin, cfg.relay_active_low, cfg.relay_min_switch_s)
+
+
 def open_ads1115():
     import board
     import busio
@@ -84,6 +116,7 @@ class PiHardware:
 
         self.cfg = cfg
         self._dht = adafruit_dht.DHT22(getattr(board, f"D{cfg.dht_pin}"), use_pulseio=False)
+        self._dht_last = None  # (temperature, humidity, monotonic time)
         self._gas = self._ldr = self._gas_do = self._ldr_do = None
         self.mode = "digital"
         if cfg.sensor_mode in ("auto", "ads1115"):
@@ -101,7 +134,7 @@ class PiHardware:
             # LM393 modules pull DO low when over their threshold.
             self._gas_do = DigitalInputDevice(cfg.gas_do_pin, pull_up=True)
             self._ldr_do = DigitalInputDevice(cfg.ldr_do_pin, pull_up=True)
-        self._fan = FanRelay(cfg.fan_relay_pin, cfg.relay_active_low, cfg.relay_min_switch_s)
+        self._fan = open_fan(cfg)
 
     @property
     def fan_on(self) -> bool:
@@ -111,14 +144,19 @@ class PiHardware:
         self._fan.set(on, force)
 
     def _dht_read(self):
-        for _ in range(4):  # DHT22 often fails a read; retry before giving up
+        # The bit-banged DHT22 driver only gets about 1 read in 4 through on a Pi,
+        # so retry, then reuse the last good reading for a couple of minutes.
+        for _ in range(8):
             try:
                 t, h = self._dht.temperature, self._dht.humidity
                 if t is not None and h is not None:
+                    self._dht_last = (t, h, time.monotonic())
                     return t, h
             except RuntimeError:
                 pass
             time.sleep(2.1)
+        if self._dht_last and time.monotonic() - self._dht_last[2] < 120:
+            return self._dht_last[:2]
         return None, None
 
     def _gas_light(self) -> tuple[float | None, float]:

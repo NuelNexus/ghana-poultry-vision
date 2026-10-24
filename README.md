@@ -65,6 +65,8 @@ can change it in Profile > Language and voice. It is saved on their account.
 1. **Houses → Add house**, and set *Chicks placed on* (this gives the AI the flock age).
 2. **Devices → Register device**, choose *Raspberry Pi (edge AI)* and the house, and copy the `agent.env` it shows.
 3. On the Pi, run `sudo edge/deploy/install_pi.sh` (full guide: [edge/README.md](edge/README.md)).
+   If the web app also runs on the Pi, `sudo scripts/setup-autostart.sh` instead starts the app
+   (port 8080), the agent and Ama's Twi voice on every boot (`--no-tts` skips the voice).
 
 The Pi posts a reading and its prediction every 30 s. The app shows:
 
