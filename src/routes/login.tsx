@@ -74,10 +74,10 @@ function LoginPage() {
                 Tap your language to hear it. The whole site will use it. You can change it later in
                 Profile.
               </p>
-              <div className="mt-6">
+              <div className="mt-6 mb-8">
                 <LanguagePicker />
               </div>
-              <button type="button" className="auth-button mt-6" onClick={() => setStep("form")}>
+              <button type="button" className="auth-button" onClick={() => setStep("form")}>
                 Continue
               </button>
               <button onClick={() => setMode("signin")} className="auth-toggle">

@@ -1,7 +1,7 @@
 """Check each sensor and the fan on the Pi, one at a time, before running the agent.
 
     python test_sensors.py              # run every test
-    python test_sensors.py dht          # just one: i2c, dht, gas, light, fan
+    python test_sensors.py dht          # just one: i2c, dht, gas, light, relay
     python test_sensors.py live         # print all readings every 2 s (Ctrl+C to stop)
 
 Pins and calibration come from agent.env, same as the agent. Each test prints
@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -42,17 +41,44 @@ def heading(title: str, wiring: str):
 
 
 def _ads(cfg):
-    import board
-    import busio
-    import adafruit_ads1x15.ads1115 as ADS
-    from adafruit_ads1x15.analog_in import AnalogIn
+    from poultrygrid.sensors import open_ads1115
 
-    ads = ADS.ADS1115(busio.I2C(board.SCL, board.SDA))
-    return AnalogIn(ads, ADS.P0), AnalogIn(ads, ADS.P1)
+    return open_ads1115()
+
+
+def _has_ads(cfg) -> bool:
+    if cfg.sensor_mode == "digital":
+        return False
+    try:
+        _ads(cfg)[0].voltage  # noqa: B018
+        return True
+    except Exception:
+        return False
+
+
+def _watch_do(pin: int, seconds: float, label: str):
+    """Watch a module's DO pin (LM393: low = over threshold). Returns the states seen."""
+    from gpiozero import DigitalInputDevice
+
+    do = DigitalInputDevice(pin, pull_up=True)
+    seen = set()
+    end = time.monotonic() + seconds
+    try:
+        while time.monotonic() < end:
+            v = int(do.value)
+            seen.add(v)
+            print(f"\r  {label} DO (GPIO{pin}): {'HIGH' if v else 'LOW '}      ", end="", flush=True)
+            time.sleep(0.2)
+    finally:
+        do.close()
+    print()
+    return seen
 
 
 def test_i2c(cfg) -> str:
-    heading("I2C bus / ADS1115", "VDD->3.3V, GND->GND, SCL->GPIO3 (pin 5), SDA->GPIO2 (pin 3), ADDR->GND")
+    heading("I2C bus / ADS1115 (optional)", "VDD->3.3V, GND->GND, SCL->GPIO3 (pin 5), SDA->GPIO2 (pin 3), ADDR->GND")
+    if cfg.sensor_mode == "digital":
+        return verdict("PASS", "PG_SENSOR_MODE=digital: no ADS1115 expected, MQ-135 and LDR use their DO pins")
     if not Path("/dev/i2c-1").exists():
         verdict("FAIL", "I2C is turned off")
         hint("sudo raspi-config nonint do_i2c 0 && sudo reboot")
@@ -75,10 +101,14 @@ def test_i2c(cfg) -> str:
         verdict("FAIL", "an ADS1115 is there but not at 0x48")
         hint("tie the ADDR pin to GND (0x49=VDD, 0x4A=SDA, 0x4B=SCL)")
         return "FAIL"
-    verdict("FAIL", "no ADS1115 on the bus")
-    hint("check SDA/SCL aren't swapped and the board has 3.3 V and GND",
-         "the MQ-135 and LDR both go through the ADS1115, so their tests will fail too")
-    return "FAIL"
+    if cfg.sensor_mode == "ads1115":
+        verdict("FAIL", "no ADS1115 on the bus, and PG_SENSOR_MODE=ads1115 requires one")
+        hint("check SDA/SCL aren't swapped and the board has 3.3 V and GND")
+        return "FAIL"
+    verdict("WARN", "no ADS1115: the MQ-135 and LDR will be read from their DO pins (on/off only)")
+    hint("that works, but an ADS1115 gives the model real gas and light levels",
+         f"DO wiring: MQ-135 DO -> GPIO{cfg.gas_do_pin}, LDR DO -> GPIO{cfg.ldr_do_pin}")
+    return "WARN"
 
 
 def test_dht(cfg) -> str:
@@ -132,6 +162,20 @@ def _watch(chan, seconds: float, label: str, fmt):
 
 
 def test_gas(cfg) -> str:
+    if not _has_ads(cfg):
+        heading("MQ-135 gas sensor (DO mode)", f"VCC->5V, GND->GND, DO->GPIO{cfg.gas_do_pin}")
+        print("  breathe on the sensor or hold a marker / alcohol wipe near it in the next 10 s")
+        seen = _watch_do(cfg.gas_do_pin, 10, "MQ-135")
+        if seen == {0}:
+            verdict("WARN", "DO stayed LOW (triggered) the whole time")
+            hint("let the heater warm up for a few minutes, then turn the module's screw until the DO LED just goes off in clean air")
+            return "WARN"
+        if seen == {1}:
+            verdict("WARN", "DO never triggered")
+            hint("turn the screw the other way a little so gas trips it",
+                 f"check DO (not AO) goes to GPIO{cfg.gas_do_pin}")
+            return "WARN"
+        return verdict("PASS", "DO switches when gas rises")
     heading("MQ-135 gas sensor", "VCC->5V, GND->GND, AO->ADS1115 A0 (through a divider, see below)")
     try:
         gas, _ = _ads(cfg)
@@ -165,6 +209,16 @@ def test_gas(cfg) -> str:
 
 
 def test_light(cfg) -> str:
+    if not _has_ads(cfg):
+        heading("LDR light sensor (DO mode)", f"VCC->3.3V, GND->GND, DO->GPIO{cfg.ldr_do_pin}")
+        print("  cover the sensor with your hand, then uncover it, in the next 10 s")
+        seen = _watch_do(cfg.ldr_do_pin, 10, "LDR")
+        if len(seen) < 2:
+            verdict("WARN", "DO didn't change. Did you cover it?")
+            hint("turn the module's screw so its DO LED flips between covered and uncovered",
+                 f"check DO goes to GPIO{cfg.ldr_do_pin}")
+            return "WARN"
+        return verdict("PASS", "responds to light")
     heading("LDR light sensor", "VCC->3.3V, GND->GND, AO->ADS1115 A1")
     try:
         _, ldr = _ads(cfg)
@@ -193,69 +247,41 @@ def test_light(cfg) -> str:
     return verdict("PASS", "responds to light")
 
 
-def test_fan(cfg) -> str:
-    heading("Fan PWM + tach",
-            f"PWM GPIO{cfg.fan_pwm_pin} -> MOSFET gate / fan PWM wire, tach -> GPIO{cfg.fan_tach_pin}, "
-            "fan on its own 12 V supply, grounds joined")
-    from gpiozero import DigitalInputDevice, PWMOutputDevice
+def test_relay(cfg) -> str:
+    low = "LOW" if cfg.relay_active_low else "HIGH"
+    heading("Fan relay",
+            f"relay IN->GPIO{cfg.fan_relay_pin}, VCC->5V, GND->GND; fan supply through COM and NO "
+            f"(module switches on when IN is {low})")
+    from gpiozero import OutputDevice
 
-    hz = min(cfg.fan_pwm_hz, 10000)
-    fan = PWMOutputDevice(cfg.fan_pwm_pin, frequency=hz, initial_value=0.0)
-    tach = DigitalInputDevice(cfg.fan_tach_pin, pull_up=True)
-    pulses = [0]
-    lock = threading.Lock()
-
-    def on_pulse():
-        with lock:
-            pulses[0] += 1
-
-    tach.when_deactivated = on_pulse
-    results = []
+    relay = OutputDevice(cfg.fan_relay_pin, active_high=not cfg.relay_active_low, initial_value=False)
     try:
-        for duty in (0.0, 0.3, 0.6, 1.0):
-            fan.value = duty
-            time.sleep(3)  # let it spin up / down
-            with lock:
-                pulses[0] = 0
-            t0 = time.monotonic()
+        for on in (True, False, True, False):
+            relay.value = on
+            print(f"  relay {'ON ' if on else 'OFF'}  (listen for the click; the fan should {'run' if on else 'stop'})")
             time.sleep(3)
-            with lock:
-                n = pulses[0]
-            rpm = n / 2.0 / (time.monotonic() - t0) * 60  # 2 pulses per revolution
-            results.append((duty, rpm))
-            print(f"  duty {duty:>4.0%}: {rpm:6.0f} rpm")
     finally:
-        fan.value = 0.0
-        fan.close()
-        tach.close()
-
-    top = results[-1][1]
-    if top < 100:
-        verdict("FAIL", "no tach pulses at full speed")
-        hint("is the fan actually spinning? If not: check the 12 V supply, MOSFET wiring, and that its GND is joined to the Pi's GND",
-             f"if it spins: tach wire (usually yellow/green) to GPIO{cfg.fan_tach_pin}; never feed it 12 V, it must be pulled up to 3.3 V")
-        return "FAIL"
-    if results[0][1] > 0.5 * top:
-        verdict("WARN", "fan still runs at 0% duty: the PWM isn't controlling it")
-        hint(f"check GPIO{cfg.fan_pwm_pin} goes to the MOSFET gate (or the fan's blue PWM wire)")
-        return "WARN"
-    if results[2][1] < results[1][1] or top < results[2][1]:
-        verdict("WARN", "speed doesn't rise with duty; the agent's fan levels won't map cleanly")
-        return "WARN"
-    return verdict("PASS", f"speed follows the PWM, {top:.0f} rpm at full")
+        relay.off()
+        relay.close()
+    print("  There's no speed sensor on a relay fan, so this test can't see the fan itself.")
+    hint("no click at all: check VCC/GND to the relay board and IN on the right GPIO",
+         "clicks but the fan never runs: check the fan's supply is wired through COM and NO (not NC)",
+         "fan runs when it should be off: flip PG_RELAY_ACTIVE_LOW in agent.env")
+    return verdict("PASS", "relay switched on and off twice; confirm the fan followed it")
 
 
 def live(cfg):
     from poultrygrid.sensors import PiHardware
 
     hw = PiHardware(cfg)
-    print("time      temp    RH     gas   light   rpm   (Ctrl+C to stop)")
+    print(f"MQ-135 / LDR mode: {hw.mode}")
+    print("time      temp    RH     gas   light   fan   (Ctrl+C to stop)")
     try:
         while True:
             r = hw.read()
             f = lambda v, n=1: "  -  " if v is None else f"{v:.{n}f}"  # noqa: E731
             print(f"{time.strftime('%H:%M:%S')}  {f(r.temperature)}°C  {f(r.humidity, 0)}%  "
-                  f"{f(r.gas_index)}  {f(r.light)}  {f(r.fan_rpm, 0)}", flush=True)
+                  f"{f(r.gas_index)}  {f(r.light)}  {'on' if r.fan_on else 'off'}", flush=True)
             time.sleep(2)
     except KeyboardInterrupt:
         pass
@@ -263,7 +289,7 @@ def live(cfg):
         hw.close()
 
 
-TESTS = {"i2c": test_i2c, "dht": test_dht, "gas": test_gas, "light": test_light, "fan": test_fan}
+TESTS = {"i2c": test_i2c, "dht": test_dht, "gas": test_gas, "light": test_light, "relay": test_relay}
 
 
 def main():

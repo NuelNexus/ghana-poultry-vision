@@ -6,7 +6,39 @@ from commit messages and file lists; they weren't re-tested for this document.
 
 ---
 
-## Unreleased — AI behaviour, sign-in page, languages fit, docs
+## Unreleased — relay fan, readout redesign, sign-up tiles
+
+### The Pi drives the fan through a relay
+- **Problem:** the agent, model and app assumed a PWM fan with a tachometer (low / medium /
+  high, rpm). The real build is a DHT22, MQ-135, LDR and a relay-switched fan.
+- **Change:** the relay is on or off (GPIO 18, active-low by default, 60 s minimum between
+  switches). MQ-135 and LDR use an ADS1115 if one answers, otherwise their DO pins. Model
+  v3 (`poultrygrid_v3.npz`) was retrained on a relay-fan simulator: 20 features, 6 causes
+  (no fan fault, since nothing measures the blades). Held-out: 91.8 % accuracy, 97.6 %
+  critical recall. The app stores `fan_on`, overrides are force on / off, and every page
+  shows On / Off instead of rpm. Migration `005_fan_relay.sql` adds `fan_on`, converts old
+  readings, overrides and alert text.
+- **Files:** `edge/poultrygrid/*`, `edge/agent.py`, `edge/test_sensors.py`, `edge/train.py`,
+  `db/migrations/005_fan_relay.sql`, `src/routes/api/public/devices/ingest.ts`,
+  `src/lib/api/types.ts`, the overview, flock health, automation, devices, reports and AI pages.
+- **Checked:** agent run against the simulated coop (`--simulate`-style loop, 60 readings),
+  `tsc`, eslint, pages in the browser. Not run on a real Pi.
+
+### Coop readout and alert rows redesigned
+- **Change:** `AiStatusPanel` (Flock health, Overview) is now a readout: a status tile with a
+  shape mark, the top cause as the title and its advice, the temperature on a comfort-band
+  scale for the flock's age, and gauges for humidity, gas, light and the fan relay. An
+  offline Pi gets a hatched "No live data" strip. Alert rows drop the coloured left stripe
+  and pill for a time column, a shape mark and the severity as a word.
+- **Files:** `src/components/coop-readout.tsx` (new), `src/components/ai-status.tsx`,
+  `src/routes/app.index.tsx`, `src/routes/app.alerts.tsx`, `src/styles.css`.
+
+### Sign-up language tiles and voice dock match the card
+- **Change:** on the auth pages the language tiles and the voice help dock use the card's
+  black outline, offset shadows and Fjalla One. The Continue button no longer touches the tiles.
+- **Files:** `src/styles.css`, `src/routes/login.tsx`.
+
+## Earlier — AI behaviour, sign-in page, languages fit, docs
 
 ### Ama no longer brings up temperature unprompted
 - **Problem:** in every language, Ama worked the farm's readings (temperature, "your data is old")

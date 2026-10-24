@@ -1,7 +1,7 @@
-"""Train the PoultryGrid v2 coop-condition model and export it for the Pi.
+"""Train the PoultryGrid v3 (relay fan) coop-condition model and export it for the Pi.
 
     pip install -r requirements-train.txt
-    python train.py                  # writes models/poultrygrid_v2.npz + metrics.json
+    python train.py                  # writes models/poultrygrid_v3.npz + metrics.json
 
 Also trains the original AI_For_Poultry network (5 raw inputs -> 16 -> 16 -> 3)
 on the same data so the improvement is measured, not claimed.
@@ -64,12 +64,12 @@ def split_by_episode(eps, seed):
     return tr, va, ~(tr | va)
 
 
-def train_v2(X, ys, yc, tr, va, epochs, seed):
+def train_model(X, ys, yc, tr, va, epochs, seed):
     torch.manual_seed(seed)
     mean, std = X[tr].mean(0), X[tr].std(0) + 1e-6
     norm = lambda a: torch.tensor((a - mean) / std, dtype=torch.float32)
     Xtr, Xva = norm(X[tr]), norm(X[va])
-    ytr, yva = torch.tensor(ys[tr]), torch.tensor(ys[va])
+    ytr, yva = torch.tensor(ys[tr], dtype=torch.long), torch.tensor(ys[va], dtype=torch.long)
     ctr, cva = torch.tensor(yc[tr]), torch.tensor(yc[va])
 
     model = CoopNet(X.shape[1])
@@ -127,7 +127,7 @@ def train_original(raw, ys, tr, seed):
     torch.manual_seed(seed)
     mean, std = raw[tr].mean(0), raw[tr].std(0) + 1e-6
     Xtr = torch.tensor((raw[tr] - mean) / std, dtype=torch.float32)
-    ytr = torch.tensor(ys[tr])
+    ytr = torch.tensor(ys[tr], dtype=torch.long)
     model = OriginalNet()
     opt = torch.optim.Adam(model.parameters(), lr=0.01)
     ce = nn.CrossEntropyLoss()
@@ -173,8 +173,8 @@ def main():
     tr, va, te = split_by_episode(eps, args.seed)
     print(f"{len(X)} samples  train={tr.sum()} val={va.sum()} test={te.sum()}  (split by episode, no leakage)")
 
-    model, mean, std, temperature, epochs = train_v2(X, ys, yc, tr, va, args.epochs, args.seed)
-    path = args.out / "poultrygrid_v2.npz"
+    model, mean, std, temperature, epochs = train_model(X, ys, yc, tr, va, args.epochs, args.seed)
+    path = args.out / "poultrygrid_v3.npz"
     export_npz(model, mean, std, temperature, path)
 
     # Evaluate the exported numpy model, i.e. exactly what runs on the Pi.
@@ -202,17 +202,17 @@ def main():
         "epochs_trained": epochs,
         "temperature": round(temperature, 3),
         "status_labels": STATUS_TITLES,
-        "v2": summary(ys[te], pred),
+        "v3": summary(ys[te], pred),
         "original_ai_for_poultry_on_same_data": summary(ys[te], base_pred),
         "cause_f1": {cid: round(f1_score(yc[te][:, i], cause_pred[:, i], zero_division=0), 4)
                      for i, cid in enumerate(CAUSES)},
     }
     (args.out / "metrics.json").write_text(json.dumps(metrics, indent=2))
 
-    v2, base = metrics["v2"], metrics["original_ai_for_poultry_on_same_data"]
-    print(f"\n{'':28}{'v2':>10}{'original':>10}")
+    v3, base = metrics["v3"], metrics["original_ai_for_poultry_on_same_data"]
+    print(f"\n{'':28}{'v3':>10}{'original':>10}")
     for k in ("accuracy", "macro_f1", "critical_recall"):
-        print(f"{k:28}{v2[k] * 100:9.2f}%{base[k] * 100:9.2f}%")
+        print(f"{k:28}{v3[k] * 100:9.2f}%{base[k] * 100:9.2f}%")
     print("\nCause F1:", json.dumps(metrics["cause_f1"]))
     print(f"\nSaved {path} ({path.stat().st_size / 1024:.1f} KB) and metrics.json")
 

@@ -1,21 +1,34 @@
 """Sensor and fan drivers for the Raspberry Pi, plus a simulated coop.
 
-Wiring (same as the original AI_For_Poultry build):
+Wiring:
     DHT22            -> GPIO 4
-    MQ-135 + LDR     -> ADS1115 on I2C, channels 0 and 1
-    Fan PWM          -> GPIO 18 through a MOSFET / fan driver on its own 12 V supply
-    Fan tach         -> GPIO 23, pulled up to 3.3 V
+    MQ-135 + LDR     -> ADS1115 on I2C, channels 0 and 1 (analog, preferred)
+                        or straight to GPIO 17 / GPIO 27 using the modules' DO pins
+    Fan relay        -> GPIO 18 (relay module IN); the fan runs on its own supply
+                        through the relay's COM / NO contacts
+
+The Pi has no analog inputs. With an ADS1115 the MQ-135 and LDR give real
+levels. Without one, their comparator outputs (DO) only say "over the
+threshold you set with the module's screw" or not, so the readings are coarse.
+PG_SENSOR_MODE=auto (default) uses the ADS1115 if it answers, else DO.
 """
 
 from __future__ import annotations
 
+import logging
 import math
 import random
-import threading
 import time
 from dataclasses import dataclass
 
-from .features import MAX_RPM, comfort_band
+from .features import FAN_AIRFLOW, comfort_band
+
+log = logging.getLogger("poultrygrid")
+
+# What a DO pin's state stands for when there's no ADS1115. Picked so a
+# triggered MQ-135 reads as a gas warning, not an instant critical.
+GAS_DO_TRIGGERED, GAS_DO_CLEAR = 16.0, 4.0
+LIGHT_DO_BRIGHT, LIGHT_DO_DARK = 30.0, 3.0
 
 
 @dataclass
@@ -24,51 +37,78 @@ class Reading:
     gas_index: float | None
     temperature: float | None
     light: float | None
-    fan_rpm: float | None
-    fan_duty: float
+    fan_on: bool
 
     def row(self):
-        return [self.humidity, self.gas_index, self.temperature, self.light, self.fan_rpm, self.fan_duty]
+        return [self.humidity, self.gas_index, self.temperature, self.light, 1.0 if self.fan_on else 0.0]
+
+
+class FanRelay:
+    """Relay-switched fan with a minimum hold time so the contacts don't chatter."""
+
+    def __init__(self, pin: int, active_low: bool, min_switch_s: float):
+        from gpiozero import OutputDevice
+
+        self._relay = OutputDevice(pin, active_high=not active_low, initial_value=False)
+        self.min_switch_s = min_switch_s
+        self.on = False
+        self._changed = -math.inf
+
+    def set(self, on: bool, force: bool = False):
+        if on == self.on:
+            return
+        if not force and time.monotonic() - self._changed < self.min_switch_s:
+            return  # switched too recently; try again next reading
+        self._relay.value = on
+        self.on, self._changed = on, time.monotonic()
+
+    def close(self):
+        self._relay.off()
+        self._relay.close()
+
+
+def open_ads1115():
+    import board
+    import busio
+    import adafruit_ads1x15.ads1115 as ADS
+    from adafruit_ads1x15.analog_in import AnalogIn
+
+    ads = ADS.ADS1115(busio.I2C(board.SCL, board.SDA))
+    return AnalogIn(ads, ADS.P0), AnalogIn(ads, ADS.P1)
 
 
 class PiHardware:
     def __init__(self, cfg):
         import board  # noqa: F401  (adafruit-blinka)
         import adafruit_dht
-        import adafruit_ads1x15.ads1115 as ADS
-        from adafruit_ads1x15.analog_in import AnalogIn
-        import busio
-        from gpiozero import DigitalInputDevice, PWMOutputDevice
 
         self.cfg = cfg
         self._dht = adafruit_dht.DHT22(getattr(board, f"D{cfg.dht_pin}"), use_pulseio=False)
-        i2c = busio.I2C(board.SCL, board.SDA)
-        ads = ADS.ADS1115(i2c)
-        self._gas = AnalogIn(ads, ADS.P0)
-        self._ldr = AnalogIn(ads, ADS.P1)
-        # lgpio's software PWM rejects anything above 10 kHz
-        self._fan = PWMOutputDevice(cfg.fan_pwm_pin, frequency=min(cfg.fan_pwm_hz, 10000), initial_value=0.0)
-        self._tach = DigitalInputDevice(cfg.fan_tach_pin, pull_up=True)
-        self._pulses = 0
-        self._lock = threading.Lock()
-        self._tach.when_deactivated = self._on_pulse
-        self._t0 = time.monotonic()
-        self.duty = 0.0
+        self._gas = self._ldr = self._gas_do = self._ldr_do = None
+        self.mode = "digital"
+        if cfg.sensor_mode in ("auto", "ads1115"):
+            try:
+                self._gas, self._ldr = open_ads1115()
+                self._gas.voltage  # noqa: B018  fails here if nothing answers on I2C
+                self.mode = "ads1115"
+            except Exception as e:  # no ADS1115 on the bus
+                if cfg.sensor_mode == "ads1115":
+                    raise
+                log.warning("No ADS1115 (%s); reading MQ-135 and LDR from their DO pins", e)
+        if self.mode == "digital":
+            from gpiozero import DigitalInputDevice
 
-    def _on_pulse(self):
-        with self._lock:
-            self._pulses += 1
+            # LM393 modules pull DO low when over their threshold.
+            self._gas_do = DigitalInputDevice(cfg.gas_do_pin, pull_up=True)
+            self._ldr_do = DigitalInputDevice(cfg.ldr_do_pin, pull_up=True)
+        self._fan = FanRelay(cfg.fan_relay_pin, cfg.relay_active_low, cfg.relay_min_switch_s)
 
-    def set_fan(self, duty: float):
-        self.duty = max(0.0, min(1.0, duty))
-        self._fan.value = self.duty
+    @property
+    def fan_on(self) -> bool:
+        return self._fan.on
 
-    def _rpm(self) -> float:
-        with self._lock:
-            pulses, self._pulses = self._pulses, 0
-        now = time.monotonic()
-        dt, self._t0 = now - self._t0, now
-        return pulses / 2.0 / dt * 60.0 if dt > 0 else 0.0  # 2 pulses per revolution
+    def set_fan(self, on: bool, force: bool = False):
+        self._fan.set(on, force)
 
     def _dht_read(self):
         for _ in range(4):  # DHT22 often fails a read; retry before giving up
@@ -81,30 +121,39 @@ class PiHardware:
             time.sleep(2.1)
         return None, None
 
+    def _gas_light(self) -> tuple[float | None, float]:
+        if self.mode == "ads1115":
+            base = self.cfg.mq135_baseline_v
+            v_gas = self._gas.voltage
+            gas = round(max(0.0, (v_gas - base) / base * 100.0), 2) if base > 0 else None
+            frac = self._ldr.voltage / 3.3
+            return gas, round((1.0 - frac if self.cfg.ldr_invert else frac) * 50.0, 2)
+        gas = GAS_DO_TRIGGERED if not self._gas_do.value else GAS_DO_CLEAR
+        bright = not self._ldr_do.value
+        if not self.cfg.ldr_invert:
+            bright = not bright
+        return gas, LIGHT_DO_BRIGHT if bright else LIGHT_DO_DARK
+
     def read(self) -> Reading:
         t, h = self._dht_read()
-        v_gas = self._gas.voltage
-        base = self.cfg.mq135_baseline_v
-        gas_index = max(0.0, (v_gas - base) / base * 100.0) if base > 0 else None
-        v_ldr = self._ldr.voltage
-        frac = v_ldr / 3.3
-        light = (1.0 - frac if self.cfg.ldr_invert else frac) * 50.0
-        return Reading(h, round(gas_index, 2) if gas_index is not None else None, t, round(light, 2),
-                       round(self._rpm(), 0), self.duty)
+        gas, light = self._gas_light()
+        return Reading(h, gas, t, light, self._fan.on)
 
     def gas_voltage(self) -> float:
+        if self.mode != "ads1115":
+            raise RuntimeError("Calibration needs the MQ-135 on an ADS1115 (analog). In DO mode, set the threshold with the module's screw.")
         return self._gas.voltage
 
     def close(self):
-        self._fan.value = 0.0
+        self._fan.close()
         self._dht.exit()
 
 
 class SimulatedCoop:
     """Closed-loop coop for running the agent without hardware.
 
-    The fan duty the agent picks feeds back into temperature, humidity and
-    gas, and faults (heatwave, fan failure, wet litter, heater failure) are
+    The relay state the agent picks feeds back into temperature, humidity
+    and gas, and faults (heatwave, fan failure, wet litter, heater failure) are
     injected at random so every status shows up in the app.
     """
 
@@ -113,13 +162,12 @@ class SimulatedCoop:
         self.age = age_days
         self.seconds_per_read = seconds_per_read  # simulated time that passes per reading
         self.T, self.RH, self.G = 27.0, 65.0, 5.0
-        self.duty = 0.3
+        self.fan_on = False
         self.clock = 13 * 3600.0
         self.event, self.event_left = None, 0.0
-        self._rpm = 0.0
 
-    def set_fan(self, duty: float):
-        self.duty = max(0.0, min(1.0, duty))
+    def set_fan(self, on: bool, force: bool = False):
+        self.fan_on = on
 
     def _step(self, dt: float):
         self.clock += dt
@@ -133,8 +181,7 @@ class SimulatedCoop:
         hour = (self.clock / 3600.0) % 24
         amb_t = 27.0 + 4.0 * math.cos((hour - 15) / 24 * 2 * math.pi) + (7 if self.event == "heatwave" else 0)
         amb_rh = 70.0 - 8.0 * math.cos((hour - 15) / 24 * 2 * math.pi) + (25 if self.event == "rain" else 0)
-        rpm = 0.0 if self.event == "fan_fail" or self.duty < 0.12 else self.duty * MAX_RPM
-        air = rpm / 1250.0
+        air = FAN_AIRFLOW if self.fan_on and self.event != "fan_fail" else 0.0
         low, high = comfort_band(self.age)
         q_birds = 1.5 + 4.0 * min(self.age, 42) / 42.0
         heater = self.age < 21 and self.event != "heater_fail"
@@ -147,7 +194,6 @@ class SimulatedCoop:
         self.RH += min(1.0, dt / 600.0) * (rh_eq - self.RH)
         for _ in range(int(dt // 30) or 1):
             self.G = max(0.0, self.G + 0.25 * wet * (0.6 + min(self.age, 56) / 40.0) - self.G * (0.01 + 0.04 * air))
-        self._rpm = rpm
 
     def read(self) -> Reading:
         self._step(self.seconds_per_read)
@@ -157,8 +203,7 @@ class SimulatedCoop:
             round(max(0, self.G * (1 + g(0, 0.08)) + g(0, 0.7)), 2),
             round(self.T + g(0, 0.35), 1),
             round(max(0, (30 if 6 <= (self.clock / 3600) % 24 <= 18 else 4) + g(0, 1.5)), 1),
-            round(max(0, self._rpm + g(0, 45)), 0),
-            self.duty,
+            self.fan_on,
         )
 
     def close(self):

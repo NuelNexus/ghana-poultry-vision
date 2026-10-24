@@ -32,7 +32,7 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 | File | Responsibility |
 |---|---|
 | `agent.py` | Main Pi loop every ~30 s: reads sensors, runs the numpy model, drives the fan, posts to `/api/public/devices/ingest`, keeps an SQLite outbox when offline. |
-| `poultrygrid/sensors.py` | DHT22, ADS1115 (MQ-135 gas, LDR light), fan PWM and tachometer. |
+| `poultrygrid/sensors.py` | DHT22, MQ-135 and LDR (ADS1115 or DO pins), fan relay. |
 | `poultrygrid/features.py`, `model_np.py` | 21 features (incl. 5-min trends, age-aware comfort band) and numpy-only inference. |
 | `poultrygrid/simulator.py`, `train.py` | Coop simulator and training script for the health model (`models/poultrygrid_v2.npz`). |
 | `test_sensors.py` | Hardware check script for the sensors. |

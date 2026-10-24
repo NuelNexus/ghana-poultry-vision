@@ -53,7 +53,7 @@ const KIND_LABEL: Record<Kind, string> = {
   cam: "ESP32-CAM camera",
 };
 
-const FAN_LABEL: Record<FanLevel, string> = { low: "Low", medium: "Medium", high: "High" };
+const FAN_LABEL: Record<FanLevel, string> = { on: "On", off: "Off" };
 
 const CELL_SELECT = "h-8 w-auto min-w-36 text-[13px] max-md:h-10 max-md:text-[16px]";
 
@@ -228,7 +228,7 @@ function Devices() {
             <option value="">AI auto</option>
             {(Object.keys(FAN_LABEL) as FanLevel[]).map((l) => (
               <option key={l} value={l}>
-                Force {l}
+                Force {FAN_LABEL[l].toLowerCase()}
               </option>
             ))}
           </Select>

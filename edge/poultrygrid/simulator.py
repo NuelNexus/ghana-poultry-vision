@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 
 from .features import (
-    CAUSES, MAX_RPM, WINDOW, FAN_DUTY, TrueState, comfort_band, extract_features, fan_policy,
+    CAUSES, FAN_AIRFLOW, WINDOW, TrueState, comfort_band, extract_features, fan_policy,
     label_state, target_temperature,
 )
 
@@ -33,7 +33,7 @@ def _ambient(rng, steps, start_hour):
 
 
 def simulate_episode(rng: np.random.Generator, steps: int = 240):
-    """Return (sensor_rows[steps, 6], true_states, age_days)."""
+    """Return (sensor_rows[steps, 5], true_states, age_days)."""
     age = float(rng.choice([rng.uniform(0, 10), rng.uniform(0, 56)]))
     density = rng.uniform(0.6, 1.4)
     wetness = rng.uniform(0.5, 1.3)
@@ -54,13 +54,13 @@ def simulate_episode(rng: np.random.Generator, steps: int = 240):
         return any(k == kind and s <= i < e for k, s, e in events)
 
     controller = rng.choice(["policy", "fixed", "thermostat"], p=[0.5, 0.25, 0.25])
-    fixed_duty = float(rng.choice([0.0, 0.2, 0.4, 0.6, 1.0]))
-    fan_health = rng.uniform(0.85, 1.05)
+    fixed_on = bool(rng.random() < 0.5)
+    fan_health = rng.uniform(0.8, 1.1)  # fan size relative to the house
 
     T = amb_t[0] + rng.uniform(-1, 4)
     RH = amb_rh[0] + rng.uniform(-5, 5)
     G = rng.uniform(1, 10)
-    duty = 0.4
+    fan_on = False
     rows, states = [], []
     sensor_gas_drift = rng.normal(0, 1.0)
 
@@ -75,21 +75,19 @@ def simulate_episode(rng: np.random.Generator, steps: int = 240):
             arh = min(arh, 22.0)
         wet = wetness * (3.0 if active("wet_litter", i) else 1.0)
 
-        # Fan controller (what the farmer or an older controller would do)
+        # Relay controller (the agent, a thermostat, or a farmer who leaves it alone)
         if controller == "policy":
-            st, sev = label_state(TrueState(T, RH, G, 1250.0, duty, age))
+            st, sev = label_state(TrueState(T, RH, G, FAN_AIRFLOW, age))
             causes = [c for c, v in zip(CAUSES, sev) if v]
-            duty = FAN_DUTY[fan_policy(st, causes)] if i % 6 == 0 else duty
+            fan_on = fan_policy(st, causes) == "on" if i % 6 == 0 else fan_on
         elif controller == "thermostat":
-            duty = float(np.clip((T - comfort_band(age)[1]) / 4.0 + 0.4, 0.0, 1.0))
+            high = comfort_band(age)[1]
+            fan_on = T > high + 0.5 or (fan_on and T > high - 0.5)  # 1 °C hysteresis
         else:
-            duty = fixed_duty
+            fan_on = fixed_on
 
-        if active("fan_fail", i) or duty < 0.12:
-            rpm_true = rng.uniform(0, 120) if active("fan_fail", i) else 0.0
-        else:
-            rpm_true = duty * MAX_RPM * fan_health
-        airflow = rpm_true / 1250.0
+        # A failed fan (blown fuse, stuck blades) moves no air even with the relay closed.
+        airflow = FAN_AIRFLOW * fan_health if fan_on and not active("fan_fail", i) else 0.0
 
         q_birds = 1.5 + 4.0 * density * min(age, 42) / 42.0
         heater_ok = brooder and not active("heater_fail", i)
@@ -104,18 +102,17 @@ def simulate_episode(rng: np.random.Generator, steps: int = 240):
         G += prod - G * (0.01 + 0.04 * airflow)
         G = max(G, 0.0)
 
-        states.append(TrueState(T, RH, G, rpm_true, duty, age))
+        states.append(TrueState(T, RH, G, airflow, age))
 
-        # Sensors: DHT22, MQ-135 via ADS1115, LDR, tach
+        # Sensors: DHT22, MQ-135 and LDR via ADS1115, relay state
         light_true = (25 + 10 * np.sin((hours[i] - 6) / 12 * np.pi)) if 6 <= hours[i] <= 18 else (12.0 if brooder else 3.0)
         s_t = T + rng.normal(0, 0.35)
         s_rh = RH + rng.normal(0, 1.8)
         s_g = max(0.0, G * (1 + rng.normal(0, 0.08)) + sensor_gas_drift + rng.normal(0, 0.7))
-        s_rpm = max(0.0, rpm_true + rng.normal(0, 45))
         s_light = max(0.0, light_true + rng.normal(0, 1.5))
         if rng.random() < 0.01:  # DHT22 glitch
             s_t += rng.choice([-1, 1]) * rng.uniform(3, 8)
-        rows.append([np.clip(s_rh, 0, 100), min(s_g, 60.0), s_t, s_light, s_rpm, duty])
+        rows.append([np.clip(s_rh, 0, 100), min(s_g, 60.0), s_t, s_light, 1.0 if fan_on else 0.0])
 
     return np.array(rows, dtype=np.float32), states, age
 

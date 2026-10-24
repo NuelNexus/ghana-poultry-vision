@@ -19,8 +19,10 @@ import {
   Toolbar,
   ToolbarSpacer,
   formatDate,
+  formatTime,
   type Status,
 } from "@/components/ui-kit";
+import { SeverityMark } from "@/components/coop-readout";
 import { cn } from "@/lib/utils";
 
 const STATES = ["open", "resolved", "all"] as const;
@@ -335,66 +337,80 @@ function AlertRow({
   onResolve: () => void;
 }) {
   const sev = SEV[a.severity] ?? SEV.info;
-  const Icon = sev.icon;
   const resolved = !!a.resolved;
   const { where, text } = parseMessage(a.message);
+  const tone = resolved
+    ? "off"
+    : sev.status === "crit"
+      ? "crit"
+      : sev.status === "warn"
+        ? "warn"
+        : "off";
   return (
-    <li className="relative flex flex-col gap-3 border-t border-hairline px-4 py-3.5 first:border-t-0 sm:flex-row sm:items-start md:px-5">
-      {!resolved && (
-        <span aria-hidden className={cn("absolute inset-y-0 left-0 w-0.5", sev.rule)} />
-      )}
-      <Icon
-        aria-hidden
-        strokeWidth={1.75}
-        className={cn(
-          "mt-0.5 hidden size-4 shrink-0 sm:block",
-          resolved
-            ? "text-ink-3"
-            : sev.status === "crit"
-              ? "text-crit"
-              : sev.status === "warn"
-                ? "text-warn"
-                : "text-info",
-        )}
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <StatusPill status={resolved ? "offline" : sev.status} size="sm">
-            {sev.label}
-          </StatusPill>
-          <span className="text-[12px] leading-4 text-ink-3">
-            {sourceLabel(a.type)}
-            {where && (
-              <>
-                {" · "}
-                <span className="pg-mono">{where}</span>
-              </>
-            )}
-          </span>
-          <span aria-hidden className="text-ink-disabled">
-            ·
-          </span>
-          <RelativeTime iso={a.created_at} className="text-[12px] leading-4 text-ink-3" />
-        </div>
+    <li className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3 gap-y-3 border-t border-hairline px-4 py-3.5 first:border-t-0 sm:grid-cols-[3.25rem_minmax(0,1fr)_auto] md:px-5">
+      <div className="flex flex-col items-start gap-1.5 pt-0.5">
+        <time
+          dateTime={new Date(a.created_at).toISOString()}
+          className="pg-mono text-[13px] leading-[18px] text-ink-2"
+        >
+          {formatTime(a.created_at)}
+        </time>
+        <SeverityMark tone={tone} />
+      </div>
+      <div className="min-w-0">
         <p
           className={cn(
-            "mt-1 text-[14px] leading-5 text-pretty break-words",
+            "text-[14px] leading-5 text-pretty break-words",
             resolved ? "text-ink-3" : "text-ink",
           )}
         >
+          <span
+            className={cn(
+              "font-semibold",
+              resolved
+                ? "text-ink-3"
+                : sev.status === "crit"
+                  ? "text-crit"
+                  : sev.status === "warn"
+                    ? "text-warn"
+                    : "text-info",
+            )}
+          >
+            {sev.label}
+          </span>{" "}
           {text}
         </p>
-        {a.device_id && (
-          <Link
-            to="/app/health"
-            search={{ device: a.device_id }}
-            className="mt-1 inline-block text-[13px] leading-[18px] font-medium text-brand underline decoration-brand/30 underline-offset-4 transition-colors hover:decoration-brand"
-          >
-            View flock health
-          </Link>
-        )}
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-4 text-ink-3">
+          <span>{sourceLabel(a.type)}</span>
+          {where && (
+            <>
+              <span aria-hidden className="text-ink-disabled">
+                ·
+              </span>
+              <span className="pg-mono">{where}</span>
+            </>
+          )}
+          <span aria-hidden className="text-ink-disabled">
+            ·
+          </span>
+          <RelativeTime iso={a.created_at} />
+          {a.device_id && (
+            <>
+              <span aria-hidden className="text-ink-disabled">
+                ·
+              </span>
+              <Link
+                to="/app/health"
+                search={{ device: a.device_id }}
+                className="font-medium text-brand underline decoration-brand/30 underline-offset-4 transition-colors hover:decoration-brand"
+              >
+                Flock health
+              </Link>
+            </>
+          )}
+        </p>
       </div>
-      <div className="shrink-0 sm:pt-0.5">
+      <div className="col-start-2 shrink-0 sm:col-start-auto sm:pt-0.5">
         {resolved ? (
           <StatusPill status="ok" size="sm">
             Resolved

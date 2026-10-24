@@ -30,13 +30,9 @@ type Mode = "auto" | FanLevel;
 
 const MODE_OPTIONS: { value: Mode; label: string }[] = [
   { value: "auto", label: "AI auto" },
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
+  { value: "on", label: "Force on" },
+  { value: "off", label: "Force off" },
 ];
-
-/** PWM duty the Pi drives for each level (edge/poultrygrid/features.py FAN_DUTY). */
-const FAN_DUTY: Record<FanLevel, number> = { low: 0.25, medium: 0.6, high: 1 };
 
 function Automation() {
   const { canManage } = useAuth();
@@ -148,14 +144,10 @@ function Automation() {
       cell: (d) => {
         const r = latestBy.get(d.id);
         if (ai.isPending) return <Skeleton className="h-3.5 w-20" />;
-        if (!r?.fan_level) return <span className="text-ink-3">No report</span>;
-        const duty = r.fan_duty != null ? `${Math.round(r.fan_duty * 100)}% PWM` : null;
+        if (r?.fan_on == null) return <span className="text-ink-3">No report</span>;
         return (
           <div className="min-w-0">
-            <div className="text-ink">
-              {formatFan(r.fan_level, r.fan_rpm)}
-              {duty && <span className="text-ink-3"> · {duty}</span>}
-            </div>
+            <div className="text-ink">{formatFan(r.fan_on)}</div>
             <RelativeTime iso={r.created_at} className="pg-t-caption" />
           </div>
         );
@@ -176,7 +168,7 @@ function Automation() {
 
       <Section
         title="Ventilation"
-        description="Each Pi sets its fan from the flock’s AI status. Force a level to override it."
+        description="Each Pi switches its fan relay from the flock’s AI status. Force it on or off to override."
       >
         {devices.isPending ? (
           <SkeletonRows rows={2} cols={5} />
@@ -213,21 +205,22 @@ function Automation() {
               {
                 label: "AI auto",
                 value:
-                  "Every ~30 s the model picks a level from the flock’s status and its causes. Cold chicks get minimum air, not a blast.",
+                  "Every ~30 s the model decides from the flock’s status and its causes. Heat, gas and damp switch the fan on; cold chicks keep it off.",
               },
               {
-                label: "Fan levels",
-                value: `Low ${FAN_DUTY.low * 100}% · Medium ${FAN_DUTY.medium * 100}% · High ${FAN_DUTY.high * 100}% PWM duty on GPIO 18.`,
+                label: "Fan relay",
+                value:
+                  "One relay on GPIO 18 switches the fan on or off. There is no speed control. The relay waits at least 60 s between switches so it doesn’t chatter.",
               },
               {
                 label: "Fan check",
                 value:
-                  "The tach on GPIO 23 reports rpm. If the fan is driven but not spinning, the model raises a fan fault alert.",
+                  "A relay can’t tell if the blades are turning. If the fan is on and the house keeps heating up, go and look at it.",
               },
               {
                 label: "Monitor only",
                 value:
-                  "With PG_FAN_AUTO=0 in agent.env the Pi reports a level but leaves the fan alone.",
+                  "With PG_FAN_AUTO=0 in agent.env the Pi reports readings but never switches the relay.",
               },
             ]}
           />
@@ -248,21 +241,12 @@ function OverrideState({
 }) {
   if (saving) return <StatusPill status="neutral">Saving…</StatusPill>;
   if (!d.fan_override) return <span className="text-ink-3">None</span>;
-  // Applied once the Pi's latest reading shows the forced level. A 0 duty with a
-  // level means the agent runs with PG_FAN_AUTO=0 and isn't driving the fan.
-  if (reported?.fan_level === d.fan_override) {
-    if (reported.fan_duty === 0)
-      return (
-        <StatusPill status="warn" title="The Pi reports 0% PWM. Is PG_FAN_AUTO=0 in agent.env?">
-          Not driving fan
-        </StatusPill>
-      );
-    return <StatusPill status="ok">Applied</StatusPill>;
-  }
+  // Applied once the Pi's latest reading shows the relay in the forced state.
+  if (reported?.fan_level === d.fan_override) return <StatusPill status="ok">Applied</StatusPill>;
   return (
     <StatusPill
       status={d.online ? "info" : "offline"}
-      title="The Pi hasn’t reported this level yet"
+      title="The Pi hasn’t reported the relay in this state yet. Is PG_FAN_AUTO=0 in agent.env?"
     >
       {d.online ? "Waiting for Pi" : "Pending · Pi offline"}
     </StatusPill>

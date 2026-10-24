@@ -10,7 +10,8 @@
 export const FRESHNESS_MS = { live: 90_000, delayed: 5 * 60_000 } as const;
 
 export type AiStatus = "healthy" | "warning" | "critical";
-export type FanLevel = "low" | "medium" | "high";
+/** The fan is switched by a relay on the Pi, so it is only ever on or off. */
+export type FanLevel = "on" | "off";
 
 export interface AiCause {
   id: string;
@@ -44,19 +45,21 @@ export interface Reading {
   temperature: number | null;
   /** DHT22, % RH. */
   humidity: number | null;
-  /** MQ-135 via ADS1115: % rise over the clean-air baseline voltage (ammonia/gas). */
+  /** MQ-135: % rise over the clean-air baseline voltage (ammonia/gas). Coarse (4 or 16) in DO mode. */
   gas_index: number | null;
-  /** LDR via ADS1115: relative light level, 0 (dark) to 50 (bright). Not lux. */
+  /**
+   * LDR: relative light level, 0 (dark) to 50 (bright). Not lux. Without an
+   * ADS1115 the Pi only knows bright (30) or dark (3) from the module's DO pin.
+   */
   light: number | null;
-  /** Fan tach, revolutions per minute. */
-  fan_rpm: number | null;
-  /** PWM duty the Pi is driving the fan at, 0..1. */
-  fan_duty: number | null;
+  /** Whether the fan relay was closed (fan running) at this reading. */
+  fan_on: boolean | null;
   bird_age_days: number | null;
   ai_status: AiStatus | null;
   ai_confidence: number | null;
   ai_probabilities: Record<AiStatus, number> | null;
   ai_causes: AiCause[] | null;
+  /** Same as fan_on, as "on" / "off". */
   fan_level: FanLevel | null;
   growth_phase: string | null;
   target_temp: number | null;

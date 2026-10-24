@@ -7,10 +7,10 @@ import { query, queryOne } from "@/lib/db.server";
 // Headers: x-device-id, x-api-key
 // Body: a single reading, or { "readings": [...] } for a batch (the Pi sends
 // its offline backlog this way). Each reading carries DHT22 temperature and
-// humidity, the MQ-135 gas index and LDR light level (via ADS1115), fan rpm
-// (tach) and PWM duty, plus the edge model's output under "ai". Status changes
-// become alerts automatically. The response returns the flock age and any fan
-// override so the Pi picks them up on its next upload.
+// humidity, the MQ-135 gas index and LDR light level, whether the fan relay is
+// on, plus the edge model's output under "ai". Status changes become alerts
+// automatically. The response returns the flock age and any fan override
+// ("on" / "off") so the Pi picks them up on its next upload.
 
 const cors = {
   "access-control-allow-origin": "*",
@@ -43,7 +43,8 @@ const aiSchema = z
       )
       .max(10)
       .optional(),
-    fan_level: z.enum(["low", "medium", "high"]).optional(),
+    // "on" / "off" from the relay agent; older PWM agents sent low / medium / high.
+    fan_level: z.enum(["on", "off", "low", "medium", "high"]).optional(),
     growth_phase: z.string().max(32).optional(),
     target_temp: num,
     model_version: z.string().max(64).optional(),
@@ -57,7 +58,7 @@ const readingSchema = z
     humidity: num,
     gas_index: num,
     light: num,
-    fan_rpm: num,
+    fan_on: z.boolean().nullable().optional(),
     fan_duty: num,
     bird_age_days: num,
     ai: aiSchema.optional(),
@@ -125,12 +126,19 @@ export const Route = createFileRoute("/api/public/devices/ingest")({
               ? r.recorded_at
               : new Date(now).toISOString();
           const ai = r.ai;
+          const fanOn =
+            r.fan_on ??
+            (r.fan_duty != null
+              ? r.fan_duty >= 0.12
+              : ai?.fan_level
+                ? ai.fan_level !== "off"
+                : null);
           await query(
             `insert into sensor_readings (
                device_id, house_id, temperature, humidity, gas_index, light,
-               fan_rpm, fan_duty, bird_age_days, ai_status, ai_confidence, ai_probabilities, ai_causes,
+               fan_on, bird_age_days, ai_status, ai_confidence, ai_probabilities, ai_causes,
                fan_level, growth_phase, target_temp, model_version, payload, created_at)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
             [
               device.id,
               device.house_id,
@@ -138,14 +146,13 @@ export const Route = createFileRoute("/api/public/devices/ingest")({
               r.humidity ?? null,
               r.gas_index ?? null,
               r.light ?? null,
-              r.fan_rpm ?? null,
-              r.fan_duty ?? null,
+              fanOn,
               r.bird_age_days ?? null,
               ai?.status ?? null,
               ai?.confidence ?? null,
               ai?.probabilities ? JSON.stringify(ai.probabilities) : null,
               ai?.causes ? JSON.stringify(ai.causes) : null,
-              ai?.fan_level ?? null,
+              fanOn == null ? null : fanOn ? "on" : "off",
               ai?.growth_phase ?? null,
               ai?.target_temp ?? null,
               ai?.model_version ?? null,
@@ -155,7 +162,7 @@ export const Route = createFileRoute("/api/public/devices/ingest")({
           );
 
           if (ai && ai.status !== lastStatus) {
-            await recordStatusChange(device, deviceId, lastStatus, ai);
+            await recordStatusChange(device, deviceId, lastStatus, ai, fanOn);
             lastStatus = ai.status;
           }
         }
@@ -188,6 +195,7 @@ async function recordStatusChange(
   deviceCode: string,
   from: keyof typeof STATUS_RANK,
   ai: z.infer<typeof aiSchema>,
+  fanOn: boolean | null,
 ) {
   const where = device.house_name ?? deviceCode;
   if (ai.status === "healthy") {
@@ -200,7 +208,7 @@ async function recordStatusChange(
   }
   if (STATUS_RANK[ai.status] < STATUS_RANK[from]) return; // easing from critical to warning: keep the open alert
   const causes = (ai.causes ?? []).map((c) => c.label).join(", ") || "conditions drifting";
-  const fan = ai.fan_level ? ` Fan set to ${ai.fan_level}.` : "";
+  const fan = fanOn == null ? "" : fanOn ? " Fan switched on." : " Fan is off.";
   const message = `${where}: ${ai.status === "critical" ? "CRITICAL" : "Warning"}: ${causes}.${fan}`;
   // Conditions hovering around a threshold: reopen the recent alert instead of
   // stacking up a new one every few minutes.

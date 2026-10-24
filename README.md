@@ -68,7 +68,7 @@ can change it in Profile > Language and voice. It is saved on their account.
 
 The Pi posts a reading and its prediction every 30 s. The app shows:
 
-- **Dashboard**: live coop condition (status, confidence, growth phase, fan level, causes and advice)
+- **Dashboard**: live coop condition (status, confidence, growth phase, fan on/off, causes and advice)
 - **AI Health**: per-house status history, temperature against the age target, time in each state, status changes
 - **Houses**: status badge and causes per house
 - **Alerts**: warning and critical alerts are raised automatically and close when conditions recover
@@ -83,7 +83,7 @@ how the house is doing, sets the fan, and then reports to the app. The fan keeps
 running correctly even if the internet goes down.
 
 ```
-DHT22 / MQ-135 / LDR / fan tach ──> Pi agent ──> model (numpy) ──> fan PWM
+DHT22 / MQ-135 / LDR ──> Pi agent ──> model (numpy) ──> fan relay (on / off)
                                         │
                                         └──> POST /api/public/devices/ingest ──> Neon ──> app
 ```
@@ -93,10 +93,12 @@ DHT22 / MQ-135 / LDR / fan tach ──> Pi agent ──> model (numpy) ──> f
 | Part | Measures | Connection |
 |-|-|-|
 | DHT22 | Temperature, humidity | GPIO 4 |
-| MQ-135 | Ammonia / gas, as a % rise over a clean-air baseline | ADS1115 ADC on I²C, channel 0 |
-| LDR | Light | ADS1115 channel 1 |
-| Fan PWM | Fan speed control | GPIO 18, through a MOSFET on its own 12 V supply |
-| Fan tach | Actual fan RPM | GPIO 23, pulled up to 3.3 V |
+| MQ-135 | Ammonia / gas, as a % rise over a clean-air baseline | ADS1115 channel 0, or its DO pin to GPIO 17 |
+| LDR | Light | ADS1115 channel 1, or its DO pin to GPIO 27 |
+| Relay | Switches the fan on or off (no speed control, no speed sensor) | IN to GPIO 18; the fan's supply through COM / NO |
+
+Without an ADS1115 the agent reads the MQ-135 and LDR modules' DO pins, which are
+only on/off, so the gas and light readings are coarse. See [edge/README.md](edge/README.md).
 
 Any Pi 3, 4, 5 or Zero 2 W running Raspberry Pi OS Bookworm will do.
 
@@ -110,16 +112,16 @@ Any Pi 3, 4, 5 or Zero 2 W running Raspberry Pi OS Bookworm will do.
    app, which is sent back with every response. If the Pi is offline, it falls back to
    `PG_BATCH_START_DATE` or `PG_BIRD_AGE_DAYS`. Age matters: 26 °C is dangerous for
    3-day-old chicks but fine for 5-week-old birds.
-4. **Build 21 features** (`poultrygrid/features.py`): the latest and 5-reading average of
-   each sensor, the commanded fan duty, the age-based target temperature (33 °C at day 0
+4. **Build 20 features** (`poultrygrid/features.py`): the latest and 5-reading average of
+   each sensor, whether the relay is on and how much of the last 5 and 10 readings it was on, the age-based target temperature (33 °C at day 0
    down to 20 °C at day 42), how far the house is above or below the comfort band (humid
    heat counts as hotter), trends in temperature, humidity and gas, temperature
-   variability, the gap between actual and expected fan RPM, and gas per unit of airflow.
+   variability, and gas per unit of airflow.
 5. **Run the model** (`poultrygrid/model_np.py`). This is a small neural network
-   (21 → 64 → 64 → 32) with two outputs:
+   (20 → 64 → 64 → 32) with two outputs:
    - **Status**: Healthy, Warning or Critical, with a calibrated confidence
-   - **Causes**: which of 7 problems are present (heat stress, too cold for the flock's age,
-     ammonia build-up, humidity too high, air too dry, poor ventilation, fan not spinning),
+   - **Causes**: which of 6 problems are present (heat stress, too cold for the flock's age,
+     ammonia build-up, humidity too high, air too dry, poor ventilation),
      each with a piece of advice
 
    On the Pi it runs on numpy alone, with no PyTorch, from a 32 KB `.npz` file.
@@ -127,11 +129,11 @@ Any Pi 3, 4, 5 or Zero 2 W running Raspberry Pi OS Bookworm will do.
    A worse status has to hold for 2 readings in a row before it is shown, and a better one
    for 4. If the model is more than 90 % sure the house is critical, that status is shown
    straight away.
-7. **Set the fan.** Heat, gas, humidity or ventilation problems give *high* when critical
-   and *medium* when warning. Cold or dry air gives *low*, so chicks get minimum
-   ventilation instead of a blast of air. Healthy gives *low*. A fan override set on
-   the Devices page always takes priority. Set `PG_FAN_AUTO=0` to monitor without
-   touching the fan.
+7. **Switch the fan relay.** Heat, gas, humidity or ventilation problems switch it *on*.
+   Cold or dry air keeps it *off*, so chicks aren't blasted. Healthy is *off*. The relay
+   holds each state for at least 60 s so it doesn't chatter. A fan override (force on /
+   off) set on the Devices or Automation page always takes priority and applies at once.
+   Set `PG_FAN_AUTO=0` to monitor without touching the fan.
 8. **Report to the app.** The reading and the AI result are written to a local SQLite
    outbox first, then sent in batches of up to 50. If the network is down, they wait
    there (up to about a week's worth) and are sent in order once it comes back, so the
@@ -187,7 +189,7 @@ them from Neon and fine-tune the model on them.
   warming up for 24 h first.
 - **Logs:** `journalctl -u poultrygrid-agent -f`
 - **No hardware:** `python edge/agent.py --simulate --dry-run`. This runs a simulated coop
-  where the fan level the agent picks changes the conditions, and faults happen at random.
+  where the agent switching the fan on or off changes the conditions, and faults happen at random.
 - **Retrain:** `pip install -r edge/requirements-train.txt && python edge/train.py`
   (about a minute on a laptop CPU)
 
@@ -209,8 +211,8 @@ Local development without Neon: point `DATABASE_URL` at any Postgres and set `DA
 
 `POST /api/public/devices/ingest` with headers `x-device-id` and `x-api-key`.
 The body is a single reading or `{"readings": [...]}` (up to 200). Fields include
-`temperature`, `humidity`, `gas_index`, `light`, `fan_rpm`, `fan_duty`, `bird_age_days`,
+`temperature`, `humidity`, `gas_index`, `light`, `fan_on` (relay state), `bird_age_days`,
 `recorded_at`, and the optional edge-AI result under `ai`
 (`status`, `confidence`, `probabilities`, `causes`, `fan_level`, `growth_phase`, `target_temp`, `model_version`).
-The response returns `config.bird_age_days` (from the house's batch date) and `config.fan_override`.
+The response returns `config.bird_age_days` (from the house's batch date) and `config.fan_override` (`"on"`, `"off"` or null).
 ESP32 nodes can post plain sensor readings to the same endpoint.

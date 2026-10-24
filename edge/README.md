@@ -2,12 +2,12 @@
 
 A rebuilt version of the coop-condition model from
 [engieworks15-dotcom/AI_For_Poultry](https://github.com/engieworks15-dotcom/AI_For_Poultry).
-It runs on a Raspberry Pi, drives the ventilation fan, and reports every
+It runs on a Raspberry Pi, switches the ventilation fan through a relay, and reports every
 reading and prediction to the PoultryGrid app, where it shows up live on the
 Dashboard, AI Health, Houses and Alerts pages.
 
 ```
-DHT22 / MQ-135 / LDR / fan tach ──> Pi agent ──> model (numpy) ──> fan PWM
+DHT22 / MQ-135 / LDR ──> Pi agent ──> model (numpy) ──> fan relay (on / off)
                                         │
                                         └──> POST /api/public/devices/ingest ──> Neon ──> app
 ```
@@ -18,22 +18,22 @@ DHT22 / MQ-135 / LDR / fan tach ──> Pi agent ──> model (numpy) ──> f
 |-|-|
 | **Status** | Healthy / Warning / Critical, smoothed so it doesn't flicker |
 | **Confidence** | Calibrated probability for that status |
-| **Causes** | Heat stress, too cold for flock age, ammonia/gas build-up, humidity too high, air too dry, poor ventilation, fan not spinning, each with advice |
+| **Causes** | Heat stress, too cold for flock age, ammonia/gas build-up, humidity too high, air too dry, poor ventilation, each with advice |
 | **Growth phase** | Brooding / Starter / Grower / Finisher, from the flock's age |
 | **Target temp** | What the house should be for that age (33 °C on day 0 down to 20 °C) |
-| **Fan level** | Low / Medium / High, picked by the agent (or forced from the Devices page) |
+| **Fan** | On / Off, switched by the agent through the relay (or forced from the Devices or Automation page) |
 
 Status changes create alerts automatically, and the alerts close again once conditions recover.
 
 ## What changed from the original model
 
-| | Original | v2 |
+| | Original | v3 (relay fan) |
 |-|-|-|
-| Training data | 12k rows drawn independently; labels computed from the *same* values the model sees | 3,000 simulated coop episodes (230k samples) over time with weather, flock age, brooder heat, airflow, wet litter, heatwaves, heater and fan failures. Labels come from the true state; the model sees noisy sensor readings |
-| Inputs | 5 instantaneous readings | 21 features: the 5 sensors + commanded fan duty, 5-minute means, trends (slopes), temperature variance, flock age and age-specific comfort band, rpm-vs-command gap, gas per unit airflow |
+| Training data | 12k rows drawn independently; labels computed from the *same* values the model sees | 3,000 simulated coop episodes (230k samples) over time with weather, flock age, brooder heat, airflow, wet litter, heatwaves, heater and fan failures, and an on/off relay fan. Labels come from the true state; the model sees noisy sensor readings |
+| Inputs | 5 instantaneous readings | 20 features: the 4 sensors + relay state, share of the last 5 and 10 readings the fan was on, 5-minute means, trends (slopes), temperature variance, flock age and age-specific comfort band, gas per unit airflow |
 | Flock age | Ignored (fixed 26 °C target) | Age-aware: a 3-day-old chick at 26 °C is in danger; a 5-week bird at 26 °C is fine |
-| Outputs | Status only | Status + which of 7 causes + calibrated confidence |
-| Fan logic | Critical → high, always | Cold chicks get minimum ventilation instead of being blasted; a dead fan is detected from the tach |
+| Outputs | Status only | Status + which of 6 causes + calibrated confidence |
+| Fan logic | Critical → high, always | Heat, gas and damp switch the fan on; cold chicks keep it off. The relay holds each state for at least 60 s |
 | Evaluation | Random row split | Split by episode (no leakage), plus macro-F1 and critical recall |
 | On the Pi | PyTorch + scikit-learn + pickle | Numpy only; the model is a 32 KB `.npz` file |
 | Stability | Raw prediction each reading | EMA + hysteresis: escalate after 2 readings (1 if very sure it's critical), de-escalate after 4 |
@@ -43,28 +43,40 @@ Status changes create alerts automatically, and the alerts close again once cond
 
 Both models were trained on the same realistic data:
 
-| | v2 | Original network |
+| | v3 | Original network |
 |-|-|-|
-| Accuracy | **93.8 %** | 80.1 % |
-| Macro F1 | **93.8 %** | 80.1 % |
-| Critical recall | **97.1 %** | 83.7 % |
+| Accuracy | **91.8 %** | 77.7 % |
+| Macro F1 | **91.0 %** | 75.9 % |
+| Critical recall | **97.6 %** | 84.7 % |
 
-v2 never confused Healthy with Critical, in either direction, on the test set. The original's
-97 % only held on its own data, where the labels were thresholds on the inputs.
-Per-cause F1 ranges from 0.88 (ammonia, the noisiest sensor) to 0.999 (fan fault).
+The original's 97 % only held on its own data, where the labels were thresholds on the inputs.
+Per-cause F1 ranges from 0.88 (air too dry) to 0.97 (heat stress). v3 scores a little
+below the PWM model it replaced (93.8 %) because an on/off fan with no tach tells it less.
 
 > These numbers come from simulated data. Real-world accuracy depends on how
 > closely the simulator matches your house. Once the Pi has logged a few weeks of
 > readings, you can export them from Neon and fine-tune the model on them.
 
-## Hardware (same wiring as the original)
+## Hardware
 
 | Part | Connection |
 |-|-|
-| DHT22 | GPIO 4 |
-| MQ-135 and LDR | ADS1115 ADC on I²C (channels 0 and 1) |
-| Fan PWM | GPIO 18, through a MOSFET / fan driver on a separate 12 V supply |
-| Fan tach | GPIO 23, pulled up to 3.3 V |
+| DHT22 | Data to GPIO 4 (10k pull-up to 3.3 V if it's a bare sensor) |
+| MQ-135 | AO to ADS1115 A0 through a 10k/20k divider (analog, preferred), or DO to GPIO 17 |
+| LDR module | AO to ADS1115 A1 (analog), or DO to GPIO 27 |
+| Fan relay | IN to GPIO 18, VCC to 5 V, GND to GND. The fan's own supply goes through COM and NO |
+
+The Pi has no analog inputs. With an ADS1115 on I²C the agent gets real gas and
+light levels. Without one it reads the modules' DO pins, which only say "over
+the threshold set with the module's screw" or not, so the gas index becomes 4
+(clear) or 16 (triggered) and the light is dark or bright. `PG_SENSOR_MODE=auto`
+(the default) uses the ADS1115 if it answers and falls back to DO otherwise.
+
+Most relay boards switch on when IN is pulled low (`PG_RELAY_ACTIVE_LOW=1`, the
+default). The agent waits at least `PG_RELAY_MIN_SWITCH_S` (60 s) between
+switches so the contacts don't chatter; a manager's override from the app skips
+that wait. A relay can't tell whether the blades are turning, so there is no fan
+fault detection: if the fan is on and the house keeps heating up, check it.
 
 Works on a Pi 3, 4, 5 or Zero 2 W with Raspberry Pi OS Bookworm.
 
@@ -76,8 +88,8 @@ After wiring, check each part on its own before running the agent:
 cd edge
 python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -r requirements-pi.txt
-.venv/bin/python test_sensors.py          # i2c, dht, gas, light, fan, with PASS/WARN/FAIL and wiring hints
-.venv/bin/python test_sensors.py fan      # just one
+.venv/bin/python test_sensors.py          # i2c, dht, gas, light, relay, with PASS/WARN/FAIL and wiring hints
+.venv/bin/python test_sensors.py relay    # just one (listen for the click)
 .venv/bin/python test_sensors.py live     # all readings every 2 s
 ```
 
@@ -95,7 +107,8 @@ ADS1115's A0 to keep the input under 3.3 V.
    ```
    It installs dependencies, asks for the app URL, device ID and key, and starts the
    `poultrygrid-agent` systemd service.
-3. Calibrate the gas sensor in clean air (after a 24 h burn-in on first use):
+3. With an ADS1115, calibrate the gas sensor in clean air (after a 24 h burn-in on first use).
+   In DO mode, turn the MQ-135 module's screw until its DO LED just goes off in clean air instead:
    ```bash
    sudo -u poultrygrid /opt/poultrygrid/venv/bin/python /opt/poultrygrid/edge/agent.py calibrate --env /etc/poultrygrid/agent.env
    ```
@@ -104,7 +117,7 @@ ADS1115's A0 to keep the input under 3.3 V.
 4. Watch it: `journalctl -u poultrygrid-agent -f`
 
 ```
-22:10:45 CRITICAL 91% | T=35.9°C RH=72% gas=3.6 rpm=2497 | fan=high | Heat stress, Humidity too high
+22:10:45 CRITICAL 91% | T=35.9°C RH=72% gas=3.6 light=30 | fan=on | Heat stress, Humidity too high
 ```
 
 ## Twi voice for Ama (optional)
@@ -156,7 +169,7 @@ heater failures happen at random, so every status shows up in the app.
 ```bash
 cd edge
 pip install -r requirements-train.txt
-python train.py            # ~1 min on a laptop CPU; writes models/poultrygrid_v2.npz + metrics.json
+python train.py            # ~1 min on a laptop CPU; writes models/poultrygrid_v3.npz + metrics.json
 ```
 
 The labelling rules, comfort bands and fan policy live in `poultrygrid/features.py`.
@@ -172,7 +185,7 @@ The coop physics is in `poultrygrid/simulator.py`. Change either and retrain.
 | `poultrygrid/features.py` | Shared domain logic: growth phases, comfort bands, labels, features, fan policy |
 | `poultrygrid/simulator.py` | Time-series coop simulator used for training |
 | `poultrygrid/model_np.py` | Numpy inference for the exported model |
-| `poultrygrid/sensors.py` | DHT22 / ADS1115 / PWM / tach drivers, plus the simulated coop |
+| `poultrygrid/sensors.py` | DHT22, ADS1115 or DO-pin gas/light, fan relay drivers, plus the simulated coop |
 | `twi_tts.py` | Ama's Twi voice: takes replies from the app and speaks them (stable-twi-tts) |
 | `models/` | Trained model and its metrics |
 | `deploy/` | Installer and systemd unit |

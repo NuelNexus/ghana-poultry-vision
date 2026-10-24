@@ -1,5 +1,5 @@
 [Unit]
-Description=PoultryGrid edge AI agent (sensors -> model -> fan -> app)
+Description=PoultryGrid edge AI agent (sensors -> model -> fan relay -> app)
 After=network-online.target
 Wants=network-online.target
 

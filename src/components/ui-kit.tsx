@@ -227,7 +227,6 @@ export const UNITS = {
   },
   rh: "% RH",
   pct: "%",
-  rpm: "rpm",
   w: "W",
   kwh: "kWh",
   m3: "m³",
@@ -236,7 +235,7 @@ export const UNITS = {
 };
 
 /**
- * "65.8 % RH", "28.2 °C", "700 rpm". null/NaN -> "—" (no unit).
+ * "65.8 % RH", "28.2 °C", "40 %". null/NaN -> "—" (no unit).
  * `digits` = max fraction digits (default 1). Pass a number, never a pre-formatted string.
  */
 export function formatUnit(
@@ -280,11 +279,18 @@ export function Quantity({
   );
 }
 
-/** Fan wording used everywhere: "Medium · 700 rpm", "Medium", "700 rpm" or "—". */
-export function formatFan(level: string | null | undefined, rpm?: number | null) {
-  const word = level ? level[0].toUpperCase() + level.slice(1) : "";
-  const r = rpm != null && !Number.isNaN(rpm) ? formatUnit(Math.round(rpm), UNITS.rpm, 0) : "";
-  return [word, r].filter(Boolean).join(" · ") || "—";
+/** Fan wording used everywhere. The fan is on a relay: "On", "Off" or "—". */
+export function formatFan(on: boolean | string | null | undefined) {
+  if (on == null) return "—";
+  return on === true || on === "on" ? "On" : "Off";
+}
+
+/** LDR wording: the level is relative (0 dark .. 50 bright), so say what it means. */
+export function formatLight(level: number | null | undefined) {
+  if (level == null || Number.isNaN(level)) return "—";
+  if (level < 8) return "Dark";
+  if (level < 20) return "Dim";
+  return "Bright";
 }
 
 /* -------------------------------------------------------------------------- *

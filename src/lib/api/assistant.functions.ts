@@ -65,9 +65,7 @@ function describeFarm(s: Awaited<ReturnType<typeof loadSnapshot>>) {
     humidity_pct: r.humidity,
     gas_index: r.gas_index,
     light_level: r.light,
-    fan_level: r.fan_level,
-    fan_duty_pct: r.fan_duty != null ? Math.round(r.fan_duty * 100) : null,
-    fan_rpm: r.fan_rpm,
+    fan_on: r.fan_on,
     bird_age_days: r.bird_age_days,
     growth_phase: r.growth_phase,
     ai_status: r.ai_status,
@@ -85,11 +83,12 @@ function describeFarm(s: Awaited<ReturnType<typeof loadSnapshot>>) {
 const HARDWARE = `The farm's hardware is exactly this, nothing more:
 - One Raspberry Pi per house running the PoultryGrid edge agent, reporting about every 30 s, with:
   - DHT22: air temperature (°C) and relative humidity (%).
-  - MQ-135 gas sensor via an ADS1115 ADC: "gas_index" = % rise in sensor voltage over its clean-air
-    baseline. It tracks ammonia and other gases but is not calibrated in ppm, so never quote ppm.
-  - LDR light sensor via the ADS1115: "light_level" 0 (dark) to 50 (bright), relative, not lux.
-  - Ventilation fan driven by PWM (fan_duty_pct) with a tachometer (fan_rpm). The Pi's model picks
-    the fan level (low/medium/high) itself unless a manager forces one in the app.
+  - MQ-135 gas sensor: "gas_index" = % rise in sensor voltage over its clean-air baseline. It tracks
+    ammonia and other gases but is not calibrated in ppm, so never quote ppm.
+  - LDR light sensor: "light_level" 0 (dark) to 50 (bright), relative, not lux.
+  - One ventilation fan switched by a relay, so it is only on or off (fan_on). There is no speed
+    control and no speed sensor, so never talk about fan speed or rpm. The Pi's model switches it
+    itself unless a manager forces it on or off in the app.
   - An on-device AI model that gives status (healthy/warning/critical), likely causes with advice,
     the flock's growth phase and the target temperature for the flock's age.
 - One ESP32-CAM camera that the farmer can watch live in the Cameras page. You cannot see its images.

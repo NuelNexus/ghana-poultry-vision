@@ -15,7 +15,8 @@ import {
 import { getDashboard, listHouses } from "@/lib/api/farm.functions";
 import { FarmScene } from "@/components/FarmScene";
 import type { AiSnapshot, Alert, House, Reading } from "@/lib/api/types";
-import { AiStatusBadge, STATUS_META, isStale } from "@/components/ai-status";
+import { AiStatusBadge, AiStatusPanel, STATUS_META, isStale } from "@/components/ai-status";
+import { RelaySwitch, SeverityMark } from "@/components/coop-readout";
 import {
   ChartFrame,
   ChartLegend,
@@ -36,6 +37,7 @@ import {
   buttonClass,
   chartColors,
   formatDateTime,
+  formatFan,
   formatNumber,
   formatRelative,
   formatTemp,
@@ -208,170 +210,98 @@ function FlockCondition({ loading, ai, now }: { loading: boolean; ai: AiSnapshot
 
   const worst = ai[0];
   const meta = STATUS_META[worst.ai_status ?? "healthy"];
-  const anyLive = ai.some((r) => !isStale(r));
-  const worstStale = isStale(worst);
   const where = worst.house_name ?? worst.device_code;
   const cause = worst.ai_status !== "healthy" ? worst.ai_causes?.[0] : undefined;
-  const liveCount = ai.filter((r) => !isStale(r)).length;
   const attention = ai.filter((r) => !isStale(r) && r.ai_status !== "healthy").length;
 
+  // One Pi: the readout's own title (the top cause) says it best. Several: sum them up.
   const headline =
-    worst.ai_status === "healthy"
-      ? worstStale
-        ? `Last known condition was healthy`
-        : ai.length > 1
-          ? "All monitored houses look healthy"
-          : `${where} looks healthy`
-      : worstStale
-        ? `Last known: ${(cause ? cause.label : meta.label).toLowerCase()} in ${where}`
-        : `${cause ? cause.label : meta.label} detected in ${where}`;
+    ai.length === 1
+      ? undefined
+      : worst.ai_status === "healthy"
+        ? isStale(worst)
+          ? "Last known condition was healthy"
+          : "All monitored houses look healthy"
+        : attention > 1
+          ? `${attention} houses need attention`
+          : `${cause ? cause.label : meta.label} in ${where}`;
 
   return (
-    <section
-      aria-labelledby="flock-h"
-      className={cn("pg-panel overflow-hidden", !anyLive && "bg-[var(--pg-hover)]")}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 px-4 py-4 md:px-5 md:py-5">
-        <div className="min-w-0 max-w-[72ch]">
-          <div className="pg-t-micro">
-            Edge AI · {ai.length} {ai.length === 1 ? "device" : "devices"}
-            {anyLive && ` · ${liveCount} live`}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-            {worstStale ? (
-              <StatusPill status="offline">No live data</StatusPill>
-            ) : (
-              <StatusPill status={meta.status} pulse={worst.ai_status !== "healthy"}>
-                {attention > 1 ? `${attention} need attention` : meta.label}
-              </StatusPill>
-            )}
-            <h2 id="flock-h" className="text-[18px] leading-6 font-semibold text-balance text-ink">
-              {headline}
-            </h2>
-          </div>
-          <p className="mt-2 text-[13px] leading-[18px] text-ink-2">
-            {worstStale ? (
-              <>
-                The Pi in {where} last reported{" "}
-                <time dateTime={new Date(worst.created_at).toISOString()} className="font-medium">
-                  {formatRelative(worst.created_at, now)}
-                </time>{" "}
-                ({formatDateTime(worst.created_at)}). Treat this as the last known state, not the
-                current one. Check the Pi’s power and network.
-              </>
-            ) : (
-              <>
-                {worst.ai_confidence != null && (
-                  <>
-                    <span className="pg-mono">{Math.round(worst.ai_confidence * 100)}%</span> model
-                    confidence ·{" "}
-                  </>
-                )}
-                updated {formatRelative(worst.created_at, now)}
-              </>
-            )}
-          </p>
-        </div>
-      </div>
-
-      {cause?.advice && (
-        <div className="border-t border-hairline px-4 py-3 md:px-5">
-          <div
-            className={cn(
-              "min-w-0 border-l-2 pl-3",
-              worstStale
-                ? "border-line-strong"
-                : worst.ai_status === "critical"
-                  ? "border-crit"
-                  : "border-warn",
-            )}
-          >
-            <h3 className="pg-t-label">
-              {worstStale ? "Advice at last reading" : "Suggested action"}
-              <span className="ml-2 text-[12px] font-normal text-ink-3 tabular-nums">
-                {cause.label} · {Math.round(cause.prob * 100)}%
-              </span>
-            </h3>
-            <p className="mt-0.5 text-[14px] leading-5 text-ink">{cause.advice}</p>
-          </div>
+    <AiStatusPanel r={worst} headline={headline} showModel={false}>
+      {ai.length > 1 && (
+        <div className="border-t border-hairline bg-surface">
+          <DataTable
+            bare
+            caption="Edge devices"
+            rows={ai}
+            rowKey={(r) => r.device_id}
+            columns={[
+              {
+                key: "where",
+                header: "Location",
+                mobile: "title",
+                cell: (r) => (
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-medium text-ink">
+                      {r.house_name ?? "Unassigned"}
+                    </span>
+                    <span className="pg-mono truncate text-[12px] leading-4 text-ink-3">
+                      {r.device_code}
+                    </span>
+                  </span>
+                ),
+              },
+              {
+                key: "status",
+                header: "Condition",
+                mobile: "status",
+                cell: (r) => <AiStatusBadge status={r.ai_status} at={r.created_at} />,
+              },
+              {
+                key: "temp",
+                header: "Temp vs target",
+                align: "right",
+                cell: (r) => <TempVsTarget r={r} />,
+              },
+              {
+                key: "rh",
+                header: "Humidity",
+                align: "right",
+                cell: (r) => <Num v={r.humidity} unit="%" muted={isStale(r)} />,
+              },
+              {
+                key: "gas",
+                header: "Gas index",
+                align: "right",
+                mobile: "hide",
+                cell: (r) => <Num v={r.gas_index} muted={isStale(r)} />,
+              },
+              {
+                key: "fan",
+                header: "Fan",
+                cell: (r) =>
+                  r.fan_on == null ? (
+                    <span className="text-ink-3">—</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2">
+                      <RelaySwitch on={r.fan_on} stale={isStale(r)} />
+                      <span className={isStale(r) ? "text-ink-3" : "text-ink"}>
+                        {formatFan(r.fan_on)}
+                      </span>
+                    </span>
+                  ),
+              },
+              {
+                key: "seen",
+                header: "Last reading",
+                align: "right",
+                cell: (r) => <RelativeTime iso={r.created_at} className="text-ink-2" />,
+              },
+            ]}
+          />
         </div>
       )}
-
-      <div className="border-t border-hairline bg-surface">
-        <DataTable
-          bare
-          caption="Edge devices"
-          rows={ai}
-          rowKey={(r) => r.device_id}
-          columns={[
-            {
-              key: "where",
-              header: "Location",
-              mobile: "title",
-              cell: (r) => (
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate font-medium text-ink">
-                    {r.house_name ?? "Unassigned"}
-                  </span>
-                  <span className="pg-mono truncate text-[12px] leading-4 text-ink-3">
-                    {r.device_code}
-                  </span>
-                </span>
-              ),
-            },
-            {
-              key: "status",
-              header: "Condition",
-              mobile: "status",
-              cell: (r) => <AiStatusBadge status={r.ai_status} at={r.created_at} />,
-            },
-            {
-              key: "temp",
-              header: "Temp vs target",
-              align: "right",
-              cell: (r) => <TempVsTarget r={r} />,
-            },
-            {
-              key: "rh",
-              header: "Humidity",
-              align: "right",
-              cell: (r) => <Num v={r.humidity} unit="%" muted={isStale(r)} />,
-            },
-            {
-              key: "gas",
-              header: "Gas index",
-              align: "right",
-              mobile: "hide",
-              cell: (r) => <Num v={r.gas_index} muted={isStale(r)} />,
-            },
-            {
-              key: "fan",
-              header: "Fan",
-              cell: (r) =>
-                r.fan_level ? (
-                  <span className={isStale(r) ? "text-ink-3" : "text-ink"}>
-                    {r.fan_level[0].toUpperCase() + r.fan_level.slice(1)}
-                    {r.fan_rpm != null && (
-                      <span className="pg-mono ml-1.5 text-[12px] text-ink-3">
-                        {Math.round(r.fan_rpm)}
-                        {NBSP}rpm
-                      </span>
-                    )}
-                  </span>
-                ) : (
-                  "—"
-                ),
-            },
-            {
-              key: "seen",
-              header: "Last reading",
-              align: "right",
-              cell: (r) => <RelativeTime iso={r.created_at} className="text-ink-2" />,
-            },
-          ]}
-        />
-      </div>
-    </section>
+    </AiStatusPanel>
   );
 }
 
@@ -556,31 +486,16 @@ function KeyMetrics({
         <Metric
           label="Fan"
           loading={loading}
-          status={
-            latest?.fan_rpm != null
-              ? lStale
-                ? "offline"
-                : latest.fan_rpm < 50 && (latest.fan_duty ?? 0) > 0.2
-                  ? "crit"
-                  : "ok"
-              : undefined
-          }
-          value={
-            latest?.fan_rpm != null
-              ? formatNumber(latest.fan_rpm, { maximumFractionDigits: 0 })
-              : null
-          }
-          unit="rpm"
+          status={latest?.fan_on != null ? (lStale ? "offline" : "ok") : undefined}
+          value={latest?.fan_on != null ? formatFan(latest.fan_on) : null}
           sub={
             !latest
               ? "No readings yet"
               : lStale
                 ? `Last known · ${ago(latest.created_at)}`
-                : latest.fan_rpm != null && latest.fan_rpm < 50 && (latest.fan_duty ?? 0) > 0.2
-                  ? "Not spinning, check the fan"
-                  : latest.fan_level
-                    ? `Level ${latest.fan_level}`
-                    : "Tach reading"
+                : latest.fan_on
+                  ? "Relay closed, fan running"
+                  : "Relay open, fan stopped"
           }
         />
       </MetricGrid>
@@ -938,7 +853,13 @@ function HousesSummary({
  * 4b. Recent alerts
  * -------------------------------------------------------------------------- */
 
-const SEVERITY: Record<Alert["severity"], { status: Status; label: string }> = {
+/** "main: Warning: Heat stress. Fan switched on." -> where "main", text "Heat stress. …" */
+function splitAlert(msg: string) {
+  const m = /^\s*([^:]{1,40}):\s*(?:healthy|warning|critical|info)\s*:\s*(.+)$/is.exec(msg);
+  return m ? { where: m[1].trim(), text: m[2].trim() } : { where: null, text: msg };
+}
+
+const SEVERITY: Record<Alert["severity"], { status: "crit" | "warn" | "info"; label: string }> = {
   critical: { status: "crit", label: "Critical" },
   warning: { status: "warn", label: "Warning" },
   info: { status: "info", label: "Info" },
@@ -988,47 +909,52 @@ function RecentAlerts({
           {alerts.map((a) => {
             const sev = SEVERITY[a.severity] ?? SEVERITY.info;
             const resolved = !!a.resolved;
+            const { where, text } = splitAlert(a.message);
             return (
               <li
                 key={a.id}
-                className={cn(
-                  "relative flex flex-col gap-1.5 px-4 py-3",
-                  resolved && "bg-[var(--pg-hover)]",
-                )}
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-3"
               >
-                {!resolved && (
-                  <span
-                    aria-hidden
+                <SeverityMark
+                  tone={resolved ? "off" : sev.status === "info" ? "off" : sev.status}
+                  className="mt-1"
+                />
+                <div className="min-w-0">
+                  <p
                     className={cn(
-                      "absolute inset-y-0 left-0 w-0.5",
-                      sev.status === "crit"
-                        ? "bg-crit"
-                        : sev.status === "warn"
-                          ? "bg-warn"
-                          : "bg-info",
+                      "line-clamp-2 text-[14px] leading-5",
+                      resolved ? "text-ink-3" : "text-ink",
                     )}
-                  />
-                )}
-                <div className="flex items-center justify-between gap-3">
-                  {resolved ? (
-                    <StatusPill status="neutral" size="sm">
-                      Resolved
-                    </StatusPill>
-                  ) : (
-                    <StatusPill status={sev.status} size="sm">
-                      {sev.label}
-                    </StatusPill>
+                  >
+                    <span
+                      className={cn(
+                        "font-semibold",
+                        resolved
+                          ? "text-ink-3"
+                          : sev.status === "crit"
+                            ? "text-crit"
+                            : sev.status === "warn"
+                              ? "text-warn"
+                              : "text-info",
+                      )}
+                    >
+                      {resolved ? "Resolved" : sev.label}
+                    </span>{" "}
+                    {text}
+                  </p>
+                  {where && (
+                    <p className="pg-mono mt-0.5 truncate text-[12px] leading-4 text-ink-3">
+                      {where}
+                    </p>
                   )}
-                  <RelativeTime iso={a.created_at} className="pg-t-caption shrink-0" />
                 </div>
-                <p
-                  className={cn(
-                    "line-clamp-2 text-[14px] leading-5",
-                    resolved ? "text-ink-3" : "text-ink",
-                  )}
+                <time
+                  dateTime={new Date(a.created_at).toISOString()}
+                  title={formatDateTime(a.created_at)}
+                  className="pg-mono pt-0.5 text-right text-[12px] leading-4 whitespace-nowrap text-ink-3"
                 >
-                  {a.message}
-                </p>
+                  {formatRelative(a.created_at)}
+                </time>
               </li>
             );
           })}

@@ -257,7 +257,7 @@ export const updateDevice = createServerFn({ method: "POST" })
     z.object({
       id: z.string().uuid(),
       houseId: z.string().uuid().nullable().optional(),
-      fanOverride: z.enum(["low", "medium", "high"]).nullable().optional(),
+      fanOverride: z.enum(["on", "off"]).nullable().optional(),
     }),
   )
   .handler(async ({ data }) => {

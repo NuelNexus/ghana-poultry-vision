@@ -343,7 +343,9 @@
 
 .auth-button {
   display: block;
-  margin: 0 auto;
+  /* Sides only, so Tailwind's mt-* on the button still applies. */
+  margin-left: auto;
+  margin-right: auto;
   line-height: 28pt;
   padding: 0 20px;
   background: #ffa580;
@@ -400,6 +402,113 @@
   .contact-us {
     padding: 36px 28px;
   }
+}
+
+/* Language tiles on the sign-in / sign-up card: same hard-edged look as the
+   card and the Continue button (black outline, offset blue shadow). */
+.auth-bg .pg-langs {
+  gap: 14px;
+}
+.auth-bg .pg-lang {
+  border: 2px solid #000;
+  border-radius: 0;
+  background: #fffdf7;
+  color: #2a293e;
+  font-family: "Fjalla One", sans-serif;
+  letter-spacing: 0.5px;
+  box-shadow: 3px 3px 0 #95a4ff, 3px 3px 0 2px #000;
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out,
+    background 0.12s;
+}
+.auth-bg .pg-lang:hover {
+  background: #fff;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 #95a4ff, 4px 4px 0 2px #000;
+}
+.auth-bg .pg-lang:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 #95a4ff, 0 0 0 0 #000;
+}
+.auth-bg .pg-lang[data-on] {
+  border-color: #000;
+  background: #ffa580;
+}
+.auth-bg .pg-lang:focus-visible {
+  outline: 3px solid #95a4ff;
+  outline-offset: 4px;
+}
+.auth-bg .pg-lang-native {
+  font-weight: 400;
+}
+.auth-bg .pg-lang-name {
+  font-family: var(--pg-font-sans, system-ui, sans-serif);
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+.auth-bg .pg-lang-icon {
+  color: #2a293e;
+}
+.auth-bg .pg-langs--chips .pg-lang {
+  border-width: 2px;
+  border-radius: 0;
+  box-shadow: 2px 2px 0 #95a4ff, 2px 2px 0 2px #000;
+}
+.auth-bg .pg-langs--chips .pg-lang:hover {
+  box-shadow: 3px 3px 0 #95a4ff, 3px 3px 0 2px #000;
+}
+.auth-bg .pg-langs--chips .pg-lang:active {
+  box-shadow: none;
+}
+
+/* Voice help dock while the auth card is on screen: match it too. */
+body:has(.auth-bg) .pg-dock {
+  border: 2px solid #000;
+  border-radius: 0;
+  background: #f8f4e5;
+  box-shadow: 6px 6px 0 #ffa580, 6px 6px 0 2px #000;
+  font-family: "Fjalla One", sans-serif;
+  gap: 4px;
+}
+body:has(.auth-bg) .pg-dock-btn {
+  border-radius: 0;
+  color: #2a293e;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+body:has(.auth-bg) .pg-dock-btn:hover {
+  background: #fff;
+}
+body:has(.auth-bg) .pg-dock-btn.is-main {
+  background: #95a4ff;
+  color: #000;
+  border: 2px solid #000;
+}
+body:has(.auth-bg) .pg-dock-btn.is-main:hover {
+  background: #000;
+  color: #fff;
+  filter: none;
+}
+body:has(.auth-bg) .pg-dock-btn[aria-pressed="true"] {
+  background: #ffa580;
+  color: #000;
+  outline: 2px solid #000;
+  outline-offset: -2px;
+}
+body:has(.auth-bg) .pg-dock-more {
+  border-radius: 0;
+  color: #2a293e;
+}
+body:has(.auth-bg) .pg-dock-bubble {
+  border: 2px solid #000;
+  border-radius: 0;
+  background: #fffdf7;
+  color: #2a293e;
+  box-shadow: 6px 6px 0 #95a4ff, 6px 6px 0 2px #000;
+}
+body:has(.auth-bg) .pg-dock-x {
+  border-radius: 0;
 }
 
 .farm-illustration {
@@ -734,6 +843,15 @@
 
   /* ---- Surfaces ------------------------------------------------------------ */
   .pg-panel { background: var(--pg-surface); border: 1px solid var(--pg-hairline); border-radius: var(--pg-r-panel); }
+  /* Diagonal hatching: marks values that are old (Pi offline), like a greyed-out gauge. */
+  .pg-hatch {
+    background-color: var(--pg-offline-tint);
+    background-image: repeating-linear-gradient(
+      -45deg,
+      transparent 0 5px,
+      color-mix(in srgb, var(--pg-ink) 6%, transparent) 5px 6px
+    );
+  }
   .pg-pop { background: var(--pg-surface); border: 1px solid var(--pg-hairline); border-radius: var(--pg-r-panel); box-shadow: var(--pg-shadow-pop); }
   .pg-divide > * + * { border-top: 1px solid var(--pg-hairline); }
 

@@ -1,4 +1,4 @@
-"""PoultryGrid Pi agent: read sensors -> run the model -> drive the fan -> report to the app.
+"""PoultryGrid Pi agent: read sensors -> run the model -> switch the fan relay -> report to the app.
 
     python agent.py                       # real hardware, settings from env / agent.env
     python agent.py --simulate            # no hardware: closed-loop simulated coop
@@ -30,7 +30,7 @@ import numpy as np
 
 from poultrygrid import MODEL_VERSION
 from poultrygrid.features import (
-    CAUSE_ADVICE, FAN_DUTY, STATUS_LABELS, STATUS_TITLES, WINDOW, extract_features, fan_policy,
+    CAUSE_ADVICE, STATUS_LABELS, STATUS_TITLES, WINDOW, extract_features, fan_policy,
     forward_fill, growth_phase, target_temperature,
 )
 from poultrygrid.model_np import CoopModel
@@ -61,10 +61,13 @@ class Config:
     outbox_path: Path
     mq135_baseline_v: float
     ldr_invert: bool
+    sensor_mode: str
     dht_pin: int
-    fan_pwm_pin: int
-    fan_tach_pin: int
-    fan_pwm_hz: int
+    gas_do_pin: int
+    ldr_do_pin: int
+    fan_relay_pin: int
+    relay_active_low: bool
+    relay_min_switch_s: float
     fan_auto: bool
 
     @classmethod
@@ -77,14 +80,17 @@ class Config:
             interval_s=float(e("PG_INTERVAL_S", "30")),
             bird_age_days=float(e("PG_BIRD_AGE_DAYS")) if e("PG_BIRD_AGE_DAYS") else None,
             batch_start_date=e("PG_BATCH_START_DATE") or None,
-            model_path=Path(e("PG_MODEL_PATH", str(HERE / "models" / "poultrygrid_v2.npz"))),
+            model_path=Path(e("PG_MODEL_PATH", str(HERE / "models" / "poultrygrid_v3.npz"))),
             outbox_path=Path(e("PG_OUTBOX_PATH", str(HERE / "outbox.sqlite3"))),
             mq135_baseline_v=float(e("PG_MQ135_BASELINE_V", "0.6")),
             ldr_invert=e("PG_LDR_INVERT", "1") == "1",
+            sensor_mode=e("PG_SENSOR_MODE", "auto"),
             dht_pin=int(e("PG_DHT_PIN", "4")),
-            fan_pwm_pin=int(e("PG_FAN_PWM_PIN", "18")),
-            fan_tach_pin=int(e("PG_FAN_TACH_PIN", "23")),
-            fan_pwm_hz=int(e("PG_FAN_PWM_HZ", "10000")),
+            gas_do_pin=int(e("PG_GAS_DO_PIN", "17")),
+            ldr_do_pin=int(e("PG_LDR_DO_PIN", "27")),
+            fan_relay_pin=int(e("PG_FAN_RELAY_PIN", "18")),
+            relay_active_low=e("PG_RELAY_ACTIVE_LOW", "1") == "1",
+            relay_min_switch_s=float(e("PG_RELAY_MIN_SWITCH_S", "60")),
             fan_auto=e("PG_FAN_AUTO", "1") == "1",
         )
 
@@ -198,7 +204,9 @@ class Agent:
             causes = self.model.top_causes(feats, 1)
         level = self.fan_override or fan_policy(status, [c["id"] for c in causes])
         if self.cfg.fan_auto:
-            self.hw.set_fan(FAN_DUTY[level])
+            # A manager's override from the app skips the relay's hold time.
+            self.hw.set_fan(level == "on", force=self.fan_override is not None)
+        fan_on = bool(self.hw.fan_on)
 
         latest = filled[-1]
         self.seq += 1
@@ -206,7 +214,7 @@ class Agent:
             "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             "seq": self.seq,
             "humidity": _r(latest[0]), "gas_index": _r(latest[1]), "temperature": _r(latest[2]),
-            "light": _r(latest[3]), "fan_rpm": _r(latest[4], 0), "fan_duty": _r(r.fan_duty, 2),
+            "light": _r(latest[3]), "fan_on": fan_on,
             "bird_age_days": round(age, 1),
             "ai": {
                 "status": STATUS_LABELS[status], "status_code": status,
@@ -214,15 +222,17 @@ class Agent:
                 "probabilities": raw["probabilities"],
                 "raw_status": raw["status"],
                 "causes": [{**c, "advice": CAUSE_ADVICE[c["id"]]} for c in causes],
-                "fan_level": level,
+                "fan_level": "on" if fan_on else "off",
                 "growth_phase": growth_phase(age),
                 "target_temp": round(target_temperature(age), 1),
                 "model_version": self.model.version,
             },
         }
-        log.info("%s %.0f%% | T=%.1f°C RH=%.0f%% gas=%.1f rpm=%.0f | fan=%s | %s",
+        log.info("%s %.0f%% | T=%.1f°C RH=%.0f%% gas=%.1f light=%.0f | fan=%s%s | %s",
                  STATUS_TITLES[status].upper(), payload["ai"]["confidence"] * 100, latest[2], latest[0],
-                 latest[1], latest[4], level, ", ".join(c["label"] for c in causes) or "all good")
+                 latest[1], latest[3], "on" if fan_on else "off",
+                 "" if (level == "on") == fan_on else f" (wants {level}, relay holding)",
+                 ", ".join(c["label"] for c in causes) or "all good")
         self._send(payload)
         return payload
 
@@ -241,7 +251,8 @@ class Agent:
                 cfg = res.get("config") or {}
                 if cfg.get("bird_age_days") is not None:
                     self.server_age = float(cfg["bird_age_days"])
-                self.fan_override = cfg.get("fan_override") or None
+                override = cfg.get("fan_override")
+                self.fan_override = override if override in ("on", "off") else None
         except urllib.error.HTTPError as e:
             log.warning("App rejected readings (%s): %s", e.code, e.read()[:200])
             if e.code in (400, 401, 403):
@@ -257,6 +268,10 @@ def _r(v, nd=1):
 def calibrate(cfg: Config):
     from poultrygrid.sensors import PiHardware
     hw = PiHardware(cfg)
+    if hw.mode != "ads1115":
+        hw.close()
+        sys.exit("No ADS1115 found. In DO mode there's nothing to calibrate: turn the MQ-135 module's screw "
+                 "until its DO LED just goes off in clean air.")
     print("Keep the MQ-135 in clean outdoor air. It should have warmed up for 24 h on first use.")
     vals = []
     for i in range(60):

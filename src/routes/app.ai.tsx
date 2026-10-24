@@ -60,6 +60,8 @@ import {
   Skeleton,
   StatusDot,
   formatDateTime,
+  formatFan,
+  formatLight,
   formatNumber,
   formatTemp,
   tempUnit,
@@ -204,6 +206,8 @@ function SensorRail() {
   const rows: {
     label: string;
     value: number | null | undefined;
+    /** Shown instead of the number (e.g. the relay's "On" / "Off"). */
+    text?: string;
     digits?: number;
     unit?: string;
     icon: LucideIcon;
@@ -242,21 +246,14 @@ function SensorRail() {
           digits: 0,
           unit: "%",
           icon: Lightbulb,
-          hint: "Relative, from the LDR",
+          hint: r.light == null ? "LDR" : `${formatLight(r.light)} · LDR`,
         },
         {
           label: "Fan",
-          value: r.fan_rpm,
-          digits: 0,
-          unit: "rpm",
+          value: r.fan_on == null ? null : Number(r.fan_on),
+          text: formatFan(r.fan_on),
           icon: Fan,
-          hint:
-            [
-              r.fan_level && `Level ${r.fan_level}`,
-              r.fan_duty != null && `${Math.round(r.fan_duty * 100)}% duty`,
-            ]
-              .filter(Boolean)
-              .join(" · ") || undefined,
+          hint: "Relay",
         },
       ]
     : [];
@@ -359,7 +356,7 @@ function SensorRail() {
                     stale ? "text-ink-2" : "text-ink",
                   )}
                 >
-                  {fmt(row.value, row.digits ?? 1)}
+                  {row.text ?? fmt(row.value, row.digits ?? 1)}
                   {row.unit && (
                     <span className="ml-1 font-sans text-[12px] font-normal text-ink-3">
                       {row.unit}
