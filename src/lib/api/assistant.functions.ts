@@ -21,15 +21,20 @@ import { AVATAR_ACTIONS, AVATAR_ACTION_IDS, type VoiceSegment } from "../avatar-
 
 // AI assistant tab: live sensor snapshot, text chat, and speech-to-speech.
 
-// Only the signed-in account's devices and alerts ($1 = user id).
+// Only the signed-in account's devices and alerts ($1 = user id). Most recently
+// reporting first, so the readings rail opens on the live device rather than a
+// long-silent one.
 const SNAPSHOT_SQL = `
-  select distinct on (r.device_id) r.*, d.device_id as device_code, d.last_seen, h.name as house_name,
-         h.bird_count
-    from sensor_readings r
-    join devices d on d.id = r.device_id
-    left join poultry_houses h on h.id = r.house_id
-   where d.owner_id = $1
-   order by r.device_id, r.created_at desc`;
+  select * from (
+    select distinct on (r.device_id) r.*, d.device_id as device_code, d.last_seen, h.name as house_name,
+           h.bird_count
+      from sensor_readings r
+      join devices d on d.id = r.device_id
+      left join poultry_houses h on h.id = r.house_id
+     where d.owner_id = $1
+     order by r.device_id, r.created_at desc
+  ) latest
+  order by created_at desc`;
 
 type SnapshotRow = AiSnapshot & { bird_count: number | null };
 
