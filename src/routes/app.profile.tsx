@@ -283,7 +283,8 @@ function AccountSection() {
           </div>
         </form>
 
-        <div className="border-t border-hairline p-4 md:p-5">
+        {/* Phones: every account owns its farm now, so this list is just reference. */}
+        <div className="border-t border-hairline p-4 max-md:hidden md:p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h3 className="pg-t-h3">What {role === "admin" ? "an admin" : `a ${role}`} can do</h3>
             <p className="pg-t-caption">{ROLE_SUMMARY[role]}</p>

@@ -121,7 +121,10 @@ function Overview() {
           )
         }
       >
-        <Link to="/app/health" className={buttonClass({ variant: "secondary" })}>
+        <Link
+          to="/app/health"
+          className={cn(buttonClass({ variant: "secondary" }), "max-md:hidden")}
+        >
           Flock health
           <ArrowRight aria-hidden strokeWidth={1.75} />
         </Link>
@@ -401,6 +404,7 @@ function KeyMetrics({
           }
         />
         <Metric
+          className="max-md:hidden"
           label="Temperature"
           loading={loading}
           status={
@@ -434,6 +438,7 @@ function KeyMetrics({
           }
         />
         <Metric
+          className="max-md:hidden"
           label="Humidity"
           loading={loading}
           status={
@@ -469,6 +474,7 @@ function KeyMetrics({
           }
         />
         <Metric
+          className="max-md:hidden"
           label="Gas index"
           loading={loading}
           status={gas != null ? (lStale ? "offline" : gas > GAS_HIGH ? "warn" : "ok") : undefined}
@@ -484,6 +490,7 @@ function KeyMetrics({
           }
         />
         <Metric
+          className="max-md:hidden"
           label="Fan"
           loading={loading}
           status={latest?.fan_on != null ? (lStale ? "offline" : "ok") : undefined}

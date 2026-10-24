@@ -381,10 +381,10 @@ function AlertRow({
           {text}
         </p>
         <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-4 text-ink-3">
-          <span>{sourceLabel(a.type)}</span>
+          <span className="max-sm:hidden">{sourceLabel(a.type)}</span>
           {where && (
             <>
-              <span aria-hidden className="text-ink-disabled">
+              <span aria-hidden className="text-ink-disabled max-sm:hidden">
                 ·
               </span>
               <span className="pg-mono">{where}</span>
@@ -416,13 +416,7 @@ function AlertRow({
             Resolved
           </StatusPill>
         ) : (
-          <Button
-            size="sm"
-            icon={Check}
-            loading={pending}
-            onClick={onResolve}
-            className="w-full sm:w-auto"
-          >
+          <Button size="sm" icon={Check} loading={pending} onClick={onResolve}>
             {pending ? "Resolving…" : "Resolve"}
           </Button>
         )}

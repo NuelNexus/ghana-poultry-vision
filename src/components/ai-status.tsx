@@ -175,10 +175,10 @@ export function AiStatusPanel({
               </>
             )}
             {where && (
-              <>
+              <span className="inline-flex items-center gap-x-2 max-sm:hidden">
                 <Sep />
                 <span className="pg-mono text-[12px]">{where}</span>
-              </>
+              </span>
             )}
             {r.bird_age_days != null && (
               <>
@@ -189,12 +189,16 @@ export function AiStatusPanel({
                 </span>
               </>
             )}
+            {/* Phones: the clock column is hidden, so say how fresh it is on its own line. */}
+            <span className="basis-full text-[12px] leading-4 text-ink-3 sm:hidden">
+              {fresh.caption}
+            </span>
           </p>
         </div>
         <time
           dateTime={new Date(r.created_at).toISOString()}
           title={formatDateTime(r.created_at)}
-          className="shrink-0 text-right"
+          className="shrink-0 text-right max-sm:hidden"
         >
           <span className="pg-mono block text-[15px] leading-5 text-ink">
             {formatTime(r.created_at)}
@@ -252,7 +256,7 @@ export function AiStatusPanel({
 
       {showModel && r.ai_probabilities && (
         <footer className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-hairline bg-sunken/50 px-4 py-2.5 md:px-5">
-          <span className="pg-t-caption inline-flex items-center gap-1.5">
+          <span className="pg-t-caption inline-flex items-center gap-1.5 max-sm:hidden">
             <Cpu className="size-3" aria-hidden />
             <span className="pg-mono">{r.model_version ?? "edge model"}</span> on the Pi
           </span>

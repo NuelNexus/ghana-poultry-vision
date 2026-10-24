@@ -843,16 +843,31 @@ export function Meter({
 export function DescList({
   items,
   className,
+  stackOnMobile = false,
 }: {
   items: { label: ReactNode; value: ReactNode }[];
   className?: string;
+  /** Phones: label above value, for values that are sentences rather than figures. */
+  stackOnMobile?: boolean;
 }) {
   return (
     <dl className={cn("divide-y divide-hairline text-[13px] leading-[18px]", className)}>
       {items.map((it, i) => (
-        <div key={i} className="flex items-baseline justify-between gap-4 py-2">
-          <dt className="text-ink-3">{it.label}</dt>
-          <dd className="pg-num min-w-0 text-right text-ink">{it.value}</dd>
+        <div
+          key={i}
+          className={cn(
+            "flex items-baseline justify-between gap-4 py-2",
+            stackOnMobile && "max-sm:flex-col max-sm:items-start max-sm:gap-0.5 max-sm:py-2.5",
+          )}
+        >
+          <dt
+            className={cn("shrink-0 text-ink-3", stackOnMobile && "max-sm:text-[12px] max-sm:leading-4")}
+          >
+            {it.label}
+          </dt>
+          <dd className={cn("pg-num min-w-0 text-right text-ink", stackOnMobile && "max-sm:text-left")}>
+            {it.value}
+          </dd>
         </div>
       ))}
     </dl>
@@ -1663,9 +1678,10 @@ export type Column<T> = {
   className?: string;
   /**
    * Phone layout: "title" = line 1 left (one column), "status" = line 1 right,
-   * "meta" (default) = line 2 as "Header value", "hide" = not shown.
+   * "meta" (default) = a label-over-value cell in a 2-column grid below,
+   * "wide" = a meta cell across both columns (controls), "hide" = not shown.
    */
-  mobile?: "title" | "status" | "meta" | "hide";
+  mobile?: "title" | "status" | "meta" | "wide" | "hide";
 };
 
 export function DataTable<T>({
@@ -1708,7 +1724,7 @@ export function DataTable<T>({
   const mobileRole = (c: Column<T>, i: number) => c.mobile ?? (i === 0 ? "title" : "meta");
   const titleCol = columns.find((c, i) => mobileRole(c, i) === "title");
   const statusCol = columns.find((c, i) => mobileRole(c, i) === "status");
-  const metaCols = columns.filter((c, i) => mobileRole(c, i) === "meta");
+  const metaCols = columns.filter((c, i) => ["meta", "wide"].includes(mobileRole(c, i)));
   const click = (row: T) =>
     onRowClick
       ? (e: React.MouseEvent) => {
@@ -1791,11 +1807,14 @@ export function DataTable<T>({
               {statusCol && <div className="shrink-0">{statusCol.cell(row)}</div>}
             </div>
             {metaCols.length > 0 && (
-              <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[13px] leading-[18px]">
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-[14px] leading-5">
                 {metaCols.map((c) => (
-                  <div key={c.key} className="flex min-w-0 items-baseline gap-1.5">
-                    <dt className="text-ink-3">{c.header}</dt>
-                    <dd className="pg-num min-w-0 text-ink">{c.cell(row)}</dd>
+                  <div
+                    key={c.key}
+                    className={cn("flex min-w-0 flex-col gap-1", c.mobile === "wide" && "col-span-2")}
+                  >
+                    <dt className="text-[12px] leading-4 text-ink-3">{c.header}</dt>
+                    <dd className="pg-num m-0 min-w-0 text-ink">{c.cell(row)}</dd>
                   </div>
                 ))}
               </dl>

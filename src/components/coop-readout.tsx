@@ -180,10 +180,14 @@ export function ComfortScale({
           }}
         />
         {/* ticks */}
-        {ticks.map((t) => (
+        {ticks.map((t, i) => (
           <span
             key={t}
-            className="pg-mono absolute top-5 -translate-x-1/2 text-[10px] leading-3 text-ink-3"
+            className={cn(
+              "pg-mono absolute top-5 -translate-x-1/2 text-[10px] leading-3 text-ink-3",
+              // Phones: every other number, so they don't run into each other.
+              i % 2 === 1 && "max-sm:hidden",
+            )}
             style={{ left: `${pct(t, lo, hi)}%` }}
           >
             {fmt(t)}
@@ -261,7 +265,7 @@ function Gauge({
     <div className="min-w-0 px-4 py-3.5 md:px-5">
       <div className="flex items-baseline justify-between gap-2">
         <dt className="text-[12px] leading-4 text-ink-2">{label}</dt>
-        <span className="pg-mono text-[10px] leading-3 text-ink-3">{source}</span>
+        <span className="pg-mono text-[10px] leading-3 text-ink-3 max-sm:hidden">{source}</span>
       </div>
       <dd className="m-0">
         <span

@@ -568,7 +568,8 @@ body:has(.pg-landing) { overflow-x: hidden; background: #c9ab8a; }
 
 @media (max-width: 600px) {
   /* keep the bird visible above the card on phones */
-  .pg-landing section { padding: 5rem 1.25rem 2.5rem; align-items: flex-end; }
+  /* bottom room for the voice help pill, so it never covers the buttons */
+  .pg-landing section { padding: 5rem 1.25rem 5.5rem; align-items: flex-end; }
   #hud { top: 1rem; right: 1rem; }
   #scene-strip, #credit { display: none; }
   .text-card { max-width: 100%; }

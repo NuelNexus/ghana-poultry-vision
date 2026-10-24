@@ -105,6 +105,7 @@ function Automation() {
     {
       key: "mode",
       header: "Mode",
+      mobile: "wide",
       className: "w-[1%] whitespace-nowrap",
       cell: (d) => {
         const value: Mode = saving[d.id] ?? d.fan_override ?? "auto";
@@ -201,6 +202,7 @@ function Automation() {
       >
         <div className="pg-panel px-4 py-1 md:px-5">
           <DescList
+            stackOnMobile
             items={[
               {
                 label: "AI auto",

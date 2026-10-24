@@ -462,6 +462,18 @@
   box-shadow: none;
 }
 
+/* A metric tile hidden on phones takes its grid cell with it. */
+@media (max-width: 767px) {
+  .pg-metric-cell:has(> .max-md\:hidden) {
+    display: none;
+  }
+}
+
+/* The phone menu drawer covers the page; the voice dock shouldn't sit on top of it. */
+body:has(.pg-drawer[data-state="open"]) :is(.pg-dock, .pg-dock-bubble) {
+  display: none;
+}
+
 /* Voice help dock while the auth card is on screen: match it too. */
 body:has(.auth-bg) .pg-dock-row,
 body:has(.auth-bg) .pg-dock-menu,
@@ -542,6 +554,21 @@ body:has(.auth-bg) .pg-dock-x {
   box-sizing: border-box;
   max-width: 100%;
   padding: 0 1em;
+}
+
+/* Phones: the scene is decoration, so keep it a short banner. */
+@media (max-width: 767px) {
+  figure.farm-illustration {
+    height: 132px;
+    margin: 0;
+    padding: 8px 4px;
+    border-radius: 10px;
+  }
+  figure.farm-illustration .farm-svg {
+    height: 100%;
+    width: auto;
+    padding: 0;
+  }
 }
 
 .farm-svg *[class^="st"] {

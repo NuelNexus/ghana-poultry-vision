@@ -55,7 +55,8 @@ const KIND_LABEL: Record<Kind, string> = {
 
 const FAN_LABEL: Record<FanLevel, string> = { on: "On", off: "Off" };
 
-const CELL_SELECT = "h-8 w-auto min-w-36 text-[13px] max-md:h-10 max-md:text-[16px]";
+const CELL_SELECT =
+  "h-8 w-auto min-w-36 text-[13px] max-md:h-10 max-md:w-full max-md:min-w-0 max-md:text-[16px]";
 
 type DeviceRow = Awaited<ReturnType<typeof listDevices>>[number];
 type Patch = { houseId?: string | null; fanOverride?: FanLevel | null };
@@ -166,6 +167,7 @@ function Devices() {
     {
       key: "seen",
       header: "Last seen",
+      mobile: "wide",
       className: "whitespace-nowrap",
       cell: (d) => <RelativeTime iso={d.last_seen} className="text-ink-2" />,
     },
@@ -305,7 +307,7 @@ function Devices() {
           />
         ) : (
           <div className="flex flex-col gap-4">
-            <MetricGrid cols={4}>
+            <MetricGrid cols={4} className="max-md:hidden">
               <Metric
                 label="Online"
                 value={online}
@@ -545,7 +547,7 @@ function SetupSection() {
               knows the flock age.
             </li>
           </Steps>
-          <dl className="mt-4 divide-y divide-hairline border-t border-hairline text-[13px]">
+          <dl className="mt-4 divide-y divide-hairline border-t border-hairline text-[13px] max-md:hidden">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
               <dt className="pg-t-label w-20 shrink-0">Endpoint</dt>
               <dd className="flex min-w-0 flex-1 items-center gap-2">
