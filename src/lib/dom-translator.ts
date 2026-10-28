@@ -122,6 +122,7 @@ export class DomTranslator {
     this.observer?.disconnect();
     this.observer = null;
     if (this.timer) window.clearTimeout(this.timer);
+    if (this.retryTimer) window.clearTimeout(this.retryTimer);
     for (const [node, { orig, shown }] of this.textOrig) {
       if (node.isConnected && node.data === shown) node.data = orig;
     }
@@ -232,6 +233,7 @@ export class DomTranslator {
       this.onPending?.(this.pending);
       const job = this.batch(this.lang, mine)
         .then((out) => {
+          this.retries = 0;
           mine.forEach((k, i) => {
             const v = out[i];
             if (v) this.dict.set(k, v);
@@ -241,7 +243,9 @@ export class DomTranslator {
           for (const k of mine) this.apply(k);
         })
         .catch(() => {
-          // Offline or rate limited: try again on the next change.
+          // Server error, offline or rate limited: ask again shortly. A quiet page
+          // (the sign-in form) has no further changes to trigger a retry.
+          this.retryLater(mine);
         })
         .finally(() => {
           for (const k of mine) this.inflight.delete(k);
@@ -252,6 +256,20 @@ export class DomTranslator {
       wait.push(job);
     }
     await Promise.all(wait);
+  }
+
+  private retries = 0;
+  private retryTimer: number | null = null;
+
+  private retryLater(keys: string[]) {
+    if (this.retries >= 5 || !this.observer) return;
+    const delay = 1500 * 2 ** this.retries++;
+    for (const k of keys) this.queue.add(k);
+    if (this.retryTimer) return;
+    this.retryTimer = window.setTimeout(() => {
+      this.retryTimer = null;
+      if (this.observer) void this.flush();
+    }, delay);
   }
 
   private apply(key: string) {
