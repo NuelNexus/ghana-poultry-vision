@@ -14,7 +14,7 @@ aren't listed individually.
 | `.env` (not in git) | Secrets and settings: `DATABASE_URL`, `OPENAI_API_KEY`, optional `KHAYA_API_KEY`, `TWI_TTS_URL`, `TWI_NLP_URL`, model overrides. |
 | `vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `components.json` | Build, TypeScript, lint and shadcn config (Lovable / TanStack Start template). |
 | `.venv-twi/` (not in git) | Local Python environment for the Twi voice and DistilABENA word helper (`npm run twi`). |
-| `firmware/coop_unit/` | Unit 2, the ESP32 coop controller: `coop_unit.ino`, `config.example.h` (copy to the gitignored `config.h`), `root_ca.h`, `emulator.py` (the same logic in Python, to try the site without the ESP32), README with wiring and the protocol. |
+| `firmware/coop_unit/` | Unit 2, the ESP32 coop controller: `coop_unit.ino` (Wi-Fi and site settings at the top), `root_ca.h`, `emulator.py` (the same logic in Python, to try the site without the ESP32), README with wiring and the protocol. |
 | `videos/` | The six guide videos in English and Twi, built with HyperFrames: `guides.mjs` (what they say), `build.mjs` (generator + render), `shots/` (screenshots + `rects.json`). See `videos/README.md`. |
 | `promo/`, `*.glb`, `*.mp4`, `*.gif` at root | Source media (3D models, the life-cycle video, promo ad). Copies the site uses live in `public/`. |
 

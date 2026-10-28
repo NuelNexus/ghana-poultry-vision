@@ -1,6 +1,7 @@
 import process from "node:process";
 import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
 import { query, queryOne } from "./db.server";
+import type { VoiceChoice } from "./voice-choice";
 
 // Email/password auth backed by Neon (replaces Supabase Auth).
 // Passwords: PBKDF2-SHA256 via Web Crypto (works on Node and Cloudflare Workers).
@@ -16,6 +17,8 @@ export interface SessionUser {
   language: string;
   /** When the first-login tour was finished or skipped; null = show it. */
   onboarded_at: string | null;
+  /** Ama's voice (Profile > Language and voice). */
+  voice: VoiceChoice;
 }
 
 const COOKIE = "pg_session";
@@ -92,8 +95,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     roles: Role[] | null;
     language: string;
     onboarded_at: string | null;
+    voice: VoiceChoice;
   }>(
-    `select u.id, u.email, u.full_name, u.language, u.onboarded_at,
+    `select u.id, u.email, u.full_name, u.language, u.onboarded_at, u.voice,
             coalesce(array_agg(r.role::text) filter (where r.role is not null), '{}') as roles
        from sessions s
        join users u on u.id = s.user_id

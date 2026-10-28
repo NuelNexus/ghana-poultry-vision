@@ -43,8 +43,5 @@ edge/.venv
 .venv-twi/
 .certs/
 
-# Coop unit firmware: WiFi password and device key
-firmware/coop_unit/config.h
-
 # Generated HyperFrames projects (node videos/build.mjs)
 videos/build/

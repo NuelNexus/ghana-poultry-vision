@@ -730,7 +730,7 @@ function RegisterModal({
         kind === "pi"
           ? "You’ll get the Pi’s API key and agent.env after this step."
           : kind === "coop"
-            ? "You’ll get the coop’s API key and the lines for its config.h after this step."
+            ? "You’ll get the coop’s API key and the lines to paste into its code after this step."
             : "The camera needs no key. Your browser opens its stream directly."
       }
       footer={
@@ -766,7 +766,7 @@ function RegisterModal({
             hint={
               kind === "pi"
                 ? "Unique, up to 64 characters, no spaces. It becomes PG_DEVICE_ID on the Pi."
-                : "Unique, up to 64 characters, no spaces. It becomes PG_DEVICE_ID in the coop’s config.h."
+                : "Unique, up to 64 characters, no spaces. It becomes PG_DEVICE_ID in the coop’s code."
             }
             error={errors.id}
           >
@@ -929,12 +929,12 @@ function CreatedModal({ created, onClose }: { created: Created | null; onClose: 
           <div>
             <div className="mb-1.5 flex items-end justify-between gap-3">
               <div>
-                <div className="pg-t-label">{coop ? "config.h" : "agent.env"}</div>
+                <div className="pg-t-label">{coop ? "coop_unit.ino" : "agent.env"}</div>
                 {coop ? (
                   <p className="pg-t-caption mt-0.5">
-                    Paste into <code className="pg-mono">firmware/coop_unit/config.h</code> (copy it
-                    from <code className="pg-mono">config.example.h</code>) next to your Wi-Fi name
-                    and password.
+                    In <code className="pg-mono">firmware/coop_unit/coop_unit.ino</code>, replace the
+                    three matching lines in the SETTINGS block at the top, and put your Wi-Fi name
+                    and password there too.
                   </p>
                 ) : (
                   <p className="pg-t-caption mt-0.5">

@@ -1,5 +1,6 @@
 import process from "node:process";
 import { KHAYA_CODES, type SpeechLang } from "./ai-languages";
+import { DEFAULT_VOICE, type VoiceChoice } from "./voice-choice";
 
 // GhanaNLP Khaya API (https://translation.ghananlp.org): speech recognition,
 // translation and voices trained on Ghanaian languages. Ama uses it for Twi, Ga,
@@ -8,7 +9,7 @@ import { KHAYA_CODES, type SpeechLang } from "./ai-languages";
 // falls back to OpenAI.
 //
 //   KHAYA_API_KEY   - subscription key from translation.ghananlp.org (required to enable)
-//   KHAYA_TTS_VOICE - female | male_low | male_high          (default female)
+//   Voice: the account's choice (Profile): male -> male_low, female -> female
 
 const BASE = "https://translation-api.ghananlp.org";
 
@@ -91,10 +92,14 @@ export async function khayaTranslate(text: string, from: SpeechLang | "en", to: 
 }
 
 /** Text to speech in a Ghanaian voice. Returns one WAV file. */
-export async function khayaSpeak(text: string, lang: SpeechLang) {
+export async function khayaSpeak(
+  text: string,
+  lang: SpeechLang,
+  voice: VoiceChoice = DEFAULT_VOICE,
+) {
   const code = KHAYA_CODES[lang]?.tts;
   if (!code) throw new Error(`Khaya has no voice for ${lang}`);
-  const speaker = process.env.KHAYA_TTS_VOICE || "female";
+  const speaker = voice === "female" ? "female" : "male_low";
   // Long replies are spoken in sentence-sized pieces and joined, which keeps
   // each request small and lets them run in parallel.
   const parts = chunkSentences(text, 350);

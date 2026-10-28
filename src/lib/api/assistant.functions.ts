@@ -482,9 +482,10 @@ export const speakReply = createServerFn({ method: "POST" })
       slowTwi: z.boolean().default(false),
     }),
   )
-  .handler(({ data }) =>
+  .handler(({ data, context }) =>
     speakIn(data.text, data.lang ?? speechLangFor(data.text, data.uiLang), {
       slowTwi: data.slowTwi,
+      voice: context.user.voice,
     }),
   );
 
@@ -530,6 +531,7 @@ export const createVoiceSession = createServerFn({ method: "POST" })
       data.uiLang === "en" || data.uiLang === "fr" ? "auto" : siteLang(data.uiLang).speech;
     return createRealtimeClientSecret(systemPrompt(farm, true, "auto", data.uiLang), hint, {
       manualResponse: data.twiRouting,
+      voice: context.user.voice,
     });
   });
 

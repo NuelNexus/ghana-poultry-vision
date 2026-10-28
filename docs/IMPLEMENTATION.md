@@ -180,12 +180,13 @@ text, Ama's replies from the last 10 minutes, and short snippets (≤200 charact
 | `OPENAI_LOCAL_MODEL` | `gpt-5.5` | Answers in Twi/Ga/Ewe/Dagbani/Hausa. |
 | `OPENAI_TRANSLATE_MODEL` | `gpt-5.5` | Site translation. |
 | `OPENAI_STT_MODEL` | `gpt-4o-transcribe` | Speech to text. |
-| `OPENAI_TTS_MODEL` / `OPENAI_TTS_VOICE` | `gpt-4o-mini-tts` / `nova` | Spoken replies (female). |
-| `OPENAI_REALTIME_MODEL` / `OPENAI_REALTIME_VOICE` | `gpt-realtime-mini` / `marin` | Voice call. |
+| `OPENAI_TTS_MODEL` | `gpt-4o-mini-tts` | Spoken replies. |
+| `OPENAI_TTS_VOICE_MALE` / `_FEMALE` | `ash` / `nova` | Read-aloud voice for each choice in Profile. |
+| `OPENAI_REALTIME_MODEL` | `gpt-realtime-mini` | Voice call. |
+| `OPENAI_REALTIME_VOICE_MALE` / `_FEMALE` | `cedar` / `marin` | Voice call voice for each choice. |
 | `KHAYA_API_KEY` | unset | Turns on Khaya (see `KHAYA_SETUP.md`). |
-| `KHAYA_TTS_VOICE` | `female` | Khaya voice. |
 | `TWI_TTS_URL` / `TWI_TTS_TOKEN` | unset | Direct Twi voice server; otherwise the Pi relay. |
-| `TWI_TTS_VOICE` | `twi-6` | stable-twi-tts voice. |
+| `TWI_TTS_VOICE_MALE` / `_FEMALE` | `twi-6` / `twi-1` | stable-twi-tts voice for each choice. Khaya uses `male_low` / `female`. |
 | `TWI_NLP_URL` / `TWI_NLP_TOKEN` | unset | DistilABENA word helper. |
 
 ## 10. Extending

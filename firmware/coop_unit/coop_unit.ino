@@ -19,8 +19,32 @@
 //   DHT sensor library (Adafruit), LiquidCrystal I2C, ArduinoJson (v7)
 // Board: ESP32 Dev Module (arduino-esp32 core 2.x or 3.x)
 //
-// Setup: copy config.example.h to config.h and fill in WiFi and the device
-// ID/key from the site (Devices -> Register device -> Coop unit).
+// Setup: fill in the SETTINGS block below: your WiFi, and the three lines the
+// site shows when you add the coop (Devices -> Add device -> Unit 2 · Coop).
+// =====================================================
+
+// =====================================================
+// SETTINGS: fill these in before uploading
+// =====================================================
+
+// ---- WiFi ----
+#define WIFI_SSID     "your-wifi-name"
+#define WIFI_PASSWORD "your-wifi-password"
+
+// ---- PoultryGrid site (paste the three lines from Devices -> Add device) ----
+#define PG_API_URL        "https://your-site.example.com"
+#define PG_DEVICE_ID      "COOP-1"
+#define PG_DEVICE_API_KEY "paste-the-device-api-key-here"
+
+// How often to report to the site and pick up new settings (milliseconds).
+// Changes made on the site reach the coop within about this long.
+#define REPORT_INTERVAL_MS 10000
+
+// Only for testing against a server with no valid HTTPS certificate.
+// Leave at 0 for a real site: 1 lets anyone on the network impersonate it.
+#define PG_INSECURE_TLS 0
+
+// Don't commit this file to GitHub with your real WiFi password and device key.
 // =====================================================
 
 #include <Wire.h>
@@ -32,12 +56,6 @@
 #include <Preferences.h>
 #include <ArduinoJson.h>
 
-#if __has_include("config.h")
-#include "config.h"
-#else
-#warning "config.h not found: using config.example.h (copy it to config.h and fill it in)"
-#include "config.example.h"
-#endif
 #include "root_ca.h"
 
 #define FIRMWARE_VERSION "coop-2.0.0"

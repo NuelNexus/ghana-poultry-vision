@@ -1,6 +1,7 @@
 import process from "node:process";
 import { STT_ISO, STT_PROMPT, isPromptEcho, type SpeechLang } from "./ai-languages";
 import { openAiLimitMessage } from "./openai-errors";
+import { DEFAULT_VOICE, type VoiceChoice } from "./voice-choice";
 
 // Thin OpenAI REST client for the AI assistant tab. Server-only: the key in
 // OPENAI_API_KEY never reaches the browser.
@@ -13,9 +14,9 @@ import { openAiLimitMessage } from "./openai-errors";
 //   OPENAI_STT_MODEL   - speech to text          (default gpt-4o-transcribe: much better than
 //                        the mini model on Twi, Ga and Ewe, still about $0.006 a minute)
 //   OPENAI_TTS_MODEL   - text to speech          (default gpt-4o-mini-tts)
-//   OPENAI_TTS_VOICE   - female voice            (default nova)
+//   OPENAI_TTS_VOICE_FEMALE / _MALE - read-aloud voices (default nova / ash)
 //   OPENAI_REALTIME_MODEL - live voice mode      (default gpt-realtime-mini)
-//   OPENAI_REALTIME_VOICE - live voice           (default marin)
+//   OPENAI_REALTIME_VOICE_FEMALE / _MALE - live call voices (default marin / cedar)
 
 const BASE = "https://api.openai.com/v1";
 
@@ -27,7 +28,6 @@ function cfg() {
     chat: process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini",
     stt: process.env.OPENAI_STT_MODEL || "gpt-4o-transcribe",
     tts: process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts",
-    voice: process.env.OPENAI_TTS_VOICE || "nova",
   };
 }
 
@@ -123,21 +123,24 @@ export async function transcribe(audio: Uint8Array, mimeType: string, lang: Spee
 }
 
 /** Text to speech. Without a language, she speaks whatever language the text is written in. */
-export async function speak(text: string, language?: string) {
+export async function speak(text: string, language?: string, voice: VoiceChoice = DEFAULT_VOICE) {
   const c = cfg();
   const res = await fetch(`${BASE}/audio/speech`, {
     method: "POST",
     headers: { authorization: `Bearer ${c.key}`, "content-type": "application/json" },
     body: JSON.stringify({
       model: c.tts,
-      voice: c.voice,
+      voice:
+        voice === "female"
+          ? process.env.OPENAI_TTS_VOICE_FEMALE || "nova"
+          : process.env.OPENAI_TTS_VOICE_MALE || "ash",
       input: text,
       response_format: "mp3",
       instructions: `${
         language
           ? `Speak in ${language}`
           : "Speak in the language the text is written in (it may be English, Twi, Ga, Ewe, Hausa or French)"
-      } with natural native Ghanaian pronunciation. Warm, friendly, clear female farm advisor.`,
+      } with natural native Ghanaian pronunciation. Warm, friendly, clear ${voice} farm advisor.`,
     }),
   });
   if (!res.ok) await fail(res, "speech");
@@ -152,7 +155,7 @@ export async function speak(text: string, language?: string) {
 export async function createRealtimeClientSecret(
   instructions: string,
   lang: SpeechLang = "auto",
-  opts: { manualResponse?: boolean } = {},
+  opts: { manualResponse?: boolean; voice?: VoiceChoice } = {},
 ) {
   const c = cfg();
   const model = process.env.OPENAI_REALTIME_MODEL || "gpt-realtime-mini";
@@ -183,7 +186,12 @@ export async function createRealtimeClientSecret(
               ...(opts.manualResponse && { create_response: false, interrupt_response: true }),
             },
           },
-          output: { voice: process.env.OPENAI_REALTIME_VOICE || "marin" },
+          output: {
+            voice:
+              opts.voice === "female"
+                ? process.env.OPENAI_REALTIME_VOICE_FEMALE || "marin"
+                : process.env.OPENAI_REALTIME_VOICE_MALE || "cedar",
+          },
         },
       },
     }),

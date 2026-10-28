@@ -1,5 +1,6 @@
 import process from "node:process";
 import { query, queryOne } from "./db.server";
+import { DEFAULT_VOICE, type VoiceChoice } from "./voice-choice";
 
 // Ama's Twi voice from GhanaNLP's stable-twi-tts, running on the farm's
 // Raspberry Pi (edge/twi_tts.py). Two ways to reach it:
@@ -11,10 +12,13 @@ import { query, queryOne } from "./db.server";
 //                       for the Pi, which polls /api/public/devices/tts, to upload the WAV.
 //                       Works behind any router, with the Pi's existing device key.
 //
-//   TWI_TTS_VOICE    - stable-twi-tts voice (default twi-6: the male voice, about 120 Hz,
-//                      which farmers found clearer than the female twi-1)
+// Voices: the account's choice (Profile) picks male twi-6 (about 120 Hz) or female twi-1
+// (about 190 Hz). TWI_TTS_VOICE_MALE / TWI_TTS_VOICE_FEMALE swap in other stable-twi-tts voices.
 
-const VOICE = () => process.env.TWI_TTS_VOICE || "twi-6";
+const VOICE = (v: VoiceChoice) =>
+  v === "female"
+    ? process.env.TWI_TTS_VOICE_FEMALE || "twi-1"
+    : process.env.TWI_TTS_VOICE_MALE || "twi-6";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** True when some Pi's voice service polled in the last minute (or a direct URL is set). */
@@ -43,7 +47,11 @@ export async function wakeTwiVoice() {
  * reachable within timeoutMs. Callers send one sentence at a time, so a short
  * timeout is plenty and a slow machine falls back to another voice quickly.
  */
-export async function twiSpeak(text: string, timeoutMs = 12_000): Promise<Uint8Array> {
+export async function twiSpeak(
+  text: string,
+  voice: VoiceChoice = DEFAULT_VOICE,
+  timeoutMs = 12_000,
+): Promise<Uint8Array> {
   const url = process.env.TWI_TTS_URL;
   if (url) {
     const token = process.env.TWI_TTS_TOKEN;
@@ -53,16 +61,16 @@ export async function twiSpeak(text: string, timeoutMs = 12_000): Promise<Uint8A
         "content-type": "application/json",
         ...(token && { authorization: `Bearer ${token}` }),
       },
-      body: JSON.stringify({ text, voice: VOICE() }),
+      body: JSON.stringify({ text, voice: VOICE(voice) }),
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) throw new Error(`Twi voice server failed (${res.status})`);
     return new Uint8Array(await res.arrayBuffer());
   }
-  return relaySpeak(text, timeoutMs + 3_000);
+  return relaySpeak(text, VOICE(voice), timeoutMs + 3_000);
 }
 
-async function relaySpeak(text: string, timeoutMs: number) {
+async function relaySpeak(text: string, voiceId: string, timeoutMs: number) {
   if (!(await twiVoiceOnline())) throw new Error("No Pi is running the Twi voice service");
   await wakeTwiVoice();
   // Tidy up old jobs (and their audio) while we're here.
@@ -71,7 +79,7 @@ async function relaySpeak(text: string, timeoutMs: number) {
   );
   const job = await queryOne<{ id: string }>(
     "insert into tts_jobs (text, voice) values ($1, $2) returning id",
-    [text, VOICE()],
+    [text, voiceId],
   );
   const id = job!.id;
   // A Pi that is polling fast picks it up within a second; give up after

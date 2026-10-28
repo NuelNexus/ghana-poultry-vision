@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import {
   changePassword,
   getAccount,
+  setMyVoice,
   signOutOtherSessions,
   updateProfile,
 } from "@/lib/api/auth.functions";
@@ -39,6 +40,9 @@ import {
 import { useTheme } from "@/components/ThemeProvider";
 import { useLanguage } from "@/components/LanguageProvider";
 import { LanguagePicker } from "@/components/LanguagePicker";
+import { speakText } from "@/lib/api/i18n.functions";
+import { SpeechPlayer, cachedChunk, clearSpeechCache } from "@/lib/speech-client";
+import { voiceChoice, type VoiceChoice } from "@/lib/voice-choice";
 import {
   ACCENTS,
   FAMILIES,
@@ -1061,6 +1065,7 @@ function LanguageSection() {
           </p>
           <LanguagePicker />
         </Card>
+        <VoiceCard />
         <Card padding="md">
           <h3 className="pg-t-h3 mb-3">Speaking and listening help</h3>
           <div className="divide-y divide-hairline">
@@ -1100,6 +1105,78 @@ function LanguageSection() {
         </Card>
       </div>
     </Section>
+  );
+}
+
+const VOICE_SAMPLE = "Akwaaba. Me din de Ama. Mɛboa wo ama wo nkokɔ ho atɔ wo.";
+
+/** Ama's voice: male (stable-twi-tts twi-6) or female (twi-1). Saved on the account. */
+function VoiceCard() {
+  const { user, patchUser } = useAuth();
+  const qc = useQueryClient();
+  const voice = voiceChoice(user?.voice);
+  const [player, setPlayer] = useState<SpeechPlayer | null>(null);
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    const p = new SpeechPlayer();
+    p.onChange = (id) => setPlaying(id !== null);
+    setPlayer(p);
+    return () => p.dispose();
+  }, []);
+
+  const save = useMutation({
+    mutationFn: (v: VoiceChoice) => setMyVoice({ data: { voice: v } }),
+    onMutate: (v) => {
+      // Audio already fetched was spoken in the old voice.
+      clearSpeechCache();
+      qc.setQueryData<typeof user>(["me"], (u) => (u ? { ...u, voice: v } : u));
+    },
+    onSuccess: (r) => void patchUser({ voice: r.voice }),
+    onError: () => {
+      toast.error("Couldn’t save the voice. Try again.");
+      void patchUser({});
+    },
+  });
+
+  const hear = () => {
+    if (!player) return;
+    if (playing) return player.stop();
+    player.unlock();
+    void player
+      .speak(
+        `voice-${voice}`,
+        VOICE_SAMPLE,
+        (text, slowTwi) =>
+          cachedChunk(`voice\u0000${voice}\u0000${text}`, () =>
+            speakText({ data: { text, lang: "tw", slowTwi } }),
+          ),
+        { twi: true },
+      )
+      .catch(() => toast.error("Couldn’t play the voice right now."));
+  };
+
+  return (
+    <Card padding="md">
+      <h3 className="pg-t-h3 mb-1">Ama’s voice</h3>
+      <p className="pg-t-caption mb-4">
+        The voice that reads replies, alerts and pages aloud. The Twi voices come from the
+        stable-twi-tts model on your Pi or computer.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <SegmentedControl
+          ariaLabel="Ama’s voice"
+          value={voice}
+          onChange={(v) => save.mutate(v)}
+          options={[
+            { value: "male", label: "Male" },
+            { value: "female", label: "Female" },
+          ]}
+        />
+        <Button variant="secondary" onClick={hear}>
+          {playing ? "Stop" : "Hear it"}
+        </Button>
+      </div>
+    </Card>
   );
 }
 

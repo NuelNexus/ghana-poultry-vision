@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { VOICES } from "../voice-choice";
 import { z } from "zod";
 import {
   createSession,
@@ -133,6 +134,15 @@ export const setMyLanguage = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await query("update users set language = $1 where id = $2", [data.language, context.user.id]);
     return { ok: true, language: data.language };
+  });
+
+/** Ama's voice (male or female), for this account on every device. */
+export const setMyVoice = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .inputValidator(z.object({ voice: z.enum(VOICES) }))
+  .handler(async ({ data, context }) => {
+    await query("update users set voice = $1 where id = $2", [data.voice, context.user.id]);
+    return { ok: true, voice: data.voice };
   });
 
 export const changePassword = createServerFn({ method: "POST" })

@@ -11,7 +11,11 @@ from commit messages and file lists; they weren't re-tested for this document.
 ### Twi voice back to male, language picker fix, OpenAI only
 - **Twi voice:** the default is the male `twi-6` again (the female `twi-1` was hard to follow).
   `src/lib/twi-tts.server.ts`, `edge/twi_tts.py`, migration `008_male_twi_voice.sql`.
-  `TWI_TTS_VOICE` still overrides it.
+- **Voice choice:** Profile → Language and voice → *Ama's voice*: Male or Female, with a
+  *Hear it* button. Saved on the account (`users.voice`, migration `009_voice_choice.sql`) and used
+  by every voice: stable-twi-tts `twi-6`/`twi-1`, Khaya `male_low`/`female`, OpenAI `ash`/`nova`
+  and the live call `cedar`/`marin`. Checked in a browser against the real voice model: male
+  measured 112 Hz, female 182 Hz, and the choice survives a reload.
 - **Language picker:** a failed translation request is retried with backoff
   (`src/lib/dom-translator.ts`); before, the sign-in page stayed in English after one failure.
 - **Offline AI removed:** Ollama, the NLLB translation service and Griot. Translation is Khaya,
@@ -34,7 +38,7 @@ from commit messages and file lists; they weren't re-tested for this document.
   reading's temperature and humidity, returns the settings, and raises alerts for dirty water,
   overheat cut-outs and rejected settings. Automation gets a coop section (zones, Auto/Manual,
   fan and lamp switches, setpoints in the user's °C/°F, water thresholds, sync status, change log)
-  above the Pi's fan control. Devices can register the coop and show its `config.h` lines.
+  above the Pi's fan control. Devices can register the coop and show the lines for its settings.
 - **Files:** `firmware/coop_unit/*`, `db/migrations/007_coop_marketplace_onboarding.sql`,
   `src/lib/controls.ts`, `src/lib/api/controls.functions.ts`, `src/components/coop-controls.tsx`,
   `src/routes/api/public/devices/ingest.ts`, `src/routes/app.automation.tsx`,

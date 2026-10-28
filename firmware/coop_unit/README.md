@@ -54,9 +54,9 @@ set it to `false`.
 
 1. On the site: **Devices → Add device → Unit 2 · Coop controller (ESP32)**. Copy the three
    `#define` lines it shows.
-2. Copy `config.example.h` to `config.h` (it's gitignored) and paste them in, with your
-   Wi-Fi name and password. `PG_API_URL` must be an address the ESP32 can reach, not
-   `localhost`.
+2. Open `coop_unit.ino` and fill in the **SETTINGS** block at the top: your Wi-Fi name and
+   password, and the three lines from the site. `PG_API_URL` must be an address the ESP32 can
+   reach, not `localhost`. Don't commit the file with your real password and key.
 3. Arduino IDE: install the board package **esp32** (Espressif) and the libraries **DHT sensor
    library** (Adafruit), **LiquidCrystal I2C** and **ArduinoJson** (version 7). Board:
    **ESP32 Dev Module**.

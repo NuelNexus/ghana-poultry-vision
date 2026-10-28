@@ -10,7 +10,7 @@ interface AuthCtx {
   canManage: boolean;
   refresh: () => Promise<void>;
   /** Optimistically patch the signed-in user (e.g. after a name change), then refetch. */
-  patchUser: (patch: Partial<Pick<SessionUser, "full_name">>) => Promise<void>;
+  patchUser: (patch: Partial<Pick<SessionUser, "full_name" | "voice">>) => Promise<void>;
   signOut: () => Promise<void>;
 }
 

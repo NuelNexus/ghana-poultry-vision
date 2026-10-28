@@ -95,8 +95,8 @@ Pages refresh every 10–15 s. Without a Pi, `python edge/agent.py --simulate` s
 
 1. **Devices → Add device → Unit 2 · Coop controller (ESP32)**, pick the house, and copy the
    three `#define` lines it shows.
-2. Put them in `firmware/coop_unit/config.h` (copy `config.example.h`) with your Wi-Fi name and
-   password, and upload `coop_unit.ino` from the Arduino IDE
+2. Put them in the SETTINGS block at the top of `firmware/coop_unit/coop_unit.ino` with your
+   Wi-Fi name and password, and upload `coop_unit.ino` from the Arduino IDE
    ([firmware/coop_unit/README.md](firmware/coop_unit/README.md) has the libraries and wiring).
 3. Run it from **Automation → Coop · unit 2**: each zone (layers, broilers) can be on Auto (the
    coop's own thermostat, with temperatures you set) or Manual (switch the fan and heat lamp

@@ -39,6 +39,10 @@ export function splitForSpeech(text: string, max = 220): string[] {
 
 // Recently fetched sentences, shared by every player (Listen twice = no second request).
 const chunkCache = new Map<string, Promise<SpokenChunk>>();
+/** Forget fetched audio (e.g. after the voice changes). */
+export function clearSpeechCache() {
+  chunkCache.clear();
+}
 export function cachedChunk(key: string, get: () => Promise<SpokenChunk>) {
   let p = chunkCache.get(key);
   if (!p) {

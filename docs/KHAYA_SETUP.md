@@ -47,8 +47,8 @@ list loads only after you sign in.
 8. **Add it to the live site:** in Lovable, open the project's settings, find environment
    variables / secrets, and add `KHAYA_API_KEY` with the same value. Then click **Publish**.
 
-Optional: Khaya has more than one voice. Set `KHAYA_TTS_VOICE` to `female` (the default),
-`male_low` or `male_high`.
+Khaya's voice follows each account's choice in Profile → Language and voice: Male uses
+`male_low`, Female uses `female`.
 
 ## Checking it works
 

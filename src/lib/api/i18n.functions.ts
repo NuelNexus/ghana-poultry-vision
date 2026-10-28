@@ -71,7 +71,8 @@ export const speakText = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    if (!(await getSessionUser())) {
+    const user = await getSessionUser();
+    if (!user) {
       // Visitors: site text and Ama's fresh replies, plus short snippets (a heading
       // built from several pieces), all inside the shared hourly allowance.
       const ok =
@@ -79,7 +80,10 @@ export const speakText = createServerFn({ method: "POST" })
       if (!ok) throw new Error("Sign in to have this read aloud");
       takeAnon("speak", 400);
     }
-    return speakIn(data.text, speechLangFor(data.text, data.lang), { slowTwi: data.slowTwi });
+    return speakIn(data.text, speechLangFor(data.text, data.lang), {
+      slowTwi: data.slowTwi,
+      voice: user?.voice,
+    });
   });
 
 /**
@@ -90,11 +94,14 @@ export const speakText = createServerFn({ method: "POST" })
 export const helloAudio = createServerFn({ method: "POST" })
   .inputValidator(z.object({ lang: langSchema }))
   .handler(async ({ data }) => {
-    if (!(await getSessionUser())) takeAnon("hello", 600);
+    const user = await getSessionUser();
+    if (!user) takeAnon("hello", 600);
     const l = siteLang(data.lang);
     const en = helloIn(l);
     const text = data.lang === "en" ? en : ((await translateTexts(data.lang, [en])).get(en) ?? en);
-    const voice = await speakIn(text, data.lang === "en" ? "auto" : l.speech);
+    const voice = await speakIn(text, data.lang === "en" ? "auto" : l.speech, {
+      voice: user?.voice,
+    });
     return { text, ...voice };
   });
 
