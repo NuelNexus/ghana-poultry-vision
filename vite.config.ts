@@ -12,6 +12,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // On Vercel builds, output for Vercel instead of the default Cloudflare target.
+  ...(process.env.VERCEL ? { nitro: { preset: "vercel" } } : {}),
   vite: {
     // Let phones reach the Pi by name (https://<pi>.local:8443, see scripts/https-proxy.mjs).
     server: { allowedHosts: [".local"] },
