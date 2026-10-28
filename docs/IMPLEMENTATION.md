@@ -42,6 +42,16 @@ Browser (React, TanStack Start) ── server functions (createServerFn) ──�
 work), but the prompt says to talk about readings only when asked about them, about how the
 farm is doing, or for an open critical alert. See `DECISIONS.md` D16 for the test.
 
+### Vaccine reminders (`src/lib/vaccine-schedule.ts`)
+- Each house has a flock type (broiler / layer) and a "Chicks placed on" date. `flockCare` turns
+  them into the schedule day (placement day = Day 1, UTC, which is Ghana time), today's tasks, a
+  vaccine due now and the next vaccine.
+- `describeFarm` adds this as `flock_care` to Ama's farm data, and her system prompt tells her to
+  mention a vaccine due today in her first reply and how to give it (`VACCINE_TIPS`).
+- `getFlockCare` (used by `FlockCareCard` on the Overview and the AI rail) also raises one
+  `vaccine` alert per vaccine (severity warning, so spoken alerts read it) and resolves it after
+  that vaccine's day or week. Ama's own reads don't touch alerts.
+
 ### Listening to replies
 **Listen** (or "read replies aloud" in settings) plays the reply through `SpeechPlayer` and
 `speakReply`, one sentence at a time (section 5).

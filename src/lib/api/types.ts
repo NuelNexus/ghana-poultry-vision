@@ -34,6 +34,8 @@ export interface House {
   bird_count: number | null;
   batch_name: string | null;
   batch_started_at: string | null;
+  /** "broiler" | "layer", or null until the farmer picks one. */
+  flock_type: string | null;
   created_at: string;
 }
 

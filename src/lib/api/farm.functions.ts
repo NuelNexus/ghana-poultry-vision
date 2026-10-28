@@ -3,6 +3,7 @@ import { z } from "zod";
 import { query, queryOne } from "../db.server";
 import { requireManager, requireUser } from "./middleware";
 import { FRESHNESS_MS } from "./types";
+import { flockCare, type FlockCare } from "../vaccine-schedule";
 import type {
   AiMonitor,
   AiSnapshot,
@@ -228,13 +229,14 @@ export const createHouse = createServerFn({ method: "POST" })
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}$/)
         .optional(),
+      flockType: z.enum(["broiler", "layer"]).optional(),
     }),
   )
   .handler(async ({ data, context }) => {
     const farmId = await ensureFarm(data.farmId, context.user.id);
     await query(
-      `insert into poultry_houses (farm_id, name, capacity, bird_count, batch_name, batch_started_at)
-       values ($1, $2, $3, $4, $5, $6)`,
+      `insert into poultry_houses (farm_id, name, capacity, bird_count, batch_name, batch_started_at, flock_type)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
       [
         farmId,
         data.name,
@@ -242,10 +244,90 @@ export const createHouse = createServerFn({ method: "POST" })
         data.birdCount,
         data.batchName || null,
         data.batchStartedAt || null,
+        data.flockType ?? null,
       ],
     );
     return { ok: true };
   });
+
+/** Broilers or layers for a house (picks which vaccination schedule it follows). */
+export const setHouseFlockType = createServerFn({ method: "POST" })
+  .middleware([requireManager])
+  .inputValidator(
+    z.object({
+      houseId: z.string().uuid(),
+      flockType: z.enum(["broiler", "layer"]),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    await ownHouseFarm(data.houseId, context.user.id);
+    await query("update poultry_houses set flock_type = $1 where id = $2", [
+      data.flockType,
+      data.houseId,
+    ]);
+    return { ok: true };
+  });
+
+// Flock care: vaccination schedule ---------------------------------------------
+
+type CareHouse = {
+  id: string;
+  farm_id: string;
+  name: string;
+  flock_type: string | null;
+  batch_started_at: string | null;
+};
+
+/**
+ * Every house the account owns, with today's schedule step and the next vaccine.
+ * `sync` also raises and closes the vaccine-day alerts (the flock care card does;
+ * Ama's prompt only reads).
+ */
+export async function loadFlockCare(userId: string, sync = true): Promise<FlockCare[]> {
+  const houses = await query<CareHouse>(
+    `select id, farm_id, name, flock_type, batch_started_at from poultry_houses
+      where farm_id in ${myFarms("$1")} order by created_at`,
+    [userId],
+  );
+  const care = houses.map((h) => flockCare(h));
+  if (sync) await syncVaccineAlerts(houses, care);
+  return care;
+}
+
+/**
+ * One "vaccine" alert per house for each vaccine on the schedule: raised on the
+ * first day the page or Ama looks, closed once that vaccine's day (or week) is
+ * over. An alert the farmer resolved is not raised again for the same vaccine.
+ * Severity "warning" so spoken alerts read it out.
+ */
+async function syncVaccineAlerts(houses: CareHouse[], care: FlockCare[]) {
+  await Promise.all(
+    houses.map(async (h, i) => {
+      const c = care[i];
+      // Days since this vaccine's window opened (0 when it is a one-day vaccine).
+      const since = c.vaccineToday && c.day != null ? c.day - c.vaccineToday.from : 0;
+      await query(
+        `update alerts set resolved = true
+          where house_id = $1 and type = 'vaccine' and not coalesce(resolved, false)
+            and created_at < current_date - $2::int`,
+        [h.id, since],
+      );
+      if (!c.vaccineToday) return;
+      await query(
+        `insert into alerts (farm_id, house_id, severity, type, message)
+         select $1, $2, 'warning', 'vaccine', $3
+          where not exists (select 1 from alerts
+                             where house_id = $2 and type = 'vaccine'
+                               and created_at >= current_date - $4::int)`,
+        [h.farm_id, h.id, `Vaccine due. ${c.summary}`, since],
+      );
+    }),
+  );
+}
+
+export const getFlockCare = createServerFn({ method: "GET" })
+  .middleware([requireUser])
+  .handler(({ context }) => loadFlockCare(context.user.id));
 
 // Devices -----------------------------------------------------------------
 

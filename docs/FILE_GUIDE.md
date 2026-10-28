@@ -24,6 +24,7 @@ aren't listed individually.
 | `migrations/002_ai_chat_history.sql` | `ai_conversations`, `ai_messages` (Ama's chat history per user, with language and English translation). |
 | `migrations/003_twi_tts.sql` | `tts_jobs` and device columns for the Pi Twi voice relay. |
 | `migrations/004_site_language.sql` | `users.language`, `ui_translations` (cached site translations), default Twi voice `twi-1`. |
+| `migrations/007_flock_type.sql` | `poultry_houses.flock_type` (broiler / layer) for the vaccination schedule. |
 
 Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP driver).
 
@@ -82,6 +83,13 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 | `openai.server.ts` | OpenAI client: chat (GPT-4o-mini / GPT-5 family), transcription, speech, realtime session secrets. Model env vars documented at the top. |
 | `ai-audio.ts` | Browser mic recording (`Recorder`, with auto-stop on silence), WAV conversion. |
 
+**Flock care**
+
+| File | Responsibility |
+|---|---|
+| `vaccine-schedule.ts` | Farmsquare broiler and layer schedules, `flockDay` (Day 1 = arrival), `flockCare` (today's step, vaccine due, next vaccine, one-line summary), `VACCINE_TIPS` for Ama. |
+| `flock-care-query.ts` | The `flock-care` React Query used by the card and Ama's starter questions. |
+
 **Data, auth, theme**
 
 | File | Responsibility |
@@ -107,6 +115,7 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 | `ThemeProvider.tsx` | Applies the console theme under `/app`. |
 | `ExplorerAvatar.tsx`, `FarmScene.tsx` | Ama's 3D avatar and the 3D farm scene. |
 | `ai-status.tsx` | AI health status badges and helpers. |
+| `FlockCareCard.tsx` | "Flock care today": each house's vaccine schedule step, next vaccine, **Hear it**, and broilers/layers buttons for houses without a type. |
 | `ui-kit.tsx` | Shared console UI (cards, buttons, fields, formatters). |
 
 ## `public/`

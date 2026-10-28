@@ -52,6 +52,9 @@ import { speechLangFor, type SiteLang } from "@/lib/site-lang";
 import { AiStatusBadge, isStale } from "@/components/ai-status";
 import type { VoiceSegment } from "@/lib/avatar-actions";
 import { ExplorerAvatar, type ExplorerAvatarHandle } from "@/components/ExplorerAvatar";
+import { FlockCareCard } from "@/components/FlockCareCard";
+import { flockCareQuery } from "@/lib/flock-care-query";
+import type { FlockCare } from "@/lib/vaccine-schedule";
 import {
   Button,
   ErrorState,
@@ -369,6 +372,8 @@ function SensorRail() {
         </ul>
       )}
 
+      <FlockCareCard compact className="border-t border-hairline" />
+
       {alerts.length > 0 && (
         <div className="border-t border-hairline px-4 py-3">
           <div className="flex items-center justify-between gap-2">
@@ -592,9 +597,12 @@ function withBold(text: string) {
 
 type Snapshot = Awaited<ReturnType<typeof getAssistantSensors>>;
 
-/** Starter questions grounded in the latest readings. */
-function suggestions(data: Snapshot | undefined) {
+/** Starter questions grounded in the latest readings and today's vaccine schedule. */
+function suggestions(data: Snapshot | undefined, care?: FlockCare[]) {
   const out: string[] = [];
+  const due = care?.find((c) => c.vaccineToday);
+  if (due) out.push(`How do I give the ${due.vaccineToday!.task} in ${due.house}?`);
+  else if (care?.some((c) => c.next)) out.push("When is the next vaccine for my birds?");
   const r = data?.readings[0];
   if (r) {
     const name = r.house_name ?? r.device_code;
@@ -633,6 +641,7 @@ function TextChat() {
   const { lang: uiLang } = useLanguage();
   const qc = useQueryClient();
   const sensors = useQuery(sensorsQuery);
+  const flockCare = useQuery(flockCareQuery);
   // With a Khaya key, dictation is sent as WAV so Khaya can re-hear it if it's Twi.
   const khaya = Boolean(useQuery(enginesQuery).data?.khaya);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -960,7 +969,7 @@ function TextChat() {
                 including Twi, Ga, Ewe and Hausa. Type, or tap the mic and speak.
               </p>
               <div className="mt-5 flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
-                {suggestions(sensors.data).map((s) => (
+                {suggestions(sensors.data, flockCare.data).map((s) => (
                   <button
                     key={s}
                     type="button"

@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { getDashboard, listHouses } from "@/lib/api/farm.functions";
 import { FarmScene } from "@/components/FarmScene";
+import { FlockCareCard } from "@/components/FlockCareCard";
 import type { AiSnapshot, Alert, House, Reading } from "@/lib/api/types";
 import { AiStatusBadge, AiStatusPanel, STATUS_META, isStale } from "@/components/ai-status";
 import { RelaySwitch, SeverityMark } from "@/components/coop-readout";
@@ -141,6 +142,8 @@ function Overview() {
       ) : (
         <>
           <FlockCondition loading={dash.isPending} ai={ai} now={now} />
+
+          <FlockCareCard />
 
           <KeyMetrics
             loading={dash.isPending}

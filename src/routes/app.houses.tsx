@@ -34,19 +34,19 @@ import {
   type Status,
 } from "@/components/ui-kit";
 import { cn } from "@/lib/utils";
+import { FLOCK_LABEL, FLOCK_TYPES, flockDay, type FlockType } from "@/lib/vaccine-schedule";
 
 export const Route = createFileRoute("/app/houses")({ component: Houses });
 
-const DAY = 86_400_000;
-
 type Row = House & { r: Reading | undefined; live: boolean };
 
-/** Flock age in days from the batch start date, or the edge AI's own estimate. */
+/**
+ * Flock day, counted the way farmers and the vaccine schedule count it: the
+ * day the chicks were placed is Day 1. Falls back to the edge AI's estimate.
+ */
 function flockAge(h: House, r: Reading | undefined) {
-  if (h.batch_started_at) {
-    return Math.max(0, Math.floor((Date.now() - new Date(h.batch_started_at).getTime()) / DAY));
-  }
-  return r?.bird_age_days != null ? Math.round(r.bird_age_days) : null;
+  if (h.batch_started_at) return Math.max(1, flockDay(h.batch_started_at) ?? 1);
+  return r?.bird_age_days != null ? Math.round(r.bird_age_days) + 1 : null;
 }
 
 function occupancyStatus(ratio: number): Status {
@@ -328,6 +328,9 @@ const columns: Column<Row>[] = [
           }
         >
           <span className="pg-mono text-ink">Day {age}</span>
+          {h.flock_type && (
+            <span className="text-ink-3"> · {FLOCK_LABEL[h.flock_type as FlockType]}</span>
+          )}
           {phase && <span className="text-ink-3"> · {phase}</span>}
         </span>
       );
@@ -359,6 +362,7 @@ function AddHouse({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boo
   const [birdCount, setBirdCount] = useState("");
   const [batch, setBatch] = useState("");
   const [batchStart, setBatchStart] = useState("");
+  const [flockType, setFlockType] = useState<FlockType | "">("");
   const [saving, setSaving] = useState(false);
   const [tried, setTried] = useState(false);
 
@@ -387,6 +391,7 @@ function AddHouse({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boo
     setBirdCount("");
     setBatch("");
     setBatchStart("");
+    setFlockType("");
     setTried(false);
   }
 
@@ -404,6 +409,7 @@ function AddHouse({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boo
           birdCount: birds,
           batchName: batch.trim() || undefined,
           batchStartedAt: batchStart || undefined,
+          flockType: flockType || undefined,
         },
       });
     } catch (err) {
@@ -485,6 +491,20 @@ function AddHouse({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boo
             />
           </Field>
         </div>
+        <Field label="Flock type" hint="Picks the vaccination schedule Ama follows.">
+          <Select
+            name="flock-type"
+            value={flockType}
+            onChange={(e) => setFlockType(e.target.value as FlockType | "")}
+          >
+            <option value="">Not set</option>
+            {FLOCK_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {FLOCK_LABEL[t]}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <Field label="Batch name">
           <Input
             name="batch"
@@ -496,7 +516,7 @@ function AddHouse({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boo
         </Field>
         <Field
           label="Chicks placed on"
-          hint="Sets flock age, which drives the edge AI’s temperature targets."
+          hint="Day 1 of the flock. Sets the edge AI’s temperature targets and the vaccine days."
           error={show("date")}
         >
           <Input

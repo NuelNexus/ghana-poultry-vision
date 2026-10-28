@@ -8,6 +8,27 @@ from commit messages and file lists; they weren't re-tested for this document.
 
 ## Unreleased — relay fan, readout redesign, sign-up tiles
 
+### Vaccine reminders: Ama follows the broiler and layer schedules
+- **Problem:** the app knew each flock's age but not what the birds needed that day, so farmers
+  had to track vaccine days on a paper chart.
+- **Change:** houses now have a flock type (broilers or layers, migration 007). The Farmsquare
+  medication and vaccination charts are in `src/lib/vaccine-schedule.ts` (Day 1 = the day the
+  chicks arrive; layer tasks given by week cover that week). A "Flock care today" card on the
+  Overview and in Ama's readings rail shows each house's step, the next vaccine and a **Hear it**
+  button that reads it in the site language. On a vaccine day a "vaccine" alert is raised once
+  (spoken by spoken alerts) and closed when the day or week is over. Ama gets every house's step
+  in her farm data, mentions a vaccine due today in her first reply even to a greeting, and
+  explains how to give it (no chlorine in the water, keep vials cold, injections by a trained
+  person, the vet decides any changes). Houses now count the flock as farmers do (placement day =
+  Day 1), and the Add house form asks for the flock type.
+- **Files:** `src/lib/vaccine-schedule.ts`, `src/lib/flock-care-query.ts`,
+  `src/components/FlockCareCard.tsx`, `src/lib/api/{farm,assistant}.functions.ts`,
+  `src/lib/api/types.ts`, `src/routes/{app.index,app.ai,app.houses}.tsx`,
+  `db/migrations/007_flock_type.sql`.
+- **Checked:** schedule script (broiler day 8 → 1st Gumboro, layer day 7 → 1st Lasota, layer day
+  47 → fowl pox week, next-vaccine countdown, missing type/date messages, no overlapping days);
+  `tsc` and `eslint` on the changed files. Not run against a live database or Ama in this session.
+
 ### Model v4: trained on this farm's sensors, including when they break
 - **Problem:** v3 was trained on clean readings that were always there. On the Pi a pulled
   DHT22 wire became 0 °C (forward-filled), garbage reads went straight in, and unwired gas/light

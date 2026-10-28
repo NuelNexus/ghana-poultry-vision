@@ -16,6 +16,8 @@ import { speakIn } from "../voice.server";
 import { SITE_LANG_IDS, siteLang, speechLangFor, type SiteLang } from "../site-lang";
 import { twiSuggest, twiWordsEnabled } from "../twi-nlp.server";
 import { requireUser } from "./middleware";
+import { loadFlockCare } from "./farm.functions";
+import { FLOCK_LABEL, VACCINE_TIPS, whenText } from "../vaccine-schedule";
 import type { Alert, AiSnapshot } from "./types";
 import { AVATAR_ACTIONS, AVATAR_ACTION_IDS, type VoiceSegment } from "../avatar-actions";
 
@@ -39,7 +41,7 @@ const SNAPSHOT_SQL = `
 type SnapshotRow = AiSnapshot & { bird_count: number | null };
 
 async function loadSnapshot(userId: string) {
-  const [readings, alerts] = await Promise.all([
+  const [readings, alerts, care] = await Promise.all([
     query<SnapshotRow>(SNAPSHOT_SQL, [userId]),
     query<Alert>(
       `select * from alerts
@@ -49,8 +51,9 @@ async function loadSnapshot(userId: string) {
         order by created_at desc limit 10`,
       [userId],
     ),
+    loadFlockCare(userId, false),
   ]);
-  return { readings, alerts };
+  return { readings, alerts, care };
 }
 
 /** The live farm state as compact JSON, for prompts elsewhere (voice commands). */
@@ -89,7 +92,27 @@ function describeFarm(s: Awaited<ReturnType<typeof loadSnapshot>>) {
     message: a.message,
     at: a.created_at,
   }));
-  return JSON.stringify({ now: new Date(now).toISOString(), houses, open_alerts: alerts });
+  // The vaccination schedule step for every house (with or without a Pi).
+  const flock_care = s.care.map((c) => ({
+    house: c.house,
+    flock_type: c.flockType ? FLOCK_LABEL[c.flockType].toLowerCase() : null,
+    chicks_placed_on: c.placedOn,
+    schedule_day: c.day,
+    today: c.today.map((i) => ({ task: i.task, how: i.how, when: whenText(i) })),
+    vaccine_due_now: c.vaccineToday
+      ? { vaccine: c.vaccineToday.task, how: c.vaccineToday.how, when: whenText(c.vaccineToday) }
+      : null,
+    next_vaccine: c.next
+      ? { vaccine: c.next.item.task, how: c.next.item.how, in_days: c.next.inDays }
+      : null,
+    note: c.flockType && c.day != null && c.day >= 1 ? undefined : c.summary,
+  }));
+  return JSON.stringify({
+    now: new Date(now).toISOString(),
+    houses,
+    flock_care,
+    open_alerts: alerts,
+  });
 }
 
 const HARDWARE = `The farm's hardware is exactly this, nothing more:
@@ -133,6 +156,16 @@ about. For greetings, small talk and general questions (feed, vaccines, eggs, di
 just answer that, in any language, without adding readings or status updates.
 
 ${HARDWARE}
+
+VACCINES AND MEDICATION: "flock_care" in the data below gives every house's vaccination schedule
+step (Day 1 = the day the chicks arrived; Farmsquare broiler and layer schedules). Use it whenever
+the farmer asks about vaccines, medicine, vitamins, what to give the birds or what to do today.
+When any house has "vaccine_due_now", say so in your first reply of the conversation, even if
+they only greeted you: which house, which vaccine, how it is given, in one or two sentences, then
+answer what they said. Mention "next_vaccine" when it is 1-2 days away so they can buy it. If a
+house has a "note" (no flock type or placement date), tell them to set it on the Houses page.
+Never move a vaccine to another day yourself. When you explain how to give a vaccine, follow these:
+${VACCINE_TIPS}
 
 Always reply in the same language the farmer used (English, Twi, Ga, Ewe, Hausa, French, or any other).${langLine}
 If they ask you to translate something, translate it.
