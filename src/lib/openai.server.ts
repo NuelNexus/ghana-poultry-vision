@@ -1,5 +1,7 @@
 import process from "node:process";
 import { STT_ISO, STT_PROMPT, isPromptEcho, type SpeechLang } from "./ai-languages";
+import { openAiLimitMessage } from "./openai-errors";
+import { aiProvider, localChat, localLlmEnabled } from "./local-ai.server";
 
 // Thin OpenAI REST client for the AI assistant tab. Server-only: the key in
 // OPENAI_API_KEY never reaches the browser.
@@ -32,6 +34,8 @@ function cfg() {
 
 async function fail(res: Response, what: string): Promise<never> {
   const body = await res.text().catch(() => "");
+  const limit = openAiLimitMessage(res.status, body);
+  if (limit) throw new Error(limit);
   let msg = body;
   try {
     msg = JSON.parse(body).error?.message ?? body;
@@ -46,16 +50,44 @@ export type ChatMessage = { role: "system" | "user" | "assistant"; content: stri
 export const localModel = () => process.env.OPENAI_LOCAL_MODEL || "gpt-5.5";
 export const translateModel = () => process.env.OPENAI_TRANSLATE_MODEL || "gpt-5.5";
 
-export async function chatCompletion(
-  messages: ChatMessage[],
-  opts: {
-    jsonSchema?: { name: string; schema: Record<string, unknown> };
-    maxTokens?: number;
-    /** Another model than OPENAI_CHAT_MODEL, e.g. localModel() for Ghanaian languages. */
-    model?: string;
-    timeoutMs?: number;
-  } = {},
-) {
+type ChatOpts = {
+  jsonSchema?: { name: string; schema: Record<string, unknown> };
+  maxTokens?: number;
+  /** Another OpenAI model than OPENAI_CHAT_MODEL, e.g. localModel() for Ghanaian languages. */
+  model?: string;
+  timeoutMs?: number;
+};
+
+/**
+ * One chat reply. With LOCAL_LLM_URL set, the model on this computer (Ollama)
+ * answers first and OpenAI is the fallback, and the other way round with
+ * AI_PROVIDER=openai. Either one alone works too.
+ */
+export async function chatCompletion(messages: ChatMessage[], opts: ChatOpts = {}) {
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+  const order =
+    aiProvider() === "local"
+      ? [() => localChat(messages, opts), ...(hasOpenAI ? [() => openaiChat(messages, opts)] : [])]
+      : [
+          () => openaiChat(messages, opts),
+          ...(localLlmEnabled() ? [() => localChat(messages, opts)] : []),
+        ];
+  let last: unknown;
+  for (const run of order) {
+    try {
+      return await run();
+    } catch (err) {
+      last = err;
+      console.warn("[ai]", err instanceof Error ? err.message : err);
+    }
+  }
+  throw last;
+}
+
+/** True when OpenAI is the main brain (so its OpenAI-only extras, like the live call, apply). */
+export const openAiFirst = () => aiProvider() === "openai" && Boolean(process.env.OPENAI_API_KEY);
+
+async function openaiChat(messages: ChatMessage[], opts: ChatOpts) {
   const c = cfg();
   const model = opts.model ?? c.chat;
   // GPT-5 family: no temperature, a different token limit, and reasoning switched

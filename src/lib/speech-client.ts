@@ -7,7 +7,7 @@
 // to be synthesised). If the Twi voice is slow or offline for one sentence, the
 // rest of the reply skips it and uses the next voice, so it never stalls twice.
 
-export type SpokenChunk = { audio: string; mimeType: string; engine?: string };
+export type SpokenChunk = { audio: string; mimeType: string; engine?: string; text?: string };
 /** Fetches audio for one sentence. slowTwi: the Twi voice already timed out in this reply. */
 export type FetchChunk = (text: string, slowTwi: boolean) => Promise<SpokenChunk>;
 
@@ -60,6 +60,7 @@ export class SpeechPlayer {
   private seq = 0;
   private url: string | null = null;
   private finish: (() => void) | null = null;
+  private browserVoice = false;
 
   constructor(el?: HTMLAudioElement) {
     this.el = el ?? new Audio();
@@ -84,6 +85,8 @@ export class SpeechPlayer {
   stop() {
     this.seq++;
     if (!this.el.paused) this.el.pause();
+    if (this.browserVoice && typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+    this.browserVoice = false;
     this.finish?.();
     this.finish = null;
     this.set(null);
@@ -141,6 +144,7 @@ export class SpeechPlayer {
   }
 
   private playOne(r: SpokenChunk, my: number) {
+    if (r.engine === "browser") return this.sayInBrowser(r.text ?? "", my);
     if (this.url) URL.revokeObjectURL(this.url);
     const bytes = Uint8Array.from(atob(r.audio), (c) => c.charCodeAt(0));
     this.url = URL.createObjectURL(new Blob([bytes], { type: r.mimeType }));
@@ -160,6 +164,24 @@ export class SpeechPlayer {
         done();
         reject(err);
       });
+    });
+  }
+
+  /** No server voice (offline): the browser's built-in voice reads the sentence. */
+  private sayInBrowser(text: string, my: number) {
+    if (typeof speechSynthesis === "undefined" || !text) return Promise.resolve();
+    this.browserVoice = true;
+    return new Promise<void>((resolve) => {
+      const u = new SpeechSynthesisUtterance(text);
+      const done = () => {
+        if (this.finish === done) this.finish = null;
+        resolve();
+      };
+      u.onend = done;
+      u.onerror = done;
+      this.finish = done;
+      if (my !== this.seq) return resolve();
+      speechSynthesis.speak(u);
     });
   }
 

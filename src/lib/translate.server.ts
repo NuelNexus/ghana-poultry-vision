@@ -1,15 +1,18 @@
+import process from "node:process";
 import { query } from "./db.server";
 import { chatCompletion, translateModel } from "./openai.server";
 import { khayaEnabled, khayaTranslate } from "./khaya.server";
+import { aiProvider, offlineTranslateMany, offlineTranslates } from "./local-ai.server";
 import { siteLang, type SiteLang } from "./site-lang";
 
 // Site text translation. The browser collects every English string on the page
 // and asks for them here in batches. Each string is translated once per language
 // and kept in ui_translations, so after the first visitor a page is instant.
 //
-// Engines:
-//   Twi, Ga, Ewe, Dagbani with KHAYA_API_KEY -> GhanaNLP Khaya (trained on Ghanaian text)
-//   everything else                          -> OpenAI (OPENAI_TRANSLATE_MODEL, default gpt-5.5)
+// Engines, first that works:
+//   Twi, Ewe, Hausa, French with TWI_OFFLINE_URL -> NLLB-200 on this computer (free, offline)
+//   Twi, Ga, Ewe, Dagbani with KHAYA_API_KEY     -> GhanaNLP Khaya (trained on Ghanaian text)
+//   everything else -> the chat model (local Ollama first, or OpenAI OPENAI_TRANSLATE_MODEL)
 // Numbers arrive as placeholders (⟦0⟧, ⟦1⟧ ...), so "3 alerts" and "5 alerts" share one entry.
 
 const GHANAIAN: SiteLang[] = ["tw", "ga", "ee", "dag"];
@@ -81,9 +84,27 @@ async function viaKhaya(lang: SiteLang, texts: string[]) {
   );
 }
 
+async function viaOffline(lang: SiteLang, texts: string[]) {
+  const got = await offlineTranslateMany(texts, "en", lang as never).catch((e) => {
+    console.warn(`[translate] offline ${lang} failed:`, e instanceof Error ? e.message : e);
+    return texts.map(() => "");
+  });
+  return texts.map((src, i) => (got[i] && sameSlots(src, got[i]) ? got[i] : null));
+}
+
 async function translateMissing(lang: SiteLang, texts: string[]) {
   let out: (string | null)[] = texts.map(() => null);
-  if (khayaEnabled() && GHANAIAN.includes(lang)) out = await viaKhaya(lang, texts);
+  const offline = offlineTranslates(lang as never);
+  if (offline) out = await viaOffline(lang, texts);
+  const todo = texts.map((t, i) => (out[i] ? null : t));
+  if (khayaEnabled() && GHANAIAN.includes(lang) && todo.some(Boolean)) {
+    const k = await viaKhaya(
+      lang,
+      todo.filter((t): t is string => t !== null),
+    );
+    let j = 0;
+    out = out.map((t, i) => t ?? (todo[i] !== null ? k[j++] : null));
+  }
   const left = texts.map((t, i) => (out[i] ? null : t)).filter((t): t is string => t !== null);
   if (left.length) {
     const got = new Map<string, string | null>();
@@ -101,7 +122,13 @@ async function translateMissing(lang: SiteLang, texts: string[]) {
     );
     out = out.map((t, i) => t ?? got.get(texts[i]) ?? null);
   }
-  const engine = khayaEnabled() && GHANAIAN.includes(lang) ? "khaya" : translateModel();
+  const engine = offline
+    ? "nllb-200"
+    : khayaEnabled() && GHANAIAN.includes(lang)
+      ? "khaya"
+      : aiProvider() === "local"
+        ? process.env.LOCAL_LLM_MODEL || "gemma3:4b"
+        : translateModel();
   const rows = texts
     .map((src, i) => ({ src, t: out[i] }))
     .filter((r): r is { src: string; t: string } => Boolean(r.t));

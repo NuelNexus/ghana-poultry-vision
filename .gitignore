@@ -42,3 +42,4 @@ edge/outbox.sqlite3
 edge/.venv
 .venv-twi/
 .certs/
+edge/offline-models

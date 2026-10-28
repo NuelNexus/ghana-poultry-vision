@@ -152,6 +152,44 @@ ADS1115's A0 to keep the input under 3.3 V.
 22:10:45 CRITICAL 91% | T=35.9°C RH=72% gas=3.6 light=30 | fan=on | Heat stress, Humidity too high
 ```
 
+## Ama offline, for free (optional)
+
+Ama can run entirely on the farm's own computer, with no OpenAI account:
+
+| Job | Runs on this computer | Size on disk |
+|-|-|-|
+| Think | [Ollama](https://ollama.com) with Google's Gemma 3 (`gemma3:4b`) | 3.4 GB |
+| Translate Twi, Ewe, Hausa, French ⇄ English | Meta's NLLB-200 (600M, int8) in `twi_offline.py` | ~0.7 GB |
+| Hear Twi and Ghanaian English | GhanaNLP's Griot-Nano-1 in `twi_offline.py` | ~0.5 GB |
+| Speak Twi | the Pi's stable-twi-tts voice (below) | on the Pi |
+| Speak English | the browser's own voice | none |
+
+Ama thinks in English and the translator turns her answer into Twi: a small
+offline model writes poor Twi itself, but NLLB was trained on it. Setup needs
+about 8 GB free while it runs (the NLLB download is 2.5 GB before conversion;
+`--clean-cache` removes it afterwards).
+
+```bash
+winget install Ollama.Ollama
+ollama pull gemma3:4b
+python edge/twi_offline.py setup --clean-cache
+python edge/twi_offline.py serve        # keep running (port 5004)
+```
+
+Then in the app's `.env`:
+
+```
+LOCAL_LLM_URL=http://127.0.0.1:11434
+LOCAL_LLM_MODEL=gemma3:4b
+TWI_OFFLINE_URL=http://127.0.0.1:5004
+```
+
+With `LOCAL_LLM_URL` set, Ama answers with Gemma first; `OPENAI_API_KEY`, if
+present, is only the fallback (`AI_PROVIDER=openai` swaps the order). The live
+voice call needs OpenAI, so offline the AI page shows the chat mic instead: tap
+it, speak Twi, and Ama answers out loud. On a laptop CPU a reply takes about
+10–15 seconds. NLLB and Griot are licensed for non-commercial use only.
+
 ## Twi voice for Ama (optional)
 
 The same Pi can give Ama, the app's AI assistant, a native Twi voice with GhanaNLP's
