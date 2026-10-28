@@ -199,3 +199,21 @@ text, Ama's replies from the last 10 minutes, and short snippets (≤200 charact
   up once their local cache is cleared or the string changes.
 - **Change when Ama mentions readings:** edit the "WHEN TO MENTION READINGS" block in
   `systemPrompt`.
+
+## 11. Coop unit, marketplace, tour and video guides (Oct 2026)
+
+- **Coop unit (unit 2):** `firmware/coop_unit/README.md` covers the sketch, wiring, safety rules
+  and the request/response format. On the site, `src/lib/controls.ts` defines the settings and
+  their validation; `src/lib/api/controls.functions.ts` stores them per coop (`device_controls`,
+  versioned, each change in `control_log`); the ingest endpoint returns them as
+  `config.controls` and marks a version applied when the coop reports it
+  (`config_version`). Why polling with versions: DECISIONS D18.
+- **Marketplace:** `src/lib/api/market.functions.ts`; photos are `listing_images.data`
+  (`bytea`) served by `/api/public/market/images/<id>` to signed-in users. Shared across
+  accounts on purpose (D17).
+- **First-login tour:** `src/components/onboarding-tour.tsx`, steps in `src/lib/guides.ts`.
+  Runs when `users.onboarded_at` is null; `completeOnboarding` sets it. Targets are sidebar
+  links (`data-tour="<path>"`) and `.pg-dock`. Translated by the page translator (D19).
+- **Video guides:** `videos/README.md`; content in `videos/guides.mjs`, rendered files in
+  `public/guides/` (D20).
+

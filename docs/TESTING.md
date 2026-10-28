@@ -74,6 +74,33 @@ purpose) and two desktop Profile items that are also cut off in English were lef
 
 Sign-in / sign-up / sign-up form on a phone in Twi, Ga, Dagbani and French: all fit.
 
+### T6. Coop unit controls (local Postgres, coop emulator, Pi simulator)
+- Registered `COOP-1` (unit 2) and `PI-BROODER-1` (unit 1) on one account; the coop came online
+  and confirmed settings v1 on its first check-in.
+- From Automation: Layers → Manual (v2), Layers fan on (v3), Broilers "fan on above" 24 → 26 °C
+  (v4). Each showed "Sending settings vN…" then "Running settings vN · applied just now · by Ama
+  Mensah"; the emulator's log showed the fan on and the new setpoint. Change log: "Layers: manual,
+  fan off, lamp off", "Layers: fan on", "Broilers: fan on above 24 → 26 °C".
+- "Fan off at" 30 °C (above "fan on above") was refused before sending, with the rule shown.
+- The emulator's water drifting below 2.5 V raised "drinking water is dirty"; recovery closed it.
+- A second account sees no coop on its Automation page.
+- **Not tested:** the sketch on a real ESP32 (it was not compiled; no Arduino toolchain here).
+
+### T7. Marketplace (two accounts in the browser)
+- Empty marketplace shows "No listings yet". Seller posts a listing with a 2400×1800 photo:
+  stored as a 1280-px JPEG of 52 KB. The buyer (another account) finds it, the WhatsApp link is
+  `wa.me/233241234567`, a message with quantity and phone reaches the seller (tab shows
+  "Messages (1 new)"). Mark as sold → gone from Browse. Photo URL without a session → 401.
+
+### T8. First-login tour
+- New account → tour opens; all 12 steps step through, 11 highlighted (the first is a centred
+  welcome); after "Start farming" and a reload it doesn't return. A second account skipped it.
+
+### T9. Video guides
+- `hyperframes check` passes on each generated project (lint, runtime, layout); remaining
+  notes: no audio (by choice, D20) and two connector notes across scenes (false positives).
+- Frames reviewed from rendered files, including Twi captions (ɛ, ɔ, ã render in Inter).
+
 ### Earlier results (same session, before these fixes)
 
 | Test | Result |
@@ -92,6 +119,10 @@ Sign-in / sign-up / sign-up form on a phone in Twi, Ga, Dagbani and French: all 
 | Lint on changed files | 0 errors; 2 warnings of a kind the project already has (react-refresh) |
 
 ## Known issues and limits
+- **The coop firmware hasn't been compiled or run on an ESP32.** Compile it once in the Arduino
+  IDE (`firmware/coop_unit/README.md`) before installing it.
+- **Twi captions in the video guides haven't been reviewed by a native speaker**, and the videos
+  are silent.
 - **Ga and Dagbani translations are unverified.** Some Ga strings came back as Twi (for example
   "Kasa" for Speak). Fix: a Khaya key (`KHAYA_SETUP.md`), or correct rows in `ui_translations`.
 - **The Twi voice needs `npm run twi` on the PC or the Pi service.** Without it, Twi is spoken by

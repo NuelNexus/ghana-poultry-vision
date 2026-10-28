@@ -1,11 +1,12 @@
 # PoultryGrid AI
 
-Smart poultry farm management for Ghana: live house monitoring, a Raspberry Pi
-edge-AI unit that classifies coop conditions and runs the ventilation fan,
-hatchery, alerts, energy and biogas tracking.
+Smart poultry farm management for Ghana: live house monitoring, two hardware units you run
+from your phone, a marketplace for selling produce, hatchery and alerts, in 7 languages.
 
 - **Web app**: TanStack Start (React) with a [Neon](https://neon.tech) Postgres database
-- **Edge AI**: [`edge/`](edge/README.md), the Raspberry Pi agent and model (rebuilt from AI_For_Poultry)
+- **Unit 1, incubator & brooder**: [`edge/`](edge/README.md), the Raspberry Pi agent and AI model (rebuilt from AI_For_Poultry)
+- **Unit 2, coop**: [`firmware/coop_unit/`](firmware/coop_unit/README.md), the ESP32 controller for the layers and broilers zones
+- **Video guides**: [`videos/`](videos/README.md), six guides in English and Twi made with HyperFrames
 
 Full documentation (changelog, how things work, decisions, tests, file guide, Khaya key setup)
 is in [`docs/`](docs/README.md).
@@ -86,9 +87,41 @@ The Pi posts a reading and its prediction every 30 s. The app shows:
 - **AI Health**: per-house status history, temperature against the age target, time in each state, status changes
 - **Houses**: status badge and causes per house
 - **Alerts**: warning and critical alerts are raised automatically and close when conditions recover
-- **Devices**: online state, house assignment, and a fan override (AI auto / force low / medium / high)
+- **Devices**: online state, house assignment, and a fan override (AI auto / force on / force off)
 
 Pages refresh every 10–15 s. Without a Pi, `python edge/agent.py --simulate` streams a simulated coop.
+
+## Connect the coop (unit 2)
+
+1. **Devices → Add device → Unit 2 · Coop controller (ESP32)**, pick the house, and copy the
+   three `#define` lines it shows.
+2. Put them in `firmware/coop_unit/config.h` (copy `config.example.h`) with your Wi-Fi name and
+   password, and upload `coop_unit.ino` from the Arduino IDE
+   ([firmware/coop_unit/README.md](firmware/coop_unit/README.md) has the libraries and wiring).
+3. Run it from **Automation → Coop · unit 2**: each zone (layers, broilers) can be on Auto (the
+   coop's own thermostat, with temperatures you set) or Manual (switch the fan and heat lamp
+   yourself). Changes reach the coop within about 10 s and the page shows when it has applied
+   them. Dirty drinking water and overheat cut-outs show up in Alerts.
+
+Without the ESP32, `python firmware/coop_unit/emulator.py --url <site> --device <id> --key <key>`
+runs the same control logic against the site.
+
+## Marketplace
+
+**Marketplace** (`/app/market`) is shared by every account: farmers list eggs, birds, chicks,
+manure, feed or equipment with a price, quantity, region and up to 4 photos; buyers call,
+WhatsApp or message the seller from the listing, and both sides see their messages under
+Messages. Sellers can edit, pause, mark sold or delete. There's no seeded data.
+
+## Welcome tour and guides
+
+New accounts get a short tour of every tab right after signing up (in their language, like the
+rest of the site). **Guides** (`/app/guides`) has six videos in English and Twi, on the site,
+both units, the coop controls, alerts and the marketplace, and can replay the tour. The videos
+are rebuilt with `node videos/build.mjs` ([videos/README.md](videos/README.md)).
+
+After pulling this version, run `npm run db:migrate` once (migration 007 adds the coop controls,
+marketplace and tour tables).
 
 ## How the Raspberry Pi edge AI works
 
@@ -231,4 +264,8 @@ The body is a single reading or `{"readings": [...]}` (up to 200). Fields includ
 `recorded_at`, and the optional edge-AI result under `ai`
 (`status`, `confidence`, `probabilities`, `causes`, `fan_level`, `growth_phase`, `target_temp`, `model_version`).
 The response returns `config.bird_age_days` (from the house's batch date) and `config.fan_override` (`"on"`, `"off"` or null).
-ESP32 nodes can post plain sensor readings to the same endpoint.
+
+The coop unit posts `unit: "coop"`, `zones` (per zone: `temp`, `humidity`, `fan`, `lamp`, `mode`,
+`sensor_ok`, `safety_tripped`), `water` (`voltage`, `good`, `sensor_ok`) and the `config_version`
+it runs; its response also carries `config.controls`, the versioned settings it should apply.
+Details in [firmware/coop_unit/README.md](firmware/coop_unit/README.md).

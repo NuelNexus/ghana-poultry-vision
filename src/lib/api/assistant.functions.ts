@@ -17,6 +17,7 @@ import { SITE_LANG_IDS, siteLang, speechLangFor, type SiteLang } from "../site-l
 import { twiSuggest, twiWordsEnabled } from "../twi-nlp.server";
 import { requireUser } from "./middleware";
 import type { Alert, AiSnapshot } from "./types";
+import type { CoopZoneState } from "../controls";
 import { AVATAR_ACTIONS, AVATAR_ACTION_IDS, type VoiceSegment } from "../avatar-actions";
 
 // AI assistant tab: live sensor snapshot, text chat, and speech-to-speech.
@@ -27,7 +28,7 @@ import { AVATAR_ACTIONS, AVATAR_ACTION_IDS, type VoiceSegment } from "../avatar-
 const SNAPSHOT_SQL = `
   select * from (
     select distinct on (r.device_id) r.*, d.device_id as device_code, d.last_seen, h.name as house_name,
-           h.bird_count
+           h.bird_count, d.unit
       from sensor_readings r
       join devices d on d.id = r.device_id
       left join poultry_houses h on h.id = r.house_id
@@ -36,7 +37,13 @@ const SNAPSHOT_SQL = `
   ) latest
   order by created_at desc`;
 
-type SnapshotRow = AiSnapshot & { bird_count: number | null };
+type SnapshotRow = AiSnapshot & {
+  bird_count: number | null;
+  unit: "brooder" | "coop" | null;
+  /** Coop unit only (firmware/coop_unit). */
+  zones?: Record<string, CoopZoneState> | null;
+  water_ok?: boolean | null;
+};
 
 async function loadSnapshot(userId: string) {
   const [readings, alerts] = await Promise.all([
@@ -63,12 +70,19 @@ export const getAssistantSensors = createServerFn({ method: "GET" })
   .handler(({ context }) => loadSnapshot(context.user.id));
 
 // Compact text version of the farm state for the model's system prompt. Only
-// fields the Raspberry Pi really sends are included (see edge/agent.py).
+// fields the units really send are included (edge/agent.py, firmware/coop_unit).
 function describeFarm(s: Awaited<ReturnType<typeof loadSnapshot>>) {
   const now = Date.now();
   const houses = s.readings.map((r) => ({
     house: r.house_name ?? r.device_code,
     device: r.device_code,
+    unit: r.unit === "coop" ? "coop unit (ESP32)" : "incubator & brooder (Raspberry Pi)",
+    ...(r.unit === "coop"
+      ? {
+          zones: r.zones,
+          drinking_water: r.water_ok == null ? null : r.water_ok ? "clean" : "dirty",
+        }
+      : {}),
     birds: r.bird_count,
     reading_at: r.created_at,
     reading_age_min: Math.round((now - new Date(r.created_at).getTime()) / 60_000),
@@ -103,8 +117,18 @@ const HARDWARE = `The farm's hardware is exactly this, nothing more:
     itself unless a manager forces it on or off in the app.
   - An on-device AI model that gives status (healthy/warning/critical), likely causes with advice,
     the flock's growth phase and the target temperature for the flock's age.
+- Optionally a coop unit (unit 2): an ESP32 reporting about every 10 s, with two zones, "layers"
+  and "broilers". Each zone has a temperature sensor (DHT22 / DHT11, also humidity), a fan relay
+  and a heat lamp relay (each only on or off). A zone is either on Auto (the coop's own thermostat:
+  fan on above one temperature, lamp on below another) or Manual (the farmer switches fan and lamp
+  on the Automation page). The lamp is cut off automatically if a zone overheats or its sensor
+  fails ("safety_tripped"). A turbidity sensor in the drinker says whether the drinking water is
+  clean or dirty; it does not measure the water level. Its readings appear as "zones" and
+  "drinking_water" below.
 - One ESP32-CAM camera that the farmer can watch live in the Cameras page. You cannot see its images.
-There are NO water-level, feed-level, drinker, feeder, lighting-control, power, solar, battery,
+The app also has a Marketplace where farmers sell eggs, birds, chicks, manure, feed and equipment
+to each other and message buyers; you can't see listings, but you can explain how to use it.
+There are NO water-level, feed-level, feeder, power, solar, battery,
 biogas, weight or ammonia-ppm sensors. If asked about those, say the farm has no sensor for it and
 give practical advice on checking it by hand. Never invent or estimate a reading. When you do talk
 about a reading and it is null, or reading_age_min is large (over ~5 minutes), say the data is

@@ -6,6 +6,80 @@ from commit messages and file lists; they weren't re-tested for this document.
 
 ---
 
+## Unreleased — coop unit, marketplace, first-login tour, video guides
+
+### Unit 2, the coop, run from the site
+- **Request:** rework the ESP32 coop sketch (two zones with a DHT sensor, fan relay and lamp relay
+  each, a water turbidity sensor and an LCD) so the coop can be controlled from the site.
+- **Change:** `firmware/coop_unit/coop_unit.ino` joins Wi-Fi and reports every 10 s to
+  `/api/public/devices/ingest`. The response carries the coop's settings: per zone Auto/Manual,
+  fan and lamp on/off, the four thermostat temperatures, and the water thresholds. Each change on
+  the site is a new version; the coop saves it in flash, applies it at once and reports the
+  version back, so the page shows when it has landed. Pins, relay logic and the thermostat with
+  its hysteresis are as before. New safety: the lamp is cut off if a zone runs 6 °C over its
+  fan temperature (or over 40 °C) or its sensor fails, even in Manual; bad settings are refused;
+  with no Wi-Fi the coop keeps its last settings. The LCD gains a connection screen.
+  `emulator.py` runs the same logic in Python against the site.
+- **Site:** migration `007` adds `devices.unit` (brooder / coop), coop reading columns,
+  `device_controls` and `control_log`. Ingest stores zones and water, averages the zones into the
+  reading's temperature and humidity, returns the settings, and raises alerts for dirty water,
+  overheat cut-outs and rejected settings. Automation gets a coop section (zones, Auto/Manual,
+  fan and lamp switches, setpoints in the user's °C/°F, water thresholds, sync status, change log)
+  above the Pi's fan control. Devices can register the coop and show its `config.h` lines.
+- **Files:** `firmware/coop_unit/*`, `db/migrations/007_coop_marketplace_onboarding.sql`,
+  `src/lib/controls.ts`, `src/lib/api/controls.functions.ts`, `src/components/coop-controls.tsx`,
+  `src/routes/api/public/devices/ingest.ts`, `src/routes/app.automation.tsx`,
+  `src/routes/app.devices.tsx`, `src/lib/api/farm.functions.ts`.
+- **Checked:** local Postgres with the coop emulator and the Pi simulator: settings v1 → v4 sent
+  from the page and applied by the coop within one check-in, the change log, an invalid setpoint
+  refused, a second account can't see the coop. **The sketch has not been compiled or run on an
+  ESP32** (no Arduino toolchain was available); compile it once before installing.
+
+### Ama knows the coop unit
+- **Change:** her hardware notes describe unit 2 (two zones, fan and heat lamp relays, Auto /
+  Manual, the safety cut-out, the drinker's turbidity sensor) and the marketplace, and her farm
+  summary includes each coop's zones and whether the drinking water is clean. "Drinker" and
+  "lighting control" were removed from the list of sensors the farm doesn't have.
+- **Files:** `src/lib/api/assistant.functions.ts`.
+- **Checked:** `tsc`. Not tried against the live model (no OpenAI key here).
+
+### Marketplace
+- **Request:** let users sell their poultry produce, with real user data only.
+- **Change:** a marketplace shared by every account (`/app/market`): listings with up to 4
+  photos (shrunk to 1280 px in the browser, stored in Neon), search, category and region filters,
+  call / WhatsApp / message the seller, a Messages tab for both sides, mark sold or pause, edit,
+  delete. Nothing is seeded: an empty marketplace says "No listings yet". Seller-written text
+  carries `translate="no"`. Ama's voice navigation knows the page.
+- **Files:** `src/lib/api/market.functions.ts`, `src/lib/market.ts`,
+  `src/routes/app.market.index.tsx`, `src/routes/app.market.$listingId.tsx`,
+  `src/components/market/listing-form.tsx`, `src/routes/api/public/market/images/$imageId.ts`,
+  `src/components/Sidebar.tsx`, `src/lib/api/i18n.functions.ts`.
+- **Checked:** two accounts in the browser: list with a photo (2400 → 1280 px, 270 → 52 KB), the
+  buyer finds it, the WhatsApp link uses +233, the message reaches the seller with a "new" count,
+  sold listings leave Browse, photos refuse signed-out requests (401).
+
+### First-login tour and Guides
+- **Change:** a new account sees a tour once after signing up: each sidebar link and the voice
+  help dock highlighted with a line about it (12 steps, centred cards on phones, Esc / arrow
+  keys). It's English in the code and translated by the site translator like any page.
+  `users.onboarded_at` records that it was seen; existing accounts are marked as seen.
+  `/app/guides` lists the video guides and replays the tour.
+- **Files:** `src/components/onboarding-tour.tsx`, `src/lib/guides.ts`, `src/routes/app.guides.tsx`,
+  `src/routes/app.tsx`, `src/lib/auth.server.ts`, `src/lib/api/auth.functions.ts`.
+- **Checked:** sign-up → tour → 12 steps with highlights → not shown again after reload; Skip on a
+  second account.
+
+### Video guides in English and Twi
+- **Change:** six guides (welcome, the incubator & brooder unit, the coop unit, running the coop,
+  flock health and alerts, the marketplace), each in English and Twi, made with HyperFrames from
+  real screenshots of the app and drawn diagrams of the two units, with the coop's LCD screens
+  copied from the firmware. Captions are baked in. `node videos/build.mjs` rebuilds them.
+- **Files:** `videos/*`, `public/guides/*`.
+- **Checked:** `hyperframes check` passes on each project; frames reviewed, including Twi letters
+  (ɛ, ɔ). Silent (no music source available). Twi captions need a native speaker's review.
+
+---
+
 ## Unreleased — relay fan, readout redesign, sign-up tiles
 
 ### Model v4: trained on this farm's sensors, including when they break

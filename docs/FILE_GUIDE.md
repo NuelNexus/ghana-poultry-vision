@@ -14,6 +14,8 @@ aren't listed individually.
 | `.env` (not in git) | Secrets and settings: `DATABASE_URL`, `OPENAI_API_KEY`, optional `KHAYA_API_KEY`, `TWI_TTS_URL`, `TWI_NLP_URL`, model overrides. |
 | `vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `components.json` | Build, TypeScript, lint and shadcn config (Lovable / TanStack Start template). |
 | `.venv-twi/` (not in git) | Local Python environment for the Twi voice and DistilABENA word helper (`npm run twi`). |
+| `firmware/coop_unit/` | Unit 2, the ESP32 coop controller: `coop_unit.ino`, `config.example.h` (copy to the gitignored `config.h`), `root_ca.h`, `emulator.py` (the same logic in Python, to try the site without the ESP32), README with wiring and the protocol. |
+| `videos/` | The six guide videos in English and Twi, built with HyperFrames: `guides.mjs` (what they say), `build.mjs` (generator + render), `shots/` (screenshots + `rects.json`). See `videos/README.md`. |
 | `promo/`, `*.glb`, `*.mp4`, `*.gif` at root | Source media (3D models, the life-cycle video, promo ad). Copies the site uses live in `public/`. |
 
 ## `db/` — database (Neon Postgres)
@@ -24,6 +26,9 @@ aren't listed individually.
 | `migrations/002_ai_chat_history.sql` | `ai_conversations`, `ai_messages` (Ama's chat history per user, with language and English translation). |
 | `migrations/003_twi_tts.sql` | `tts_jobs` and device columns for the Pi Twi voice relay. |
 | `migrations/004_site_language.sql` | `users.language`, `ui_translations` (cached site translations), default Twi voice `twi-1`. |
+| `migrations/005_fan_relay.sql` | `sensor_readings.fan_on`; fan overrides become on / off. |
+| `migrations/006_account_ownership.sql` | `owner_id` on devices and cameras: each account is its own farm. |
+| `migrations/007_coop_marketplace_onboarding.sql` | `devices.unit` (brooder / coop), coop reading columns (`zones`, `water_turbidity_v`, `water_ok`, `config_version`), `device_controls` and `control_log` (the coop's remote settings), `listings`, `listing_images`, `inquiries` (marketplace), `users.onboarded_at` (first-login tour). |
 
 Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP driver).
 
@@ -59,9 +64,12 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 | `app.tsx` | Console shell (sidebar, top bar, theme) for everything under `/app`. |
 | `app.index.tsx` | Overview dashboard. |
 | `app.houses.tsx`, `app.health.tsx`, `app.cameras.tsx`, `app.alerts.tsx`, `app.automation.tsx`, `app.hatchery.tsx`, `app.devices.tsx`, `app.reports.tsx` | The console pages. |
+| `app.market.index.tsx`, `app.market.$listingId.tsx` | Marketplace: browse / my listings / messages, and one listing (photos, call, WhatsApp, message the seller, seller tools). |
+| `app.guides.tsx` | Guides: the six videos in English or Twi, and "Replay the welcome tour". |
 | `app.ai.tsx` | Ama: text chat (history, dictation, Listen, Twi word chips) and live voice call (OpenAI Realtime with Twi routing). |
 | `app.profile.tsx` | Account, **Language and voice**, security, appearance, accessibility, preferences, farm info. |
-| `api/public/devices/ingest.ts` | Pi readings in; alerts raised/resolved; flock age and fan override back. |
+| `api/public/devices/ingest.ts` | Readings in from both units; alerts raised/resolved (AI status, dirty water, overheat cut-outs, rejected settings); flock age and fan override back to the Pi, versioned `controls` back to the coop. |
+| `api/public/market/images/$imageId.ts` | Listing photos from Neon, for signed-in users. |
 | `api/public/devices/tts.ts` | Pi Twi-voice worker: long-poll for jobs, upload audio. |
 
 ## `src/lib/` — shared logic
@@ -89,7 +97,12 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 | `api/assistant.functions.ts` | Ama's server functions: chat, transcription, speech, Twi turns, voice sessions, chat history. Holds her system prompt (`systemPrompt`) and the hardware description. |
 | `api/i18n.functions.ts` | `translateUi`, `speakText`, `helloAudio`, `dictate`, `explainPage`, `voiceCommand`, with hourly limits for signed-out visitors. |
 | `api/auth.functions.ts` | Sign in/up (with language), profile, password, sessions, `setMyLanguage`. |
-| `api/farm.functions.ts` | Farms, houses, devices, readings, alerts, hatchery, cameras. |
+| `api/farm.functions.ts` | Farms, houses, devices (Pi and coop), readings, alerts, hatchery, cameras. |
+| `api/controls.functions.ts` | The coop's remote settings: `listCoops`, `updateCoopControls` (owner only; logs each change). |
+| `api/market.functions.ts` | Marketplace: listings with photos, search and filters, messages between buyers and sellers. |
+| `controls.ts` | Coop settings schema, defaults and validation, shared by the site and mirrored in the firmware. |
+| `market.ts` | Categories, units, Ghana's 16 regions, WhatsApp number and cedi formatting. |
+| `guides.ts` | First-login tour steps and the video guide list. |
 | `api/middleware.ts` | `requireUser`, `requireManager`. |
 | `auth.server.ts`, `auth.tsx` | Password hashing, session cookies, `getSessionUser` (includes `language`); React auth context. |
 | `db.server.ts` | Neon `query` / `queryOne`. |
@@ -107,6 +120,9 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 | `ThemeProvider.tsx` | Applies the console theme under `/app`. |
 | `ExplorerAvatar.tsx`, `FarmScene.tsx` | Ama's 3D avatar and the 3D farm scene. |
 | `ai-status.tsx` | AI health status badges and helpers. |
+| `coop-controls.tsx` | The coop section of Automation: zones, Auto/Manual, fan and lamp switches, setpoints, water, sync status, change log. |
+| `onboarding-tour.tsx` | First-login tour (`TourProvider`, `useTour`): highlights each sidebar link and the voice dock. |
+| `market/listing-form.tsx` | Sell / edit a listing, with photos shrunk in the browser before upload. |
 | `ui-kit.tsx` | Shared console UI (cards, buttons, fields, formatters). |
 
 ## `public/`
@@ -115,4 +131,5 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 |---|---|
 | `auth-bg.svg` | Sign-in/sign-up background, drawn locally (replaced a remote image that now returns 403). |
 | `hatch/` | Landing page frame sequence (egg to chicken). |
+| `guides/` | Rendered guide videos `<slug>-<lang>.mp4` and posters (from `videos/build.mjs`). |
 | `ai/` | Ama's 3D model, animations, coop and grass models, still/animated blob. |

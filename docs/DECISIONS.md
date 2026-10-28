@@ -6,6 +6,70 @@ be verified, it says so.
 
 ---
 
+## D20. Video guides: HyperFrames, captions baked in, two languages (Oct 2026)
+
+**Request:** tutorials for the site and both units, in Twi and English, made with HyperFrames.
+
+**Choices:**
+- **Real screenshots, not mock-ups.** The app was run locally with the coop emulator and the Pi
+  simulator reporting, and each screen was captured at 1920×1080 with the bounding boxes of the
+  elements the guides point at (`videos/shots/rects.json`), so every highlight lands on the real
+  button. The units have no photos, so they're drawn; the coop's LCD screens are copied
+  character for character from the firmware.
+- **One content file, generated projects.** `videos/guides.mjs` holds every line in both
+  languages; `videos/build.mjs` writes a HyperFrames project per guide and language and renders
+  it. Changing a caption means editing one line and re-rendering one video.
+- **Captions baked in, two files per guide.** HyperFrames renders a fixed MP4; there's no
+  subtitle track to switch. Twi accounts get the Twi videos, other languages English for now.
+- **Silent.** The skill adds music to explainers, but the only offline sound was a 5.5 s
+  cinematic whoosh and there was no HeyGen sign-in for music or voice. A voiceover in Twi needs
+  a Twi voice (stable-twi-tts is in the repo) and can be added later.
+- **GSAP vendored from npm** (`videos/vendor/`): the render sandbox blocked jsDelivr, and a
+  local copy also keeps renders reproducible.
+
+**Not verified:** the Twi captions were written for these videos without a native speaker's
+review.
+
+## D19. First-login tour translated by the site translator (Oct 2026)
+
+**Need:** an introduction for new accounts that shows every tab, in their language.
+
+**Options:** hand-written copy per language (7 languages, would drift), or **English copy that
+the page translator renders** like everything else (D12). **Chosen:** the second; the tour is
+ordinary DOM text, so the translator and Tap-to-hear handle it with no extra work. It highlights
+real sidebar links (`data-tour="<path>"`) rather than screenshots, so it can't go stale.
+Existing accounts are marked as onboarded in migration 007 so only new sign-ups see it.
+
+## D18. The coop takes its settings by polling, with versions (Oct 2026)
+
+**Need:** switch the coop's fans and lamps and change its temperatures from the site.
+
+**Options:**
+1. Push (MQTT or WebSockets to the ESP32). Needs a broker or a long-lived connection; the app
+   runs on serverless hosting where neither is available.
+2. A separate command queue the ESP32 polls. Commands can be lost or replayed out of order.
+3. **Desired state with a version, returned on every check-in. Chosen.** The site stores the
+   whole settings object; each change bumps the version. The coop applies a version once, saves
+   it in flash, and reports the version it runs, which is how the page knows it landed.
+
+**Why:** the coop already checks in every 10 s, so the latency is at most 10 s with no extra
+requests; a missed response just means the next one carries the same state; an offline coop
+keeps running its last settings. Validation lives in both places (`src/lib/controls.ts`, the
+firmware) so a bad value can't reach the relays. Safety limits (overheat cut-out, sensor
+failure) live only in the firmware so the site can't turn them off.
+
+## D17. One marketplace for every account; seller text left untranslated (Oct 2026)
+
+**Context:** since migration 006 every account is its own farm and sees only its own data.
+
+**Choice:** the marketplace is the exception: listings are visible to every signed-in account,
+because the point is farmers trading with each other. The owner still asked that nothing be
+seeded, so an empty marketplace says so. Photos are stored in Neon (`bytea`, ≤ 800 KB, shrunk to
+1280 px in the browser) because the app has no file storage; at ~50–150 KB a photo that's fine for
+now. Titles, descriptions and messages carry `translate="no"`: machine-translating free text
+would garble product names and prices, and every listing would add rows to `ui_translations`
+forever.
+
 ## D16. Ama only mentions readings when they're relevant (Oct 2026)
 
 **Problem:** Ama kept bringing up temperature and farm status, even when the farmer just said
