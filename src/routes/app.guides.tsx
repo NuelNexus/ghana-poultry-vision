@@ -64,7 +64,7 @@ function Guides() {
                   />
                   <PlayCircle
                     aria-hidden
-                    className="absolute inset-0 m-auto size-14 text-white drop-shadow-lg transition-transform group-hover:scale-110"
+                    className="absolute right-4 bottom-4 size-12 text-white drop-shadow-lg transition-transform group-hover:scale-110"
                     strokeWidth={1.5}
                   />
                 </button>
