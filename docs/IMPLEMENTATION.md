@@ -118,7 +118,7 @@ text fits the layout" for the CSS rules and the scan that checks every page.
 ### Engine order (`src/lib/voice.server.ts`, `speakIn`)
 | Language | 1st | 2nd | 3rd |
 |---|---|---|---|
-| Twi | stable-twi-tts `twi-1` (Pi relay or `TWI_TTS_URL`) | Khaya (key) | OpenAI `gpt-4o-mini-tts` "nova" |
+| Twi | stable-twi-tts `twi-6` (Pi relay or `TWI_TTS_URL`) | Khaya (key) | OpenAI `gpt-4o-mini-tts` "nova" |
 | Ga, Ewe, Dagbani, Hausa | Khaya (key) | OpenAI | — |
 | English, French, other | OpenAI | — | — |
 
@@ -185,7 +185,7 @@ text, Ama's replies from the last 10 minutes, and short snippets (≤200 charact
 | `KHAYA_API_KEY` | unset | Turns on Khaya (see `KHAYA_SETUP.md`). |
 | `KHAYA_TTS_VOICE` | `female` | Khaya voice. |
 | `TWI_TTS_URL` / `TWI_TTS_TOKEN` | unset | Direct Twi voice server; otherwise the Pi relay. |
-| `TWI_TTS_VOICE` | `twi-1` | stable-twi-tts voice. |
+| `TWI_TTS_VOICE` | `twi-6` | stable-twi-tts voice. |
 | `TWI_NLP_URL` / `TWI_NLP_TOKEN` | unset | DistilABENA word helper. |
 
 ## 10. Extending

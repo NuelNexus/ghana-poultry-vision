@@ -67,7 +67,7 @@ can change it in Profile > Language and voice. It is saved on their account.
   ask about the farm, in your language), **Explain** (Ama says what the page shows) and **Tap to
   hear** (tap any text to hear it; tap a button once to hear it and again to press it). Every text
   box gets a microphone, and new alerts can be read out loud.
-- **Voices:** Twi uses the female `twi-1` voice from stable-twi-tts (`npm run twi` on this PC, or
+- **Voices:** Twi uses the male `twi-6` voice from stable-twi-tts (`npm run twi` on this PC, or
   the Pi service); other languages use Khaya with a key, else OpenAI. Speech is sent one sentence
   at a time, so the first words play after about a second.
 - **Ama's answers** in Twi and the other Ghanaian languages use `OPENAI_LOCAL_MODEL` (default

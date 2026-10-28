@@ -8,6 +8,15 @@ from commit messages and file lists; they weren't re-tested for this document.
 
 ## Unreleased — coop unit, marketplace, first-login tour, video guides
 
+### Twi voice back to male, language picker fix, OpenAI only
+- **Twi voice:** the default is the male `twi-6` again (the female `twi-1` was hard to follow).
+  `src/lib/twi-tts.server.ts`, `edge/twi_tts.py`, migration `008_male_twi_voice.sql`.
+  `TWI_TTS_VOICE` still overrides it.
+- **Language picker:** a failed translation request is retried with backoff
+  (`src/lib/dom-translator.ts`); before, the sign-in page stayed in English after one failure.
+- **Offline AI removed:** Ollama, the NLLB translation service and Griot. Translation is Khaya,
+  then OpenAI; Ama uses OpenAI.
+
 ### Unit 2, the coop, run from the site
 - **Request:** rework the ESP32 coop sketch (two zones with a DHT sensor, fan relay and lamp relay
   each, a water turbidity sensor and an LCD) so the coop can be controlled from the site.

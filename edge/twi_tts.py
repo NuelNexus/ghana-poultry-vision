@@ -10,7 +10,7 @@ The worker needs no open ports: it polls the app with the Pi's device key
 It checks every 20 s, and every second while someone is talking to Ama in Twi.
 
 Settings (env or agent.env):
-  PG_TTS_VOICE    voice, default twi-1 (female, the clearest in the package's tests; see `stable-twi-tts --list-voices`)
+  PG_TTS_VOICE    voice, default twi-6 (male; see `stable-twi-tts --list-voices`)
   PG_TTS_THREADS  CPU threads for synthesis, default 4 (a Pi 4/5 has 4 cores)
   PG_TTS_CACHE    where the 80 MB voice model is cached
   PG_TTS_TOKEN    bearer token required by `serve` (recommended whenever it is reachable)
@@ -115,7 +115,7 @@ class Voice:
 
         _lenient_symbols()
         cache = os.environ.get("PG_TTS_CACHE") or None
-        self.voice = os.environ.get("PG_TTS_VOICE", "twi-1")
+        self.voice = os.environ.get("PG_TTS_VOICE", "twi-6")
         self.tts = StableTwiTTS(ensure_model(cache), num_threads=int(os.environ.get("PG_TTS_THREADS", "4")))
         self.lock = threading.Lock()  # one synthesis at a time; the Pi has no cores to spare
         self.cache: "OrderedDict[tuple[str, str], tuple[bytes, float]]" = OrderedDict()  # recent sentences

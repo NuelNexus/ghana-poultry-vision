@@ -9,7 +9,7 @@ import { twiSpeak } from "./twi-tts.server";
 // each as soon as it arrives, so the first words are heard after one short
 // synthesis instead of after the whole reply.
 //
-//   Twi            -> stable-twi-tts (female twi-1, Pi or this PC), then Khaya, then OpenAI
+//   Twi            -> stable-twi-tts (male twi-6, Pi or this PC), then Khaya, then OpenAI
 //   Ga, Ewe, Dagbani, Hausa -> Khaya when there is a key, then OpenAI
 //   anything else  -> OpenAI (female "nova")
 

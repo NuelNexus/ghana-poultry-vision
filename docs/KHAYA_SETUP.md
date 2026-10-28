@@ -14,7 +14,7 @@ Everything below turns on automatically once `KHAYA_API_KEY` is set. No code cha
 | Ama's replies in Twi, Ga, Ewe | GPT-5.5 writes the language directly | GPT thinks in English; Khaya translates the farmer's words in and her answer out |
 | Speech-to-text for Twi | OpenAI `gpt-4o-transcribe` | OpenAI first, then Khaya re-transcribes when the speech is Twi |
 | Voices for Ga, Ewe, Hausa, Dagbani | OpenAI voice | Khaya's female voice |
-| Voice for Twi | stable-twi-tts (`twi-1`), then OpenAI | stable-twi-tts, then Khaya, then OpenAI |
+| Voice for Twi | stable-twi-tts (`twi-6`), then OpenAI | stable-twi-tts, then Khaya, then OpenAI |
 
 Code: `src/lib/khaya.server.ts`, used by `src/lib/translate.server.ts`,
 `src/lib/voice.server.ts` and `src/lib/api/assistant.functions.ts`.

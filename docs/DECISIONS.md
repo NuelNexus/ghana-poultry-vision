@@ -193,6 +193,9 @@ was the lowest (≈120–127 Hz, male). `twi-1` was the highest (≈189 Hz media
 also the package's top-ranked voice for clarity. An OpenAI audio model was asked to confirm
 gender but declined, so the choice rests on pitch.
 
+**Reversed (Oct 2026):** after using it, the female `twi-1` was judged worse to listen to; the
+default is the male `twi-6` again (migration 008).
+
 ## D8. Voice help on every page (Oct 2026)
 
 For farmers who can't read, or can't read English: **Speak** (spoken navigation and questions),

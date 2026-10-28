@@ -11,10 +11,10 @@ import { query, queryOne } from "./db.server";
 //                       for the Pi, which polls /api/public/devices/tts, to upload the WAV.
 //                       Works behind any router, with the Pi's existing device key.
 //
-//   TWI_TTS_VOICE    - stable-twi-tts voice (default twi-1: a female voice, about 190 Hz,
-//                      and the package's best-scoring voice for clarity)
+//   TWI_TTS_VOICE    - stable-twi-tts voice (default twi-6: the male voice, about 120 Hz,
+//                      which farmers found clearer than the female twi-1)
 
-const VOICE = () => process.env.TWI_TTS_VOICE || "twi-1";
+const VOICE = () => process.env.TWI_TTS_VOICE || "twi-6";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** True when some Pi's voice service polled in the last minute (or a direct URL is set). */

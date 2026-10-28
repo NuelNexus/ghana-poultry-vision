@@ -42,7 +42,7 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 | `poultrygrid/features.py`, `model_np.py` | Sensor health checks, 26 features (incl. 5-min trends, age-aware comfort band, per-sensor trust) and numpy-only inference. |
 | `poultrygrid/simulator.py`, `train.py` | Coop simulator (the farm's sensors and their faults) and training script with the v3/v4 benchmark (`models/poultrygrid_v4.npz`). |
 | `test_sensors.py` | Hardware check script for the sensors. |
-| `twi_tts.py` | Twi voice (GhanaNLP stable-twi-tts, female `twi-1`). Modes: `worker` (polls the app for jobs), `serve` (HTTP `/synthesize`), `say`, `bench`. Number/English handling, lenient phoneme table, sentence cache. |
+| `twi_tts.py` | Twi voice (GhanaNLP stable-twi-tts, male `twi-6`). Modes: `worker` (polls the app for jobs), `serve` (HTTP `/synthesize`), `say`, `bench`. Number/English handling, lenient phoneme table, sentence cache. |
 | `twi_nlp.py` | DistilABENA v2 word helper: `POST /suggest` for next-word / fill-the-blank Twi suggestions. |
 | `deploy/*.service`, `install_pi.sh`, `install_tts.sh` | systemd units and installers for the agent and the Twi voice. |
 | `README.md` | Pi wiring, setup and the Twi voice section. |
@@ -84,7 +84,7 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 | `translate.server.ts` | Server: translates batches (Khaya or GPT-5.5), caches in `ui_translations`, de-duplicates concurrent requests. |
 | `voice.server.ts` | `speakIn(text, lang)`: Twi voice → Khaya → OpenAI, with a sentence cache. |
 | `speech-client.ts` | Browser: `SpeechPlayer` plays text sentence by sentence with prefetch and slow-voice fallback. |
-| `twi-tts.server.ts` | Reaches the Twi voice: direct `TWI_TTS_URL`, or the database relay to the Pi. Default voice `twi-1`. |
+| `twi-tts.server.ts` | Reaches the Twi voice: direct `TWI_TTS_URL`, or the database relay to the Pi. Default voice `twi-6`. |
 | `twi-nlp.server.ts` | Calls the DistilABENA word helper (`TWI_NLP_URL`). |
 | `khaya.server.ts` | GhanaNLP Khaya client: transcribe, translate, speak. |
 | `openai.server.ts` | OpenAI client: chat (GPT-4o-mini / GPT-5 family), transcription, speech, realtime session secrets. Model env vars documented at the top. |
