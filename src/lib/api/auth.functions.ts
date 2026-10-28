@@ -116,6 +116,16 @@ export const updateProfile = createServerFn({ method: "POST" })
     return { ok: true, fullName: data.fullName };
   });
 
+/** The first-login tour ended (finished or skipped): don't show it again. */
+export const completeOnboarding = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .handler(async ({ context }) => {
+    await query("update users set onboarded_at = coalesce(onboarded_at, now()) where id = $1", [
+      context.user.id,
+    ]);
+    return { ok: true };
+  });
+
 /** The language the site is shown in, for this account on every device. */
 export const setMyLanguage = createServerFn({ method: "POST" })
   .middleware([requireUser])

@@ -22,6 +22,7 @@ import {
   type Column,
 } from "@/components/ui-kit";
 import { useAuth } from "@/lib/auth";
+import { CoopControlsSection } from "@/components/coop-controls";
 
 export const Route = createFileRoute("/app/automation")({ component: Automation });
 
@@ -162,13 +163,15 @@ function Automation() {
         {!canManage && (
           <p className="pg-t-caption inline-flex items-center gap-1.5">
             <Lock className="size-3.5 shrink-0" aria-hidden strokeWidth={1.75} />
-            Changing fan modes needs a manager account.
+            Changing the controls needs a manager account.
           </p>
         )}
       </PageHeader>
 
+      <CoopControlsSection canManage={canManage} />
+
       <Section
-        title="Ventilation"
+        title="Incubator & brooder · unit 1"
         description="Each Pi switches its fan relay from the flock’s AI status. Force it on or off to override."
       >
         {devices.isPending ? (
@@ -198,7 +201,7 @@ function Automation() {
 
       <Section
         title="What the Pi controls"
-        description="Ventilation is the only thing wired to the Pi. There are no feeder, drinker or lighting controls."
+        description="Ventilation is the only thing wired to the Pi. The coop unit above runs the zone fans, heat lamps and the water check."
       >
         <div className="pg-panel px-4 py-1 md:px-5">
           <DescList

@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { Sidebar, TopBar, navItemFor } from "@/components/Sidebar";
 import { Skeleton } from "@/components/ui-kit";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { TourProvider } from "@/components/onboarding-tour";
 
 export const Route = createFileRoute("/app")({
   component: AppLayout,
@@ -41,18 +42,20 @@ function AppLayout() {
 
 function Shell() {
   return (
-    <div className="pg-console pg-shell">
-      <a href="#main" className="pg-skip">
-        Skip to content
-      </a>
-      <Sidebar />
-      <div className="pg-main">
-        <TopBar />
-        <main id="main" tabIndex={-1} className="pg-content outline-none">
-          <Outlet />
-        </main>
+    <TourProvider>
+      <div className="pg-console pg-shell">
+        <a href="#main" className="pg-skip">
+          Skip to content
+        </a>
+        <Sidebar />
+        <div className="pg-main">
+          <TopBar />
+          <main id="main" tabIndex={-1} className="pg-content outline-none">
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </TourProvider>
   );
 }
 

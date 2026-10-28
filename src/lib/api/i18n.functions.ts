@@ -75,9 +75,7 @@ export const speakText = createServerFn({ method: "POST" })
       // Visitors: site text and Ama's fresh replies, plus short snippets (a heading
       // built from several pieces), all inside the shared hourly allowance.
       const ok =
-        data.text.length <= 200 ||
-        isRecentReply(data.text) ||
-        (await isKnownSiteText(data.text));
+        data.text.length <= 200 || isRecentReply(data.text) || (await isKnownSiteText(data.text));
       if (!ok) throw new Error("Sign in to have this read aloud");
       takeAnon("speak", 400);
     }
@@ -151,11 +149,14 @@ const APP_PAGES = {
   "/app/health": "Flock health: the AI's health status and likely causes",
   "/app/cameras": "Cameras: live view from the farm camera",
   "/app/alerts": "Alerts: warnings about heat, gas, fans, offline devices",
-  "/app/automation": "Automation: fan control, target temperature",
+  "/app/automation": "Automation: coop zones (fans, heat lamps, water) and the brooder fan",
   "/app/hatchery": "Hatchery: egg batches and hatch records",
   "/app/devices": "Devices: Raspberry Pi and camera setup",
   "/app/reports": "Reports: charts and history",
   "/app/ai": "AI assistant: chat or talk with Ama",
+  "/app/market":
+    "Marketplace: buy and sell eggs, birds, chicks, feed and manure with other farmers",
+  "/app/guides": "Guides: video guides for the site and both units, and the welcome tour",
   "/app/profile": "Profile and settings: language, text size, account",
 } as const;
 const PUBLIC_PAGES = {

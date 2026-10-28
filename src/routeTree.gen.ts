@@ -18,13 +18,17 @@ import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppHousesRouteImport } from './routes/app.houses'
 import { Route as AppHealthRouteImport } from './routes/app.health'
 import { Route as AppHatcheryRouteImport } from './routes/app.hatchery'
+import { Route as AppGuidesRouteImport } from './routes/app.guides'
 import { Route as AppDevicesRouteImport } from './routes/app.devices'
 import { Route as AppCamerasRouteImport } from './routes/app.cameras'
 import { Route as AppAutomationRouteImport } from './routes/app.automation'
 import { Route as AppAlertsRouteImport } from './routes/app.alerts'
 import { Route as AppAiRouteImport } from './routes/app.ai'
+import { Route as AppMarketIndexRouteImport } from './routes/app.market.index'
+import { Route as AppMarketListingIdRouteImport } from './routes/app.market.$listingId'
 import { Route as ApiPublicDevicesTtsRouteImport } from './routes/api/public/devices/tts'
 import { Route as ApiPublicDevicesIngestRouteImport } from './routes/api/public/devices/ingest'
+import { Route as ApiPublicMarketImagesImageIdRouteImport } from './routes/api/public/market/images/$imageId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -71,6 +75,11 @@ const AppHatcheryRoute = AppHatcheryRouteImport.update({
   path: '/hatchery',
   getParentRoute: () => AppRoute,
 } as any)
+const AppGuidesRoute = AppGuidesRouteImport.update({
+  id: '/guides',
+  path: '/guides',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDevicesRoute = AppDevicesRouteImport.update({
   id: '/devices',
   path: '/devices',
@@ -96,6 +105,16 @@ const AppAiRoute = AppAiRouteImport.update({
   path: '/ai',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMarketIndexRoute = AppMarketIndexRouteImport.update({
+  id: '/market/',
+  path: '/market/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMarketListingIdRoute = AppMarketListingIdRouteImport.update({
+  id: '/market/$listingId',
+  path: '/market/$listingId',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiPublicDevicesTtsRoute = ApiPublicDevicesTtsRouteImport.update({
   id: '/api/public/devices/tts',
   path: '/api/public/devices/tts',
@@ -106,6 +125,12 @@ const ApiPublicDevicesIngestRoute = ApiPublicDevicesIngestRouteImport.update({
   path: '/api/public/devices/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicMarketImagesImageIdRoute =
+  ApiPublicMarketImagesImageIdRouteImport.update({
+    id: '/api/public/market/images/$imageId',
+    path: '/api/public/market/images/$imageId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -116,14 +141,18 @@ export interface FileRoutesByFullPath {
   '/app/automation': typeof AppAutomationRoute
   '/app/cameras': typeof AppCamerasRoute
   '/app/devices': typeof AppDevicesRoute
+  '/app/guides': typeof AppGuidesRoute
   '/app/hatchery': typeof AppHatcheryRoute
   '/app/health': typeof AppHealthRoute
   '/app/houses': typeof AppHousesRoute
   '/app/profile': typeof AppProfileRoute
   '/app/reports': typeof AppReportsRoute
   '/app/': typeof AppIndexRoute
+  '/app/market/$listingId': typeof AppMarketListingIdRoute
+  '/app/market/': typeof AppMarketIndexRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
+  '/api/public/market/images/$imageId': typeof ApiPublicMarketImagesImageIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -133,14 +162,18 @@ export interface FileRoutesByTo {
   '/app/automation': typeof AppAutomationRoute
   '/app/cameras': typeof AppCamerasRoute
   '/app/devices': typeof AppDevicesRoute
+  '/app/guides': typeof AppGuidesRoute
   '/app/hatchery': typeof AppHatcheryRoute
   '/app/health': typeof AppHealthRoute
   '/app/houses': typeof AppHousesRoute
   '/app/profile': typeof AppProfileRoute
   '/app/reports': typeof AppReportsRoute
   '/app': typeof AppIndexRoute
+  '/app/market/$listingId': typeof AppMarketListingIdRoute
+  '/app/market': typeof AppMarketIndexRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
+  '/api/public/market/images/$imageId': typeof ApiPublicMarketImagesImageIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -152,14 +185,18 @@ export interface FileRoutesById {
   '/app/automation': typeof AppAutomationRoute
   '/app/cameras': typeof AppCamerasRoute
   '/app/devices': typeof AppDevicesRoute
+  '/app/guides': typeof AppGuidesRoute
   '/app/hatchery': typeof AppHatcheryRoute
   '/app/health': typeof AppHealthRoute
   '/app/houses': typeof AppHousesRoute
   '/app/profile': typeof AppProfileRoute
   '/app/reports': typeof AppReportsRoute
   '/app/': typeof AppIndexRoute
+  '/app/market/$listingId': typeof AppMarketListingIdRoute
+  '/app/market/': typeof AppMarketIndexRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
+  '/api/public/market/images/$imageId': typeof ApiPublicMarketImagesImageIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -172,14 +209,18 @@ export interface FileRouteTypes {
     | '/app/automation'
     | '/app/cameras'
     | '/app/devices'
+    | '/app/guides'
     | '/app/hatchery'
     | '/app/health'
     | '/app/houses'
     | '/app/profile'
     | '/app/reports'
     | '/app/'
+    | '/app/market/$listingId'
+    | '/app/market/'
     | '/api/public/devices/ingest'
     | '/api/public/devices/tts'
+    | '/api/public/market/images/$imageId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -189,14 +230,18 @@ export interface FileRouteTypes {
     | '/app/automation'
     | '/app/cameras'
     | '/app/devices'
+    | '/app/guides'
     | '/app/hatchery'
     | '/app/health'
     | '/app/houses'
     | '/app/profile'
     | '/app/reports'
     | '/app'
+    | '/app/market/$listingId'
+    | '/app/market'
     | '/api/public/devices/ingest'
     | '/api/public/devices/tts'
+    | '/api/public/market/images/$imageId'
   id:
     | '__root__'
     | '/'
@@ -207,14 +252,18 @@ export interface FileRouteTypes {
     | '/app/automation'
     | '/app/cameras'
     | '/app/devices'
+    | '/app/guides'
     | '/app/hatchery'
     | '/app/health'
     | '/app/houses'
     | '/app/profile'
     | '/app/reports'
     | '/app/'
+    | '/app/market/$listingId'
+    | '/app/market/'
     | '/api/public/devices/ingest'
     | '/api/public/devices/tts'
+    | '/api/public/market/images/$imageId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -223,6 +272,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ApiPublicDevicesIngestRoute: typeof ApiPublicDevicesIngestRoute
   ApiPublicDevicesTtsRoute: typeof ApiPublicDevicesTtsRoute
+  ApiPublicMarketImagesImageIdRoute: typeof ApiPublicMarketImagesImageIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -290,6 +340,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHatcheryRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/guides': {
+      id: '/app/guides'
+      path: '/guides'
+      fullPath: '/app/guides'
+      preLoaderRoute: typeof AppGuidesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/devices': {
       id: '/app/devices'
       path: '/devices'
@@ -325,6 +382,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAiRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/market/': {
+      id: '/app/market/'
+      path: '/market'
+      fullPath: '/app/market/'
+      preLoaderRoute: typeof AppMarketIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/market/$listingId': {
+      id: '/app/market/$listingId'
+      path: '/market/$listingId'
+      fullPath: '/app/market/$listingId'
+      preLoaderRoute: typeof AppMarketListingIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/public/devices/tts': {
       id: '/api/public/devices/tts'
       path: '/api/public/devices/tts'
@@ -339,6 +410,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDevicesIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/market/images/$imageId': {
+      id: '/api/public/market/images/$imageId'
+      path: '/api/public/market/images/$imageId'
+      fullPath: '/api/public/market/images/$imageId'
+      preLoaderRoute: typeof ApiPublicMarketImagesImageIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -348,12 +426,15 @@ interface AppRouteChildren {
   AppAutomationRoute: typeof AppAutomationRoute
   AppCamerasRoute: typeof AppCamerasRoute
   AppDevicesRoute: typeof AppDevicesRoute
+  AppGuidesRoute: typeof AppGuidesRoute
   AppHatcheryRoute: typeof AppHatcheryRoute
   AppHealthRoute: typeof AppHealthRoute
   AppHousesRoute: typeof AppHousesRoute
   AppProfileRoute: typeof AppProfileRoute
   AppReportsRoute: typeof AppReportsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppMarketListingIdRoute: typeof AppMarketListingIdRoute
+  AppMarketIndexRoute: typeof AppMarketIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -362,12 +443,15 @@ const AppRouteChildren: AppRouteChildren = {
   AppAutomationRoute: AppAutomationRoute,
   AppCamerasRoute: AppCamerasRoute,
   AppDevicesRoute: AppDevicesRoute,
+  AppGuidesRoute: AppGuidesRoute,
   AppHatcheryRoute: AppHatcheryRoute,
   AppHealthRoute: AppHealthRoute,
   AppHousesRoute: AppHousesRoute,
   AppProfileRoute: AppProfileRoute,
   AppReportsRoute: AppReportsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppMarketListingIdRoute: AppMarketListingIdRoute,
+  AppMarketIndexRoute: AppMarketIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -378,6 +462,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ApiPublicDevicesIngestRoute: ApiPublicDevicesIngestRoute,
   ApiPublicDevicesTtsRoute: ApiPublicDevicesTtsRoute,
+  ApiPublicMarketImagesImageIdRoute: ApiPublicMarketImagesImageIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

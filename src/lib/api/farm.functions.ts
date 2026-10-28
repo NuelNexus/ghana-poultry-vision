@@ -275,9 +275,10 @@ export const createDevice = createServerFn({ method: "POST" })
       // The Pi agent strips whitespace from agent.env values, so a stray space
       // here would make the ID impossible to match.
       deviceId: z.string().trim().min(1).max(64),
-      // The Raspberry Pi is the only device that posts readings. The ESP32-CAM
-      // has no API key: it is added under Cameras by its stream URL.
-      type: z.literal("pi").default("pi"),
+      // Devices that post readings: the Raspberry Pi (unit 1, incubator &
+      // brooder) and the ESP32 coop controller (unit 2). The ESP32-CAM has no
+      // API key: it is added under Cameras by its stream URL.
+      type: z.enum(["pi", "coop"]).default("pi"),
       location: z.string().optional(),
       houseId: z.string().uuid().optional(),
     }),
@@ -289,8 +290,8 @@ export const createDevice = createServerFn({ method: "POST" })
     const farmId = await ownHouseFarm(data.houseId, context.user.id);
     try {
       await query(
-        `insert into devices (device_id, api_key, type, location, house_id, farm_id, owner_id)
-         values ($1, $2, $3, $4, $5, $6, $7)`,
+        `insert into devices (device_id, api_key, type, location, house_id, farm_id, owner_id, unit)
+         values ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           data.deviceId,
           apiKey,
@@ -299,6 +300,7 @@ export const createDevice = createServerFn({ method: "POST" })
           data.houseId || null,
           farmId,
           context.user.id,
+          data.type === "coop" ? "coop" : "brooder",
         ],
       );
     } catch (e) {

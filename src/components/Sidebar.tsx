@@ -21,7 +21,9 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  PlayCircle,
   SlidersHorizontal,
+  Store,
   Warehouse,
   X,
   type LucideIcon,
@@ -71,10 +73,15 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "Trade",
+    items: [{ to: "/app/market", label: "Marketplace", icon: Store }],
+  },
+  {
     label: "Insights",
     items: [
       { to: "/app/reports", label: "Reports", icon: FileText },
       { to: "/app/ai", label: "AI assistant", icon: MessageSquare },
+      { to: "/app/guides", label: "Guides", icon: PlayCircle },
     ],
   },
 ];
@@ -260,6 +267,7 @@ function NavContent({ rail, onNavigate }: { rail: boolean; onNavigate?: () => vo
                   <RailTip label={count ? `${n.label} (${count} open)` : n.label} enabled={rail}>
                     <Link
                       to={n.to}
+                      data-tour={n.to}
                       className="pg-navlink"
                       activeOptions={{ exact: !!n.exact, includeSearch: false }}
                       aria-current={active ? "page" : undefined}

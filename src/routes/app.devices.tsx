@@ -41,17 +41,24 @@ import { cameraUrls } from "@/lib/esp32cam";
 export const Route = createFileRoute("/app/devices")({ component: Devices });
 
 /**
- * The farm's hardware is one Raspberry Pi edge node (sensors + fan + AI) and one
- * ESP32-CAM. Only the Pi has a device row and API key; the camera lives in the
- * cameras table because it never posts to the app.
+ * The PoultryGrid kit is two units plus a camera:
+ *   unit 1, incubator & brooder: a Raspberry Pi edge node (sensors + fan + AI)
+ *   unit 2, coop: an ESP32 controller (two zones, fans, lamps, water sensor)
+ * Both post readings with an API key. The ESP32-CAM lives in the cameras table
+ * because it never posts to the app.
  */
-const TYPE_LABEL: Record<string, string> = { pi: "Raspberry Pi · edge AI" };
+const TYPE_LABEL: Record<string, string> = {
+  pi: "Unit 1 · Incubator & brooder (Pi)",
+  coop: "Unit 2 · Coop (ESP32)",
+};
 
-type Kind = "pi" | "cam";
+type Kind = "pi" | "coop" | "cam";
 const KIND_LABEL: Record<Kind, string> = {
-  pi: "Raspberry Pi · edge AI",
+  pi: "Unit 1 · Incubator & brooder (Raspberry Pi)",
+  coop: "Unit 2 · Coop controller (ESP32)",
   cam: "ESP32-CAM camera",
 };
+type Created = { deviceId: string; apiKey: string; kind: "pi" | "coop" };
 
 const FAN_LABEL: Record<FanLevel, string> = { on: "On", off: "Off" };
 
@@ -80,7 +87,7 @@ function Devices() {
   const { canManage } = useAuth();
   const [registerOpen, setRegisterOpen] = useState(false);
   const [registerKind, setRegisterKind] = useState<Kind>("pi");
-  const [created, setCreated] = useState<{ deviceId: string; apiKey: string } | null>(null);
+  const [created, setCreated] = useState<Created | null>(null);
   const [saving, setSaving] = useState<Record<string, Patch>>({});
   const now = useNow(15_000);
 
@@ -258,7 +265,7 @@ function Devices() {
           devices ? (
             <>
               <span>
-                {devices.length} {devices.length === 1 ? "Pi" : "Pis"} · {online} online
+                {devices.length} {devices.length === 1 ? "unit" : "units"} · {online} online
                 {cams.data
                   ? ` · ${cams.data.length} ${cams.data.length === 1 ? "camera" : "cameras"}`
                   : ""}
@@ -280,7 +287,7 @@ function Devices() {
         )}
       </PageHeader>
 
-      <Section title="Raspberry Pi">
+      <Section title="Units">
         {q.isPending ? (
           <div className="flex flex-col gap-4">
             <SkeletonMetrics count={4} cols={4} />
@@ -294,16 +301,16 @@ function Devices() {
           />
         ) : devices.length === 0 ? (
           <EmptyState
-            title="No Raspberry Pi registered"
-            description="Register the Pi to get its API key and agent.env. Its check-ins, house and fan mode show here."
+            title="No units registered"
+            description="Register unit 1 (the incubator & brooder Pi) or unit 2 (the coop ESP32) to get its API key. Check-ins, house and fan mode show here."
             action={
               canManage ? (
                 <Button variant="primary" icon={Plus} onClick={() => openRegister("pi")}>
-                  Register Pi
+                  Register a unit
                 </Button>
               ) : undefined
             }
-            note={!canManage ? "Ask a farm manager to register the Pi." : undefined}
+            note={!canManage ? "Ask a farm manager to register the units." : undefined}
           />
         ) : (
           <div className="flex flex-col gap-4">
@@ -627,7 +634,7 @@ function RegisterModal({
   initialKind: Kind;
   onOpenChange: (o: boolean) => void;
   houses: { id: string; name: string }[];
-  onCreated: (c: { deviceId: string; apiKey: string }) => void;
+  onCreated: (c: Created) => void;
   onCameraAdded: () => void;
 }) {
   const [kind, setKind] = useState<Kind>(initialKind);
@@ -657,7 +664,7 @@ function RegisterModal({
     setErrors({});
   }
 
-  async function submitPi() {
+  async function submitUnit(type: "pi" | "coop") {
     const id = deviceId.trim();
     if (!id) return setErrors({ id: "Enter a device ID." });
     setBusy(true);
@@ -666,15 +673,15 @@ function RegisterModal({
       const res = await createDevice({
         data: {
           deviceId: id,
-          type: "pi",
+          type,
           location: location.trim(),
           houseId: houseId || undefined,
         },
       });
       reset();
-      onCreated(res);
+      onCreated({ ...res, kind: type });
     } catch (err) {
-      setErrors({ id: err instanceof Error ? err.message : "Couldn’t register the Pi" });
+      setErrors({ id: err instanceof Error ? err.message : "Couldn’t register the unit" });
     } finally {
       setBusy(false);
     }
@@ -708,7 +715,7 @@ function RegisterModal({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    void (kind === "pi" ? submitPi() : submitCam());
+    void (kind === "cam" ? submitCam() : submitUnit(kind));
   }
 
   return (
@@ -722,13 +729,15 @@ function RegisterModal({
       description={
         kind === "pi"
           ? "You’ll get the Pi’s API key and agent.env after this step."
-          : "The camera needs no key. Your browser opens its stream directly."
+          : kind === "coop"
+            ? "You’ll get the coop’s API key and the lines for its config.h after this step."
+            : "The camera needs no key. Your browser opens its stream directly."
       }
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button variant="primary" type="submit" form="register-device" loading={busy}>
-            {kind === "pi" ? "Register Pi" : "Add camera"}
+            {kind === "pi" ? "Register Pi" : kind === "coop" ? "Register coop" : "Add camera"}
           </Button>
         </>
       }
@@ -750,11 +759,15 @@ function RegisterModal({
             ))}
           </Select>
         </Field>
-        {kind === "pi" ? (
+        {kind !== "cam" ? (
           <Field
             label="Device ID"
             required
-            hint="Unique, up to 64 characters, no spaces. It becomes PG_DEVICE_ID on the Pi."
+            hint={
+              kind === "pi"
+                ? "Unique, up to 64 characters, no spaces. It becomes PG_DEVICE_ID on the Pi."
+                : "Unique, up to 64 characters, no spaces. It becomes PG_DEVICE_ID in the coop’s config.h."
+            }
             error={errors.id}
           >
             <Input
@@ -764,7 +777,7 @@ function RegisterModal({
               autoComplete="off"
               spellCheck={false}
               className="pg-mono"
-              placeholder="PI-HOUSE-A…"
+              placeholder={kind === "pi" ? "PI-HOUSE-A…" : "COOP-1…"}
               onChange={(e) => {
                 setDeviceId(e.target.value.replace(/\s/g, ""));
                 if (errors.id) setErrors({});
@@ -805,7 +818,7 @@ function RegisterModal({
         )}
         <Field
           label="House"
-          hint={kind === "pi" ? "Optional. You can change it later in the table." : "Optional."}
+          hint={kind !== "cam" ? "Optional. You can change it later in the table." : "Optional."}
         >
           <Select name="house" value={houseId} onChange={(e) => setHouseId(e.target.value)}>
             <option value="">Unassigned</option>
@@ -816,7 +829,7 @@ function RegisterModal({
             ))}
           </Select>
         </Field>
-        {kind === "pi" && (
+        {kind !== "cam" && (
           <Field label="Location" hint="Optional. Where it’s mounted.">
             <Input
               name="location"
@@ -837,17 +850,14 @@ function RegisterModal({
   );
 }
 
-function CreatedModal({
-  created,
-  onClose,
-}: {
-  created: { deviceId: string; apiKey: string } | null;
-  onClose: () => void;
-}) {
+function CreatedModal({ created, onClose }: { created: Created | null; onClose: () => void }) {
   const [copied, setCopied] = useState<"key" | "env" | null>(null);
-  const env = created
-    ? `PG_API_URL=${origin()}\nPG_DEVICE_ID=${created.deviceId}\nPG_DEVICE_API_KEY=${created.apiKey}\n`
-    : "";
+  const coop = created?.kind === "coop";
+  const env = !created
+    ? ""
+    : coop
+      ? `#define PG_API_URL        "${origin()}"\n#define PG_DEVICE_ID      "${created.deviceId}"\n#define PG_DEVICE_API_KEY "${created.apiKey}"\n`
+      : `PG_API_URL=${origin()}\nPG_DEVICE_ID=${created.deviceId}\nPG_DEVICE_API_KEY=${created.apiKey}\n`;
   // The Pi can't reach "localhost" on this computer.
   const localOrigin =
     typeof window !== "undefined" && /^(localhost|127\.|\[::1\])/.test(window.location.hostname);
@@ -870,7 +880,7 @@ function CreatedModal({
           onClose();
         }
       }}
-      title="Pi registered"
+      title={coop ? "Coop unit registered" : "Pi registered"}
       description={
         created ? <span className="pg-mono text-ink-2">{created.deviceId}</span> : undefined
       }
@@ -896,7 +906,7 @@ function CreatedModal({
             />
             <p>
               <span className="font-medium">Store this key now.</span> Anyone with it can post data
-              as this Pi. Managers can reveal it again from the devices table.
+              as this {coop ? "coop" : "Pi"}. Managers can reveal it again from the devices table.
             </p>
           </div>
 
@@ -919,11 +929,20 @@ function CreatedModal({
           <div>
             <div className="mb-1.5 flex items-end justify-between gap-3">
               <div>
-                <div className="pg-t-label">agent.env</div>
-                <p className="pg-t-caption mt-0.5">
-                  The installer <code className="pg-mono">edge/deploy/install_pi.sh</code> asks for
-                  these and writes <code className="pg-mono">/etc/poultrygrid/agent.env</code>.
-                </p>
+                <div className="pg-t-label">{coop ? "config.h" : "agent.env"}</div>
+                {coop ? (
+                  <p className="pg-t-caption mt-0.5">
+                    Paste into <code className="pg-mono">firmware/coop_unit/config.h</code> (copy it
+                    from <code className="pg-mono">config.example.h</code>) next to your Wi-Fi name
+                    and password.
+                  </p>
+                ) : (
+                  <p className="pg-t-caption mt-0.5">
+                    The installer <code className="pg-mono">edge/deploy/install_pi.sh</code> asks
+                    for these and writes <code className="pg-mono">/etc/poultrygrid/agent.env</code>
+                    .
+                  </p>
+                )}
               </div>
               <Button
                 size="sm"
@@ -940,26 +959,48 @@ function CreatedModal({
             {localOrigin && (
               <p className="pg-t-caption mt-1.5">
                 <span className="font-medium text-warn">Change PG_API_URL.</span> This page is open
-                on {window.location.host}, which the Pi can’t reach. Use the app’s LAN or public
-                address.
+                on {window.location.host}, which the {coop ? "coop" : "Pi"} can’t reach. Use the
+                app’s LAN or public address.
               </p>
             )}
           </div>
 
-          <div>
-            <div className="pg-t-label mb-1.5">Then on the Pi</div>
-            <Steps>
-              <li>
-                Run <Code>sudo edge/deploy/install_pi.sh</Code> and enter these values. If the agent
-                is already installed, edit <Code>/etc/poultrygrid/agent.env</Code> and run{" "}
-                <Code>sudo systemctl restart poultrygrid-agent</Code>.
-              </li>
-              <li>
-                Follow the log with <Code>journalctl -u poultrygrid-agent -f</Code>. The Pi shows
-                Online here within about 30 s.
-              </li>
-            </Steps>
-          </div>
+          {coop ? (
+            <div>
+              <div className="pg-t-label mb-1.5">Then on the ESP32</div>
+              <Steps>
+                <li>
+                  In the Arduino IDE, install the libraries <Code>DHT sensor library</Code>,{" "}
+                  <Code>LiquidCrystal I2C</Code> and <Code>ArduinoJson</Code>, and pick the board{" "}
+                  <Code>ESP32 Dev Module</Code>.
+                </li>
+                <li>
+                  Open <Code>firmware/coop_unit/coop_unit.ino</Code>, upload it, and open the serial
+                  monitor at 115200 baud. The LCD shows <Code>SITE: ONLINE</Code> once it connects,
+                  and the coop shows Online here within about 10 s.
+                </li>
+                <li>
+                  Run it from Automation: switch each zone between Auto and Manual, turn fans and
+                  lamps on or off, and set the temperatures.
+                </li>
+              </Steps>
+            </div>
+          ) : (
+            <div>
+              <div className="pg-t-label mb-1.5">Then on the Pi</div>
+              <Steps>
+                <li>
+                  Run <Code>sudo edge/deploy/install_pi.sh</Code> and enter these values. If the
+                  agent is already installed, edit <Code>/etc/poultrygrid/agent.env</Code> and run{" "}
+                  <Code>sudo systemctl restart poultrygrid-agent</Code>.
+                </li>
+                <li>
+                  Follow the log with <Code>journalctl -u poultrygrid-agent -f</Code>. The Pi shows
+                  Online here within about 30 s.
+                </li>
+              </Steps>
+            </div>
+          )}
         </div>
       )}
     </Modal>
