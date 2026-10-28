@@ -123,6 +123,23 @@ struct Settings {
   float waterGoodV;
 };
 
+// Defined here, above every function, because the Arduino builder puts its
+// auto-generated function declarations just before the first function.
+struct Zone {
+  const char* key;      // name used by the site
+  const char* lcdName;  // 7 chars max
+  DHT* dht;
+  int fanPin;
+  int lampPin;
+  float temperature;
+  float humidity;
+  bool fan;
+  bool lamp;
+  int errors;
+  bool sensorOk;
+  bool safetyTripped;   // lamp forced off by a safety limit
+};
+
 const uint32_t SETTINGS_MAGIC = 0x50474332;  // "PGC2"
 
 Settings settings;
@@ -158,21 +175,6 @@ void loadSettings() {
 
 DHT dhtLayers(DHT22_PIN, DHT22);
 DHT dhtBroilers(DHT11_PIN, DHT11);
-
-struct Zone {
-  const char* key;      // name used by the site
-  const char* lcdName;  // 7 chars max
-  DHT* dht;
-  int fanPin;
-  int lampPin;
-  float temperature;
-  float humidity;
-  bool fan;
-  bool lamp;
-  int errors;
-  bool sensorOk;
-  bool safetyTripped;   // lamp forced off by a safety limit
-};
 
 Zone zones[2] = {
   {"layers", "LAYERS", &dhtLayers, LAYERS_FAN_RELAY, LAYERS_LAMP_RELAY, NAN, NAN, false, false, 0, false, false},
