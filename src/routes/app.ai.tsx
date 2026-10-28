@@ -37,6 +37,7 @@ import {
   wakeTwiVoiceFn,
 } from "@/lib/api/assistant.functions";
 import { detectLang } from "@/lib/ai-languages";
+import { openAiLimitMessage } from "@/lib/openai-errors";
 import {
   MIC_CONSTRAINTS,
   Recorder,
@@ -105,7 +106,10 @@ function AiAssistant() {
   useWakeTwiVoice();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const mode: Mode = search.mode ?? "chat";
+  // The live call is OpenAI only. Offline, Ama runs on this computer and the chat
+  // mic is how you talk to her (she still answers out loud).
+  const liveVoice = useQuery(enginesQuery).data?.liveVoice !== false;
+  const mode: Mode = liveVoice ? (search.mode ?? "chat") : "chat";
   // The 3D model is ~24 MB: only load it once voice mode is first opened,
   // then keep it mounted so switching back and forth is instant.
   const [voiceOpened, setVoiceOpened] = useState(false);
@@ -121,12 +125,14 @@ function AiAssistant() {
         <div className="min-w-0">
           <h1 className="pg-t-h2">AI assistant</h1>
           <p className="ai-head-sub">
-            {mode === "chat"
-              ? "Ask Ama about your farm in any language."
-              : "Talk to Ama out loud. She answers out loud too."}
+            {!liveVoice
+              ? "Ama runs on this computer. Type, or tap the mic and talk: she answers out loud."
+              : mode === "chat"
+                ? "Ask Ama about your farm in any language."
+                : "Talk to Ama out loud. She answers out loud too."}
           </p>
         </div>
-        <ModeToggle voice={mode === "voice"} onChange={toggle} />
+        {liveVoice && <ModeToggle voice={mode === "voice"} onChange={toggle} />}
       </header>
 
       <div className="ai-layout">
@@ -634,7 +640,9 @@ function TextChat() {
   const qc = useQueryClient();
   const sensors = useQuery(sensorsQuery);
   // With a Khaya key, dictation is sent as WAV so Khaya can re-hear it if it's Twi.
-  const khaya = Boolean(useQuery(enginesQuery).data?.khaya);
+  // Khaya and the offline Griot listener both need WAV.
+  const speechEngines = useQuery(enginesQuery).data;
+  const khaya = Boolean(speechEngines?.khaya || speechEngines?.offline?.asr);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -730,7 +738,7 @@ function TextChat() {
         setError("Didn’t catch that. Hold the phone closer and try again.");
         return;
       }
-      // Khaya needs WAV; if this browser can't convert, OpenAI takes the original.
+      // Khaya / Griot need WAV; if this browser can't convert, OpenAI takes the original.
       const audio = (khaya && (await toWav16k(blob))) || blob;
       const { text } = await transcribeSpeech({
         data: { audio: await blobToBase64(audio), mimeType: audio.type, uiLang },
@@ -1620,7 +1628,12 @@ function VoiceChat({ active }: { active: boolean }) {
           "Content-Type": "application/sdp",
         },
       });
-      if (!res.ok) throw new Error(`Couldn’t start the live call (${res.status}).`);
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(
+          openAiLimitMessage(res.status, body) ?? `Couldn’t start the live call (${res.status}).`,
+        );
+      }
       const sdp = await res.text();
       if (my !== gen.current) return;
       await conn.setRemoteDescription({ type: "answer", sdp });

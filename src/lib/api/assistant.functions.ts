@@ -8,9 +8,17 @@ import {
   localModel,
   transcribe,
   type ChatMessage,
+  openAiFirst,
 } from "../openai.server";
 import { KHAYA_CODES, detectLang, langName, type SpeechLang } from "../ai-languages";
 import { khayaEnabled, khayaTranscribe, khayaTranslate } from "../khaya.server";
+import {
+  offlineHealth,
+  offlineTranscribe,
+  offlineTranslate,
+  offlineTranslates,
+  offlineTwiEnabled,
+} from "../local-ai.server";
 import { twiVoiceOnline, wakeTwiVoice } from "../twi-tts.server";
 import { speakIn } from "../voice.server";
 import { SITE_LANG_IDS, siteLang, speechLangFor, type SiteLang } from "../site-lang";
@@ -180,12 +188,29 @@ type Turn = z.infer<typeof historySchema>[number];
 const stripBold = (t: string) => t.replace(/\*\*(.+?)\*\*/g, "$1");
 
 /**
- * One reply from Ama. For Twi, Ga and Ewe (with a Khaya key) she thinks in
- * English and GhanaNLP's Khaya translates both ways: the farmer's words into
- * English for her, and her plain-English answer into their language. Khaya is
- * trained on Ghanaian text, so the result reads far more naturally than GPT
- * writing Twi itself. Everything else is answered directly by GPT.
+ * One reply from Ama. For Twi, Ewe, Hausa (and Ga with Khaya) she thinks in
+ * English and a translator trained on that language works both ways: the
+ * farmer's words into English for her, and her plain-English answer into their
+ * language. The offline NLLB service on this computer goes first, then Khaya.
+ * That reads far more naturally than a general model writing Twi itself.
+ * Everything else is answered directly.
  */
+const canTranslate = (lang: SpeechLang) =>
+  offlineTranslates(lang) || (khayaEnabled() && Boolean(KHAYA_CODES[lang]?.mt));
+
+async function translate(text: string, from: SpeechLang, to: SpeechLang) {
+  const lang = from === "en" ? to : from;
+  if (offlineTranslates(lang)) {
+    try {
+      const t = await offlineTranslate(text, from, to);
+      if (t) return t;
+    } catch (err) {
+      console.warn("[ai] offline translation:", err instanceof Error ? err.message : err);
+    }
+  }
+  if (khayaEnabled() && KHAYA_CODES[lang]?.mt) return khayaTranslate(text, from, to);
+  return null;
+}
 /** Twi, Ga, Ewe, Dagbani, Hausa: the bigger model, the only one that writes them well. */
 const LOCAL_UI: SiteLang[] = ["tw", "ga", "ee", "dag", "ha"];
 const modelFor = (lang: SpeechLang, uiLang: SiteLang) =>
@@ -213,13 +238,13 @@ async function answer(
     english: null as string | null,
     youEnglish: null as string | null,
   });
-  if (!khayaEnabled() || !KHAYA_CODES[lang]?.mt) return direct();
+  if (!canTranslate(lang)) return direct();
 
   const name = langName(lang);
   const last = turns[turns.length - 1];
   const youEnglish =
     last?.role === "user"
-      ? (last.english ?? (await khayaTranslate(last.content, lang, "en").catch(() => null)))
+      ? (last.english ?? (await translate(last.content, lang, "en").catch(() => null)))
       : null;
   const msgs: ChatMessage[] = turns.map((t, i) => {
     if (t.role === "assistant") return { role: "assistant", content: t.english || t.content };
@@ -249,10 +274,10 @@ they wrote in ${name}: a translation model turns your English into ${name} for t
     ).trim(),
   );
   try {
-    const reply = await khayaTranslate(english, "en", lang);
+    const reply = await translate(english, "en", lang);
     if (reply) return { reply, english, youEnglish };
   } catch {
-    /* Khaya is down: let GPT write the language itself */
+    /* translators down: let the model write the language itself */
   }
   return { ...(await direct()), youEnglish };
 }
@@ -264,6 +289,16 @@ they wrote in ${name}: a translation model turns your English into ${name} for t
  * on Ghanaian speech) transcribes it again.
  */
 export async function hear(audio: Uint8Array, mimeType: string, uiLang: SiteLang = "en") {
+  // Offline first: GhanaNLP's Griot on this computer hears Twi and Ghanaian English
+  // (it needs the 16 kHz WAV the browser sends when the service is up).
+  if (offlineTwiEnabled() && mimeType.includes("wav")) {
+    try {
+      return await offlineTranscribe(audio);
+    } catch (err) {
+      if (!process.env.OPENAI_API_KEY) throw err;
+      console.warn("[ai] offline speech recognition:", err instanceof Error ? err.message : err);
+    }
+  }
   // The site language steers the transcriber toward that language's spelling;
   // English and French speakers get the open "auto" hint.
   const hint = uiLang === "en" || uiLang === "fr" ? "auto" : siteLang(uiLang).speech;
@@ -282,11 +317,18 @@ export async function hear(audio: Uint8Array, mimeType: string, uiLang: SiteLang
 /** Which speech engines this server has keys for (the browser picks its voice mode from it). */
 export const getSpeechEngines = createServerFn({ method: "GET" })
   .middleware([requireUser])
-  .handler(async () => ({
-    khaya: khayaEnabled(),
-    twiVoice: await twiVoiceOnline(),
-    twiWords: twiWordsEnabled(),
-  }));
+  .handler(async () => {
+    const [twiVoice, offline] = await Promise.all([twiVoiceOnline(), offlineHealth()]);
+    return {
+      khaya: khayaEnabled(),
+      twiVoice,
+      twiWords: twiWordsEnabled(),
+      /** NLLB translation and Griot speech recognition on this computer. */
+      offline,
+      /** The live voice call is OpenAI only; offline, the chat mic does voice instead. */
+      liveVoice: openAiFirst(),
+    };
+  });
 
 /** Twi word suggestions from DistilABENA: the next word, or the word for a "___" blank. */
 export const suggestTwiWords = createServerFn({ method: "POST" })

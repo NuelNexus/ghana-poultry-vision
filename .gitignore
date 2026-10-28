@@ -42,6 +42,7 @@ edge/outbox.sqlite3
 edge/.venv
 .venv-twi/
 .certs/
+edge/offline-models
 
 # Coop unit firmware: WiFi password and device key
 firmware/coop_unit/config.h

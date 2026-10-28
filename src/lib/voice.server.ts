@@ -1,3 +1,4 @@
+import process from "node:process";
 import { speak, toBase64 } from "./openai.server";
 import { KHAYA_CODES, langName, type SpeechLang } from "./ai-languages";
 import { khayaEnabled, khayaSpeak } from "./khaya.server";
@@ -12,7 +13,13 @@ import { twiSpeak } from "./twi-tts.server";
 //   Ga, Ewe, Dagbani, Hausa -> Khaya when there is a key, then OpenAI
 //   anything else  -> OpenAI (female "nova")
 
-export type Spoken = { audio: string; mimeType: string; engine: "twi" | "khaya" | "openai" };
+export type Spoken = {
+  audio: string;
+  mimeType: string;
+  engine: "twi" | "khaya" | "openai" | "browser";
+  /** engine "browser": no audio; the browser reads this text with its own voice (offline). */
+  text?: string;
+};
 
 // Recently spoken sentences. Menu words, greetings and repeated advice are free the second time.
 const cache = new Map<string, Spoken>();
@@ -59,10 +66,17 @@ export async function speakIn(
       /* fall back to OpenAI */
     }
   }
-  if (!out) {
-    const mp3 = await speak(said, lang === "auto" ? undefined : langName(lang));
-    out = { audio: toBase64(mp3), mimeType: "audio/mpeg", engine: "openai" };
+  if (!out && process.env.OPENAI_API_KEY) {
+    try {
+      const mp3 = await speak(said, lang === "auto" ? undefined : langName(lang));
+      out = { audio: toBase64(mp3), mimeType: "audio/mpeg", engine: "openai" };
+    } catch (err) {
+      console.warn("[voice]", err instanceof Error ? err.message : err);
+    }
   }
+  // Offline, or OpenAI out of credit: the browser's own voice reads it (not cached:
+  // there is nothing to keep).
+  if (!out) return { audio: "", mimeType: "", engine: "browser", text: said };
   cache.set(key, out);
   while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
   return out;
