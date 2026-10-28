@@ -8,6 +8,15 @@ from commit messages and file lists; they weren't re-tested for this document.
 
 ## Unreleased — relay fan, readout redesign, sign-up tiles
 
+### Stage demo for the Renewable Energy Challenge pitch
+- **Change:** `public/stage-demo.html`, a self-contained, offline simulation of the pitch demo in
+  nine scenes that follow the script (heat stress, fan switching itself, internet pulled, Ama's
+  Twi answer and vaccine reminder, incubator on battery during a power cut, solar and biogas).
+  Clearly labelled as simulated data, for rehearsal and as the backup if the live demo fails.
+  Recorded as `promo/stage-demo.mp4` (3 min 36 s, no sound, for the team to speak over).
+- **Checked:** rendered at 1600 × 900 and phone size in light and dark, no console errors or
+  sideways scroll; video frames checked.
+
 ### Vaccine reminders: Ama follows the broiler and layer schedules
 - **Problem:** the app knew each flock's age but not what the birds needed that day, so farmers
   had to track vaccine days on a paper chart.

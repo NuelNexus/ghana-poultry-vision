@@ -122,6 +122,7 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 
 | Path | What it is |
 |---|---|
+| `stage-demo.html` | Pitch stage demo: a self-contained simulation of the PoultryGrid demo (Sense, Think, Act, no internet, Ama's vaccine reminder, hatchery, power) with the script cue for each scene. Open `/stage-demo.html`; works offline. Space plays/pauses, arrow keys change scene. Recording: `promo/stage-demo.mp4`. |
 | `auth-bg.svg` | Sign-in/sign-up background, drawn locally (replaced a remote image that now returns 403). |
 | `hatch/` | Landing page frame sequence (egg to chicken). |
 | `ai/` | Ama's 3D model, animations, coop and grass models, still/animated blob. |
