@@ -1,0 +1,4 @@
+# Ghana Voice: speaking (serve.py). CPU is fine; a Raspberry Pi 4/5 (64-bit OS) works.
+torch>=2.1
+transformers>=4.40
+numpy

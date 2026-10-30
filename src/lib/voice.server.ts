@@ -1,6 +1,7 @@
 import process from "node:process";
 import { speak, toBase64 } from "./openai.server";
 import { KHAYA_CODES, langName, type SpeechLang } from "./ai-languages";
+import { ghanaVoiceSpeak } from "./ghana-voice.server";
 import { khayaEnabled, khayaSpeak } from "./khaya.server";
 import { twiSpeak } from "./twi-tts.server";
 import { DEFAULT_VOICE, type VoiceChoice } from "./voice-choice";
@@ -10,15 +11,16 @@ import { DEFAULT_VOICE, type VoiceChoice } from "./voice-choice";
 // each as soon as it arrives, so the first words are heard after one short
 // synthesis instead of after the whole reply.
 //
-//   Twi            -> stable-twi-tts (Pi or this PC), then Khaya, then OpenAI
+//   Twi            -> stable-twi-tts (Pi or this PC), then Ghana Voice, then Khaya, then OpenAI
 //   Male or female: the account's choice in Profile (default male, twi-6).
-//   Ga, Ewe, Dagbani, Hausa -> Khaya when there is a key, then OpenAI
+//   Ga, Ewe, Dagbani, Hausa -> Ghana Voice (speech/serve.py, when GHANA_VOICE_URL is set and
+//                    it has that language), then Khaya when there is a key, then OpenAI
 //   anything else  -> OpenAI
 
 export type Spoken = {
   audio: string;
   mimeType: string;
-  engine: "twi" | "khaya" | "openai" | "browser";
+  engine: "twi" | "ghana" | "khaya" | "openai" | "browser";
   /** engine "browser": no audio; the browser reads this text with its own voice (offline). */
   text?: string;
 };
@@ -56,6 +58,18 @@ export async function speakIn(
       out = { audio: toBase64(await twiSpeak(said, voice)), mimeType: "audio/wav", engine: "twi" };
     } catch {
       /* Pi / PC voice offline or slow: next option */
+    }
+  }
+  // Ghana Voice has one voice per language, so the male/female choice doesn't apply.
+  if (!out) {
+    try {
+      out = {
+        audio: toBase64(await ghanaVoiceSpeak(said, lang)),
+        mimeType: "audio/wav",
+        engine: "ghana",
+      };
+    } catch {
+      /* not set up, no voice for this language, or offline: next option */
     }
   }
   if (!out && khayaEnabled() && KHAYA_CODES[lang]?.tts) {

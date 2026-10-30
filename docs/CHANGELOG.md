@@ -8,6 +8,20 @@ from commit messages and file lists; they weren't re-tested for this document.
 
 ## Unreleased — coop unit, marketplace, first-login tour, video guides
 
+### Ghana Voice: our own speech model for Ghanaian languages
+- **Request:** a speech model that speaks the native languages of Ghana.
+- **Change:** new `speech/` folder. Voices are VITS models fine-tuned from Meta's MMS-TTS on
+  GhanaNLP's open `ghana-speech` recordings. Twi, Ewe, Hausa and 14 other Ghanaian languages
+  speak out of the box (MMS voices); Fante and Dagbani start from a close relative (Akan,
+  Mampruli) and switch on once trained; Ga has no open data, so it trains on your own
+  recordings. Training runs on a free Colab GPU (`speech/train_colab.ipynb`). Numbers are read
+  in English. `speech/serve.py` is the voice server; the app uses it when `GHANA_VOICE_URL` is
+  set: after stable-twi-tts for Twi, and first for Ga, Ewe, Dagbani and Hausa, before Khaya and
+  OpenAI. Files: `speech/*`, `src/lib/ghana-voice.server.ts`, `src/lib/voice.server.ts`,
+  `src/lib/api/assistant.functions.ts`, `src/routes/app.ai.tsx`.
+- **Checked:** unit tests and a CPU run of the whole pipeline with a tiny stand-in model (T10).
+  A real GPU training run hasn't been done yet. MMS voices and the dataset are CC BY-NC 4.0.
+
 ### Twi voice back to male, language picker fix, OpenAI only
 - **Twi voice:** the default is the male `twi-6` again (the female `twi-1` was hard to follow).
   `src/lib/twi-tts.server.ts`, `edge/twi_tts.py`, migration `008_male_twi_voice.sql`.

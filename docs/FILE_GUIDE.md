@@ -47,6 +47,17 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 | `deploy/*.service`, `install_pi.sh`, `install_tts.sh` | systemd units and installers for the agent and the Twi voice. |
 | `README.md` | Pi wiring, setup and the Twi voice section. |
 
+## `speech/` — Ghana Voice (our own text-to-speech)
+
+| Path | What it is |
+|---|---|
+| `README.md` | Languages, speaking, connecting to the app, training, recording Ga, licences. |
+| `ghana_voice/` | `languages.py` (21 languages: base voice, dataset, letter fixes), `text.py` (clean-up, numbers in English, fit text to a voice's letters), `synth.py` (load voices, speak). |
+| `serve.py` | `list`, `say`, and the HTTP server the app calls (`GET /health`, `POST /synthesize`). |
+| `prepare_data.py`, `make_base.py`, `train.py` | Training: collect recordings from `ghana-speech` (or your own), build the trainable base with any new letters, fine-tune and export to `models/<code>/`. |
+| `train_colab.ipynb`, `setup_training.sh` | The training flow on a free Colab GPU. |
+| `tests/test_text.py` | Unit tests for the text rules (no models needed). |
+
 ## `scripts/`
 
 | File | Responsibility |
@@ -82,7 +93,8 @@ Applied with `npm run db:migrate` (`scripts/db-migrate.mjs`, over Neon's HTTP dr
 | `ai-languages.ts` | Speech-language codes, Khaya codes, transcription hints, `isPromptEcho`, `detectLang` (Twi / Ga / Ewe / other). |
 | `dom-translator.ts` | Browser: translates the page in place (text, placeholders, labels), with number placeholders, local cache, `translate="no"` opt-out. |
 | `translate.server.ts` | Server: translates batches (Khaya or GPT-5.5), caches in `ui_translations`, de-duplicates concurrent requests. |
-| `voice.server.ts` | `speakIn(text, lang)`: Twi voice → Khaya → OpenAI, with a sentence cache. |
+| `voice.server.ts` | `speakIn(text, lang)`: Twi voice → Ghana Voice → Khaya → OpenAI, with a sentence cache. |
+| `ghana-voice.server.ts` | Reaches Ghana Voice (`speech/serve.py`) at `GHANA_VOICE_URL`; asks `/health` which languages it speaks (cached a minute). |
 | `speech-client.ts` | Browser: `SpeechPlayer` plays text sentence by sentence with prefetch and slow-voice fallback. |
 | `twi-tts.server.ts` | Reaches the Twi voice: direct `TWI_TTS_URL`, or the database relay to the Pi. Default voice `twi-6`. |
 | `twi-nlp.server.ts` | Calls the DistilABENA word helper (`TWI_NLP_URL`). |

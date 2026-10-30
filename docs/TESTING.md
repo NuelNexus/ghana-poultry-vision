@@ -101,6 +101,17 @@ Sign-in / sign-up / sign-up form on a phone in Twi, Ga, Dagbani and French: all 
   notes: no audio (by choice, D20) and two connector notes across scenes (false positives).
 - Frames reviewed from rendered files, including Twi captions (ɛ, ɔ, ã render in Inter).
 
+### T10. Ghana Voice (`speech/`)
+- `python -m unittest discover -s speech/tests`: 10 tests pass (numbers to English words, text
+  fitted to the Akan and Mampruli alphabets, Dagbani look-alike letters, data filters).
+- Pipeline checked on CPU with a tiny randomly initialised VITS model standing in for the MMS
+  voice (Hugging Face downloads were blocked in that sandbox): `make_base.py` added ɣ, ʒ, c, j
+  after the tokenizer's hidden `<unk>` id (a clash found and fixed here), the exported voice
+  tokenizes every new letter, and `serve.py` returned WAV over HTTP (401 without the token,
+  404 for a language it doesn't serve, 400 for empty text).
+- **Not yet run:** a real fine-tune on a GPU (`train.py` calling finetune-hf-vits), real MMS
+  voices, and speed on a Pi. Listen to the Colab sample before switching a language on.
+
 ### Earlier results (same session, before these fixes)
 
 | Test | Result |

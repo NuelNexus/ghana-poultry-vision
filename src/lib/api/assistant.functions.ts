@@ -11,6 +11,7 @@ import {
   openAiFirst,
 } from "../openai.server";
 import { KHAYA_CODES, detectLang, langName, type SpeechLang } from "../ai-languages";
+import { ghanaVoiceSpeaks } from "../ghana-voice.server";
 import { khayaEnabled, khayaTranscribe, khayaTranslate } from "../khaya.server";
 import { twiVoiceOnline, wakeTwiVoice } from "../twi-tts.server";
 import { speakIn } from "../voice.server";
@@ -292,10 +293,12 @@ export async function hear(audio: Uint8Array, mimeType: string, uiLang: SiteLang
 export const getSpeechEngines = createServerFn({ method: "GET" })
   .middleware([requireUser])
   .handler(async () => {
-    const twiVoice = await twiVoiceOnline();
+    const [twiVoice, ghanaTwi] = await Promise.all([twiVoiceOnline(), ghanaVoiceSpeaks("tw")]);
     return {
       khaya: khayaEnabled(),
       twiVoice,
+      /** Ghana Voice (speech/serve.py) is reachable and speaks Twi. */
+      ghanaVoice: ghanaTwi,
       twiWords: twiWordsEnabled(),
       /** The live voice call is OpenAI only; without a key, the chat mic does voice instead. */
       liveVoice: openAiFirst(),

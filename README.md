@@ -68,7 +68,9 @@ can change it in Profile > Language and voice. It is saved on their account.
   hear** (tap any text to hear it; tap a button once to hear it and again to press it). Every text
   box gets a microphone, and new alerts can be read out loud.
 - **Voices:** Twi uses the male `twi-6` voice from stable-twi-tts (`npm run twi` on this PC, or
-  the Pi service); other languages use Khaya with a key, else OpenAI. Speech is sent one sentence
+  the Pi service). **Ghana Voice** ([`speech/`](speech/README.md)), our own voices for Twi, Ewe,
+  Hausa, Dagbani, Ga and 14 more Ghanaian languages, comes next when `GHANA_VOICE_URL` is set; it
+  can be retrained on a free Colab GPU. Then Khaya with a key, else OpenAI. Speech is sent one sentence
   at a time, so the first words play after about a second.
 - **Ama's answers** in Twi and the other Ghanaian languages use `OPENAI_LOCAL_MODEL` (default
   `gpt-5.5`); English uses `OPENAI_CHAT_MODEL` (default `gpt-4o-mini`).

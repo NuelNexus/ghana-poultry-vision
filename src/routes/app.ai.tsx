@@ -428,10 +428,10 @@ const enginesQuery = {
   staleTime: 60_000,
   refetchInterval: 60_000,
 };
-/** True when Twi has its own voice (stable-twi-tts or Khaya); otherwise GPT speaks Twi too. */
+/** True when Twi has its own voice (stable-twi-tts, Ghana Voice or Khaya); otherwise GPT speaks Twi too. */
 function useTwiVoice() {
   const engines = useQuery(enginesQuery);
-  return Boolean(engines.data?.twiVoice || engines.data?.khaya);
+  return Boolean(engines.data?.twiVoice || engines.data?.ghanaVoice || engines.data?.khaya);
 }
 /** While the AI tab is open, keep the Pi polling fast (it slows down after 5 minutes). */
 function useWakeTwiVoice() {

@@ -45,3 +45,12 @@ edge/.venv
 
 # Generated HyperFrames projects (node videos/build.mjs)
 videos/build/
+
+# Ghana Voice training (speech/): downloads, checkpoints and trained voices
+speech/.venv/
+speech/data/
+speech/bases/
+speech/runs/
+speech/models/
+speech/finetune-hf-vits/
+speech/*.wav
