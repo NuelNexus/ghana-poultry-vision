@@ -1,5 +1,5 @@
 # Ghana Voice: training (prepare_data.py, make_base.py, train.py). Needs an NVIDIA GPU for train.py.
-# Versions pinned to what finetune-hf-vits works with (checked with a CPU smoke run).
+# Versions pinned for finetune-hf-vits (built for transformers ~4.35-4.46). Not yet run on a GPU.
 torch>=2.1
 transformers==4.46.3
 datasets[audio]==2.21.0
