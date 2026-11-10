@@ -1110,7 +1110,7 @@ function LanguageSection() {
 
 const VOICE_SAMPLE = "Akwaaba. Me din de Ama. Mɛboa wo ama wo nkokɔ ho atɔ wo.";
 
-/** Ama's voice: male (stable-twi-tts twi-6) or female (twi-1). Saved on the account. */
+/** Ama's voice: NELVIN (our fine-tuned Twi voice), stock male twi-6 or female twi-1. Saved on the account. */
 function VoiceCard() {
   const { user, patchUser } = useAuth();
   const qc = useQueryClient();
@@ -1159,8 +1159,9 @@ function VoiceCard() {
     <Card padding="md">
       <h3 className="pg-t-h3 mb-1">Ama’s voice</h3>
       <p className="pg-t-caption mb-4">
-        The voice that reads replies, alerts and pages aloud. The Twi voices come from the
-        stable-twi-tts model on your Pi or computer.
+        The voice that reads replies, alerts and pages aloud. NELVIN is our own Twi voice,
+        trained on a real speaker; Male and Female are the stock stable-twi-tts voices. They run
+        on your Pi or computer.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl
@@ -1168,6 +1169,7 @@ function VoiceCard() {
           value={voice}
           onChange={(v) => save.mutate(v)}
           options={[
+            { value: "nelvin", label: "NELVIN" },
             { value: "male", label: "Male" },
             { value: "female", label: "Female" },
           ]}

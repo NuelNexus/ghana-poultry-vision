@@ -11,7 +11,7 @@ import { DEFAULT_VOICE, type VoiceChoice } from "./voice-choice";
 // synthesis instead of after the whole reply.
 //
 //   Twi            -> stable-twi-tts (Pi or this PC), then Khaya, then OpenAI
-//   Male or female: the account's choice in Profile (default male, twi-6).
+//   Voice: the account's choice in Profile (default NELVIN, our fine-tuned male Twi voice).
 //   Ga, Ewe, Dagbani, Hausa -> Khaya when there is a key, then OpenAI
 //   anything else  -> OpenAI
 

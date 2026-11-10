@@ -12,14 +12,16 @@ import { DEFAULT_VOICE, type VoiceChoice } from "./voice-choice";
 //                       for the Pi, which polls /api/public/devices/tts, to upload the WAV.
 //                       Works behind any router, with the Pi's existing device key.
 //
-// Voices: the account's choice (Profile) picks male "nelvin" (our fine-tuned voice; the Pi
-// falls back to stock twi-6 if it doesn't have the model) or female twi-1 (about 190 Hz).
-// TWI_TTS_VOICE_MALE / TWI_TTS_VOICE_FEMALE swap in other stable-twi-tts voices.
+// Voices: the account's choice (Profile) picks NELVIN (our fine-tuned male voice, the default;
+// a Pi without the model falls back to twi-6), stock male twi-6, or stock female twi-1.
+// TWI_TTS_VOICE_NELVIN / _MALE / _FEMALE swap in other stable-twi-tts voices.
 
 const VOICE = (v: VoiceChoice) =>
   v === "female"
     ? process.env.TWI_TTS_VOICE_FEMALE || "twi-1"
-    : process.env.TWI_TTS_VOICE_MALE || "nelvin";
+    : v === "male"
+      ? process.env.TWI_TTS_VOICE_MALE || "twi-6"
+      : process.env.TWI_TTS_VOICE_NELVIN || "nelvin";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** True when some Pi's voice service polled in the last minute (or a direct URL is set). */

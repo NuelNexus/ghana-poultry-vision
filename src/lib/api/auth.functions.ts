@@ -136,7 +136,7 @@ export const setMyLanguage = createServerFn({ method: "POST" })
     return { ok: true, language: data.language };
   });
 
-/** Ama's voice (male or female), for this account on every device. */
+/** Ama's voice (NELVIN, male or female), for this account on every device. */
 export const setMyVoice = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .inputValidator(z.object({ voice: z.enum(VOICES) }))
