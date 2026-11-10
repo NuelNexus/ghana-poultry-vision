@@ -45,3 +45,9 @@ edge/.venv
 
 # Generated HyperFrames projects (node videos/build.mjs)
 videos/build/
+
+
+# Duplicate of "Twi AI"
+Twi AI - Copy/
+# Python caches in the training code
+tts-finetune/**/__pycache__/

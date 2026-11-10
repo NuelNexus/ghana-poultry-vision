@@ -27,9 +27,17 @@ is in [`docs/`](docs/README.md).
 
 ## Run the app
 
+Everything (website + Twi voice + Twi word helper) in one command, or double-click
+`Start PoultryGrid.bat`:
+
 ```bash
-npm run dev
+npm start
 ```
+
+The first run installs the site's packages and the Twi Python environment (`.venv-twi`, needs
+Python 3.10-3.12 and a few minutes), and pulls the NELVIN voice model from Git LFS. Clone with
+[Git LFS](https://git-lfs.com) installed so the model and recordings come down. `npm run dev` still
+starts only the website.
 
 ### HTTPS for the microphone on other devices
 
@@ -67,8 +75,9 @@ can change it in Profile > Language and voice. It is saved on their account.
   ask about the farm, in your language), **Explain** (Ama says what the page shows) and **Tap to
   hear** (tap any text to hear it; tap a button once to hear it and again to press it). Every text
   box gets a microphone, and new alerts can be read out loud.
-- **Voices:** Twi uses the male `twi-6` voice from stable-twi-tts (`npm run twi` on this PC, or
-  the Pi service); other languages use Khaya with a key, else OpenAI. Speech is sent one sentence
+- **Voices:** Twi uses NELVIN, our own male voice fine-tuned from stable-twi-tts at 0.85x speed
+  (`edge/voices/nelvin`, how it was made: `tts-finetune/`), or the female `twi-1` (`npm start` on
+  this PC, or the Pi service); other languages use Khaya with a key, else OpenAI. Speech is sent one sentence
   at a time, so the first words play after about a second.
 - **Ama's answers** in Twi and the other Ghanaian languages use `OPENAI_LOCAL_MODEL` (default
   `gpt-5.5`); English uses `OPENAI_CHAT_MODEL` (default `gpt-4o-mini`).

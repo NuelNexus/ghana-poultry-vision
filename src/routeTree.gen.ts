@@ -9,30 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/app.index'
-import { Route as AppReportsRouteImport } from './routes/app.reports'
-import { Route as AppProfileRouteImport } from './routes/app.profile'
-import { Route as AppHousesRouteImport } from './routes/app.houses'
-import { Route as AppHealthRouteImport } from './routes/app.health'
-import { Route as AppHatcheryRouteImport } from './routes/app.hatchery'
-import { Route as AppGuidesRouteImport } from './routes/app.guides'
-import { Route as AppDevicesRouteImport } from './routes/app.devices'
-import { Route as AppCamerasRouteImport } from './routes/app.cameras'
-import { Route as AppAutomationRouteImport } from './routes/app.automation'
-import { Route as AppAlertsRouteImport } from './routes/app.alerts'
 import { Route as AppAiRouteImport } from './routes/app.ai'
+import { Route as AppAlertsRouteImport } from './routes/app.alerts'
+import { Route as AppAutomationRouteImport } from './routes/app.automation'
+import { Route as AppCamerasRouteImport } from './routes/app.cameras'
+import { Route as AppDevicesRouteImport } from './routes/app.devices'
+import { Route as AppGuidesRouteImport } from './routes/app.guides'
+import { Route as AppHatcheryRouteImport } from './routes/app.hatchery'
+import { Route as AppHealthRouteImport } from './routes/app.health'
+import { Route as AppHousesRouteImport } from './routes/app.houses'
+import { Route as AppProfileRouteImport } from './routes/app.profile'
+import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppMarketIndexRouteImport } from './routes/app.market.index'
 import { Route as AppMarketListingIdRouteImport } from './routes/app.market.$listingId'
-import { Route as ApiPublicDevicesTtsRouteImport } from './routes/api/public/devices/tts'
 import { Route as ApiPublicDevicesIngestRouteImport } from './routes/api/public/devices/ingest'
+import { Route as ApiPublicDevicesTtsRouteImport } from './routes/api/public/devices/tts'
 import { Route as ApiPublicMarketImagesImageIdRouteImport } from './routes/api/public/market/images/$imageId'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -40,9 +40,9 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -50,49 +50,9 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppReportsRoute = AppReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppProfileRoute = AppProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppHousesRoute = AppHousesRouteImport.update({
-  id: '/houses',
-  path: '/houses',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppHealthRoute = AppHealthRouteImport.update({
-  id: '/health',
-  path: '/health',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppHatcheryRoute = AppHatcheryRouteImport.update({
-  id: '/hatchery',
-  path: '/hatchery',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppGuidesRoute = AppGuidesRouteImport.update({
-  id: '/guides',
-  path: '/guides',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppDevicesRoute = AppDevicesRouteImport.update({
-  id: '/devices',
-  path: '/devices',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppCamerasRoute = AppCamerasRouteImport.update({
-  id: '/cameras',
-  path: '/cameras',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppAutomationRoute = AppAutomationRouteImport.update({
-  id: '/automation',
-  path: '/automation',
+const AppAiRoute = AppAiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAlertsRoute = AppAlertsRouteImport.update({
@@ -100,9 +60,49 @@ const AppAlertsRoute = AppAlertsRouteImport.update({
   path: '/alerts',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAiRoute = AppAiRouteImport.update({
-  id: '/ai',
-  path: '/ai',
+const AppAutomationRoute = AppAutomationRouteImport.update({
+  id: '/automation',
+  path: '/automation',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCamerasRoute = AppCamerasRouteImport.update({
+  id: '/cameras',
+  path: '/cameras',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDevicesRoute = AppDevicesRouteImport.update({
+  id: '/devices',
+  path: '/devices',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppGuidesRoute = AppGuidesRouteImport.update({
+  id: '/guides',
+  path: '/guides',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHatcheryRoute = AppHatcheryRouteImport.update({
+  id: '/hatchery',
+  path: '/hatchery',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHealthRoute = AppHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHousesRoute = AppHousesRouteImport.update({
+  id: '/houses',
+  path: '/houses',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfileRoute = AppProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMarketIndexRoute = AppMarketIndexRouteImport.update({
@@ -115,14 +115,14 @@ const AppMarketListingIdRoute = AppMarketListingIdRouteImport.update({
   path: '/market/$listingId',
   getParentRoute: () => AppRoute,
 } as any)
-const ApiPublicDevicesTtsRoute = ApiPublicDevicesTtsRouteImport.update({
-  id: '/api/public/devices/tts',
-  path: '/api/public/devices/tts',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicDevicesIngestRoute = ApiPublicDevicesIngestRouteImport.update({
   id: '/api/public/devices/ingest',
   path: '/api/public/devices/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDevicesTtsRoute = ApiPublicDevicesTtsRouteImport.update({
+  id: '/api/public/devices/tts',
+  path: '/api/public/devices/tts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicMarketImagesImageIdRoute =
@@ -277,11 +277,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app': {
@@ -291,11 +291,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/': {
@@ -305,67 +305,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/reports': {
-      id: '/app/reports'
-      path: '/reports'
-      fullPath: '/app/reports'
-      preLoaderRoute: typeof AppReportsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/profile': {
-      id: '/app/profile'
-      path: '/profile'
-      fullPath: '/app/profile'
-      preLoaderRoute: typeof AppProfileRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/houses': {
-      id: '/app/houses'
-      path: '/houses'
-      fullPath: '/app/houses'
-      preLoaderRoute: typeof AppHousesRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/health': {
-      id: '/app/health'
-      path: '/health'
-      fullPath: '/app/health'
-      preLoaderRoute: typeof AppHealthRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/hatchery': {
-      id: '/app/hatchery'
-      path: '/hatchery'
-      fullPath: '/app/hatchery'
-      preLoaderRoute: typeof AppHatcheryRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/guides': {
-      id: '/app/guides'
-      path: '/guides'
-      fullPath: '/app/guides'
-      preLoaderRoute: typeof AppGuidesRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/devices': {
-      id: '/app/devices'
-      path: '/devices'
-      fullPath: '/app/devices'
-      preLoaderRoute: typeof AppDevicesRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/cameras': {
-      id: '/app/cameras'
-      path: '/cameras'
-      fullPath: '/app/cameras'
-      preLoaderRoute: typeof AppCamerasRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/app/automation': {
-      id: '/app/automation'
-      path: '/automation'
-      fullPath: '/app/automation'
-      preLoaderRoute: typeof AppAutomationRouteImport
+    '/app/ai': {
+      id: '/app/ai'
+      path: '/ai'
+      fullPath: '/app/ai'
+      preLoaderRoute: typeof AppAiRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/alerts': {
@@ -375,11 +319,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAlertsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/ai': {
-      id: '/app/ai'
-      path: '/ai'
-      fullPath: '/app/ai'
-      preLoaderRoute: typeof AppAiRouteImport
+    '/app/automation': {
+      id: '/app/automation'
+      path: '/automation'
+      fullPath: '/app/automation'
+      preLoaderRoute: typeof AppAutomationRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/cameras': {
+      id: '/app/cameras'
+      path: '/cameras'
+      fullPath: '/app/cameras'
+      preLoaderRoute: typeof AppCamerasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/devices': {
+      id: '/app/devices'
+      path: '/devices'
+      fullPath: '/app/devices'
+      preLoaderRoute: typeof AppDevicesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/guides': {
+      id: '/app/guides'
+      path: '/guides'
+      fullPath: '/app/guides'
+      preLoaderRoute: typeof AppGuidesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/hatchery': {
+      id: '/app/hatchery'
+      path: '/hatchery'
+      fullPath: '/app/hatchery'
+      preLoaderRoute: typeof AppHatcheryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/health': {
+      id: '/app/health'
+      path: '/health'
+      fullPath: '/app/health'
+      preLoaderRoute: typeof AppHealthRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/houses': {
+      id: '/app/houses'
+      path: '/houses'
+      fullPath: '/app/houses'
+      preLoaderRoute: typeof AppHousesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/profile': {
+      id: '/app/profile'
+      path: '/profile'
+      fullPath: '/app/profile'
+      preLoaderRoute: typeof AppProfileRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/reports': {
+      id: '/app/reports'
+      path: '/reports'
+      fullPath: '/app/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/market/': {
@@ -396,18 +396,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMarketListingIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/api/public/devices/tts': {
-      id: '/api/public/devices/tts'
-      path: '/api/public/devices/tts'
-      fullPath: '/api/public/devices/tts'
-      preLoaderRoute: typeof ApiPublicDevicesTtsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/devices/ingest': {
       id: '/api/public/devices/ingest'
       path: '/api/public/devices/ingest'
       fullPath: '/api/public/devices/ingest'
       preLoaderRoute: typeof ApiPublicDevicesIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/devices/tts': {
+      id: '/api/public/devices/tts'
+      path: '/api/public/devices/tts'
+      fullPath: '/api/public/devices/tts'
+      preLoaderRoute: typeof ApiPublicDevicesTtsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/market/images/$imageId': {

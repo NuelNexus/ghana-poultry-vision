@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Twi Voice</title>
+<style>
+  :root {
+    --bg: #f6f4ef; --card: #ffffff; --ink: #1d1b16; --muted: #6b665c; --line: #e3ded3;
+    --accent: #1f6f4a; --accent-ink: #ffffff; --accent-soft: #e4f1ea; --err: #a3321f; --warn-soft: #f7ecd8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151512; --card: #1f1e1a; --ink: #eeeae1; --muted: #a39e92; --line: #34322c;
+      --accent: #5cc08f; --accent-ink: #0d1a13; --accent-soft: #1d3328; --err: #f08a74; --warn-soft: #3a3020;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .train { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 14px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 18px; }
+  .bar { flex: 1; min-width: 160px; height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; }
+  .dot.on { background: var(--accent); }
+  .tabs { display: flex; gap: 4px; margin-bottom: -1px; }
+  .tab { border: 1px solid var(--line); border-bottom: 0; background: transparent; color: var(--muted);
+    padding: 8px 18px; border-radius: 10px 10px 0 0; font-size: 15px; cursor: pointer; }
+  .tab[aria-selected="true"] { background: var(--card); color: var(--ink); font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 0 14px 14px 14px; padding: 18px; }
+  textarea { width: 100%; min-height: 130px; resize: vertical; padding: 14px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 20px; line-height: 1.5; font-family: inherit; }
+  textarea:focus, select:focus, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .keys { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; align-items: center; }
+  .keys span { color: var(--muted); font-size: 14px; margin-right: 4px; }
+  .key { min-width: 40px; height: 36px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); font-size: 18px; cursor: pointer; }
+  .key:hover { border-color: var(--accent); }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; }
+  label.l { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+  select { height: 42px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); font-size: 16px; min-width: 230px; }
+  .speed { flex: 1; min-width: 180px; }
+  .speed input { width: 100%; accent-color: var(--accent); }
+  .btn { height: 46px; padding: 0 24px; border: 0; border-radius: 10px; background: var(--accent);
+    color: var(--accent-ink); font-size: 17px; font-weight: 600; cursor: pointer; margin-left: auto; }
+  .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); font-size: 15px; height: 40px; margin: 0; }
+  .btn:disabled { opacity: 0.6; cursor: progress; }
+  .hint { color: var(--muted); font-size: 14px; margin-top: 12px; }
+  .status { min-height: 24px; margin: 12px 2px 0; font-size: 15px; }
+  .status.err { color: var(--err); }
+  h2 { font-size: 16px; margin: 26px 0 10px; }
+  .clips { display: grid; gap: 10px; }
+  .clip { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .clip p { margin: 0 0 8px; overflow-wrap: anywhere; }
+  .meta { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .clip audio, .cell audio { width: 100%; margin-top: 8px; }
+  a { color: var(--accent); }
+  .tag { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1px 9px; }
+  .empty { color: var(--muted); font-size: 14px; }
+  .examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .ex { border: 1px dashed var(--line); background: transparent; color: var(--muted); border-radius: 999px;
+    padding: 4px 12px; font-size: 14px; cursor: pointer; }
+  .ex:hover { color: var(--ink); border-color: var(--accent); }
+  .picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin: 4px 0 14px; }
+  .pick { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line);
+    border-radius: 10px; cursor: pointer; font-size: 15px; background: var(--bg); }
+  .pick input { accent-color: var(--accent); width: 18px; height: 18px; }
+  .pick.new { border-color: var(--accent); }
+  .pick small { color: var(--muted); margin-left: auto; }
+  .round { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .round > p { margin: 0 0 10px; font-size: 17px; overflow-wrap: anywhere; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .cell { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+  .cell.playing { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .cell b { font-size: 15px; }
+  .cell .meta { margin-top: 2px; }
+  .cell .star { margin-left: auto; background: none; border: 0; font-size: 20px; cursor: pointer; color: var(--muted); padding: 0; }
+  .cell .star.on { color: #d49b1a; }
+  .roundbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .roundbar .grow { flex: 1; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Twi Voice</h1>
+  <p class="sub">Type Twi and hear it spoken. Runs on this computer.</p>
+
+  <div class="train" id="train" hidden>
+    <span id="trainText"><span class="dot"></span>Checking training…</span>
+    <div class="bar"><i id="trainBar"></i></div>
+    <span id="trainLast" class="empty"></span>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-speak" aria-selected="true">Speak</button>
+    <button class="tab" role="tab" id="tab-compare" aria-selected="false">Compare snapshots</button>
+  </div>
+
+  <div class="card">
+    <label class="l" for="text">Twi text</label>
+    <textarea id="text" placeholder="Akwaaba! Me din de Ama..."></textarea>
+    <div class="keys" aria-label="Twi letters">
+      <span>Insert:</span>
+      <button class="key" data-k="ɛ">ɛ</button><button class="key" data-k="ɔ">ɔ</button>
+      <button class="key" data-k="Ɛ">Ɛ</button><button class="key" data-k="Ɔ">Ɔ</button>
+    </div>
+
+    <div id="pane-speak">
+      <div class="row">
+        <div>
+          <label class="l" for="voice">Voice</label>
+          <select id="voice"></select>
+        </div>
+        <div class="speed">
+          <label class="l" for="speed">Speed: <b class="speedVal">0.85×</b></label>
+          <input id="speed" type="range" min="0.6" max="2" step="0.05" value="0.85">
+        </div>
+        <button class="btn" id="go">Speak</button>
+      </div>
+    </div>
+
+    <div id="pane-compare" hidden>
+      <div class="roundbar">
+        <label class="l grow" style="margin:0">Voices to compare <span id="pickCount"></span></label>
+        <button class="btn ghost" id="pickNelvin">All NELVIN</button>
+        <button class="btn ghost" id="pickNone">None</button>
+      </div>
+      <div class="picks" id="picks"></div>
+      <div class="row">
+        <div class="speed">
+          <label class="l" for="speedC">Speed (same for all): <b class="speedVal">0.85×</b></label>
+          <input id="speedC" type="range" min="0.6" max="2" step="0.05" value="0.85">
+        </div>
+        <button class="btn" id="goCompare">Compare</button>
+      </div>
+    </div>
+
+    <div class="examples" id="examples"></div>
+    <div class="hint">Ctrl+Enter runs it. Put English in [square brackets]; numbers are read in English.</div>
+  </div>
+  <div class="status" id="status" role="status"></div>
+
+  <section id="out-speak">
+    <h2>Recent clips</h2>
+    <div class="clips" id="clips"><div class="empty">Nothing yet.</div></div>
+  </section>
+  <section id="out-compare" hidden>
+    <h2>Comparisons</h2>
+    <div id="rounds"><div class="empty">Tick some voices, type a sentence and press Compare. New snapshots appear here on their own while training runs.</div></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const text = $("text"), voiceSel = $("voice"), statusEl = $("status");
+let voices = [], mode = "speak", known = null;
+const EXAMPLES = [
+  "Akwaaba! Me din de Ama. Mɛboa wo ama wo nkokɔ ayɛ yie.",
+  "Hwɛ sɛ nsuo a ɛwɔ nkokɔ no nsuo nkuruwa mu no ho teɛ.",
+  "Nkosua dodoɔ a wonyaeɛ ɛnnɛ no yɛ 30.",
+  "Meda wo ase!",
+];
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem("twivoice") || "{}"); } catch { return {}; } },
+  set(p) { try { localStorage.setItem("twivoice", JSON.stringify({ ...store.get(), ...p })); } catch {} },
+};
+
+function setStatus(msg, err) { statusEl.textContent = msg; statusEl.className = "status" + (err ? " err" : ""); }
+document.querySelectorAll("input[type=range]").forEach(r => {
+  const show = () => r.closest(".speed").querySelector(".speedVal").textContent = Number(r.value).toFixed(2) + "×";
+  r.addEventListener("input", show); show();
+});
+
+// ---- voices (re-checked every 30 s so new snapshots appear on their own) ----
+async function loadVoices() {
+  const r = await fetch("/api/voices");
+  const list = await r.json();
+  const fresh = known ? list.filter(v => !known.has(v.id)).map(v => v.id) : [];
+  known = new Set(list.map(v => v.id));
+  voices = list;
+  const cur = voiceSel.value || store.get().v;
+  voiceSel.innerHTML = voices.map(v => `<option value="${v.id}">${v.label}</option>`).join("");
+  if (cur && known.has(cur)) voiceSel.value = cur;
+  renderPicks(fresh);
+  if (fresh.length) setStatus("New snapshot ready: " + voices.filter(v => fresh.includes(v.id)).map(v => v.label).join(", "));
+}
+function checkedIds() { return [...document.querySelectorAll("#picks input:checked")].map(i => i.value); }
+function renderPicks(fresh = []) {
+  let sel = new Set(document.querySelector("#picks input") ? checkedIds() : (store.get().picks || []));
+  if (!sel.size && !document.querySelector("#picks input")) {
+    // default: newest two NELVIN snapshots + stock male
+    voices.filter(v => v.group === "nelvin").slice(0, 2).forEach(v => sel.add(v.id));
+    sel.add("twi-6");
+  }
+  fresh.forEach(id => sel.add(id));
+  $("picks").innerHTML = voices.map(v => `<label class="pick${fresh.includes(v.id) ? " new" : ""}">
+      <input type="checkbox" value="${v.id}" ${sel.has(v.id) ? "checked" : ""}> ${v.label}
+      ${fresh.includes(v.id) ? "<small>new</small>" : ""}</label>`).join("");
+  countPicks();
+}
+function countPicks() { const n = checkedIds().length; $("pickCount").textContent = n ? `(${n} picked)` : ""; store.set({ picks: checkedIds() }); }
+$("picks").addEventListener("change", countPicks);
+$("pickNelvin").onclick = () => { document.querySelectorAll("#picks input").forEach(i => i.checked = voices.find(v => v.id === i.value)?.group === "nelvin"); countPicks(); };
+$("pickNone").onclick = () => { document.querySelectorAll("#picks input").forEach(i => i.checked = false); countPicks(); };
+
+async function synth(t, voice, speed) {
+  const started = performance.now();
+  const r = await fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: t, voice, speed }) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.statusText); }
+  const blob = await r.blob();
+  return { url: URL.createObjectURL(blob), dur: Number(r.headers.get("X-Duration")), took: (performance.now() - started) / 1000 };
+}
+const label = (id) => voices.find(v => v.id === id)?.label || id;
+
+// ---- Speak ----
+let n = 0;
+async function speak() {
+  const t = text.value.trim();
+  if (!t) { setStatus("Type some Twi first.", true); text.focus(); return; }
+  $("go").disabled = true; setStatus("Speaking…");
+  try {
+    const v = voiceSel.value, c = await synth(t, v, Number($("speed").value));
+    const box = $("clips"); box.querySelector(".empty")?.remove();
+    const el = document.createElement("div"); el.className = "clip";
+    el.innerHTML = `<p></p><div class="meta"><span class="tag"></span><span>${c.dur.toFixed(1)} s audio · made in ${c.took.toFixed(1)} s</span>
+      <a download="twi-${++n}-${v}.wav" href="${c.url}">Download</a></div><audio controls src="${c.url}"></audio>`;
+    el.querySelector("p").textContent = t; el.querySelector(".tag").textContent = label(v);
+    box.prepend(el); el.querySelector("audio").play().catch(() => {});
+    setStatus("");
+  } catch (e) { setStatus("Couldn’t speak that: " + e.message, true); }
+  finally { $("go").disabled = false; }
+}
+
+// ---- Compare ----
+async function compare() {
+  const t = text.value.trim(), ids = checkedIds();
+  if (!t) { setStatus("Type some Twi first.", true); text.focus(); return; }
+  if (ids.length < 2) { setStatus("Tick at least two voices to compare.", true); return; }
+  $("goCompare").disabled = true;
+  const speed = Number($("speedC").value);
+  const rounds = $("rounds"); rounds.querySelector(".empty")?.remove();
+  const round = document.createElement("div"); round.className = "round";
+  round.innerHTML = `<div class="roundbar"><p class="grow" style="margin:0"></p>
+    <button class="btn ghost playall" disabled>▶ Play all in order</button></div><div class="grid"></div>`;
+  round.querySelector("p").textContent = t;
+  rounds.prepend(round);
+  const grid = round.querySelector(".grid");
+  const cells = [];
+  for (const [i, id] of ids.entries()) {
+    setStatus(`Making ${i + 1} of ${ids.length}: ${label(id)}… (first use of a snapshot takes a few seconds to load)`);
+    const cell = document.createElement("div"); cell.className = "cell";
+    cell.innerHTML = `<div class="meta"><b></b><button class="star" title="Mark as best" aria-label="Mark as best">☆</button></div>
+      <div class="meta info">working…</div>`;
+    cell.querySelector("b").textContent = label(id);
+    grid.append(cell);
+    try {
+      const c = await synth(t, id, speed);
+      cell.querySelector(".info").innerHTML = `${c.dur.toFixed(1)} s audio · <a download="compare-${id}.wav" href="${c.url}">Download</a>`;
+      const a = document.createElement("audio"); a.controls = true; a.src = c.url; cell.append(a);
+      cells.push({ cell, a });
+    } catch (e) { cell.querySelector(".info").textContent = "Failed: " + e.message; }
+  }
+  grid.addEventListener("click", e => {
+    const s = e.target.closest(".star"); if (!s) return;
+    grid.querySelectorAll(".star").forEach(x => { x.classList.toggle("on", x === s && !x.classList.contains("on")); x.textContent = x.classList.contains("on") ? "★" : "☆"; });
+  });
+  const pa = round.querySelector(".playall"); pa.disabled = !cells.length;
+  pa.onclick = async () => {
+    for (const { cell, a } of cells) {
+      cell.classList.add("playing"); a.currentTime = 0;
+      await new Promise(res => { a.onended = res; a.play().catch(res); });
+      cell.classList.remove("playing");
+      await new Promise(res => setTimeout(res, 400));
+    }
+  };
+  setStatus(""); $("goCompare").disabled = false;
+}
+
+// ---- training status ----
+async function loadStatus() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    if (s.epoch == null) return;
+    $("train").hidden = false;
+    const ep = s.done ? s.max_epochs : s.epoch + 1;
+    $("trainBar").style.width = Math.min(100, 100 * ep / s.max_epochs) + "%";
+    const state = s.crashed ? "Training stopped with an error" : s.done ? "Training finished" : s.running ? "Training" : "Training paused";
+    $("trainText").innerHTML = `<span class="dot ${s.running ? "on" : ""}"></span>${state} · epoch ${ep} of ${s.max_epochs}`;
+    const last = (s.exports || []).filter(l => l.includes("exported")).pop();
+    $("trainLast").textContent = last ? "Last snapshot: " + last.replace("exported ", "").replace("nelvin-clean-epoch", "epoch ") : "";
+  } catch {}
+}
+
+// ---- tabs, keys, examples ----
+function setMode(m) {
+  mode = m; store.set({ mode: m });
+  $("tab-speak").setAttribute("aria-selected", m === "speak"); $("tab-compare").setAttribute("aria-selected", m === "compare");
+  $("pane-speak").hidden = $("out-speak").hidden = m !== "speak";
+  $("pane-compare").hidden = $("out-compare").hidden = m !== "compare";
+}
+$("tab-speak").onclick = () => setMode("speak");
+$("tab-compare").onclick = () => setMode("compare");
+document.querySelectorAll(".key").forEach(b => b.addEventListener("click", () => {
+  text.setRangeText(b.dataset.k, text.selectionStart, text.selectionEnd, "end"); text.focus(); store.set({ t: text.value });
+}));
+$("examples").innerHTML = EXAMPLES.map((x, i) => `<button class="ex" data-i="${i}">${x.length > 34 ? x.slice(0, 32) + "…" : x}</button>`).join("");
+$("examples").addEventListener("click", e => { const b = e.target.closest(".ex"); if (b) { text.value = EXAMPLES[b.dataset.i]; store.set({ t: text.value }); run(); } });
+const run = () => (mode === "compare" ? compare() : speak());
+voiceSel.addEventListener("change", () => store.set({ v: voiceSel.value }));
+text.addEventListener("input", () => store.set({ t: text.value }));
+text.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); } });
+$("go").onclick = speak; $("goCompare").onclick = compare;
+
+const saved = store.get();
+if (saved.t) text.value = saved.t;
+setMode(saved.mode === "compare" ? "compare" : "speak");
+loadVoices().catch(() => setStatus("Couldn’t reach the voice server. Is it running?", true));
+loadStatus();
+setInterval(() => { loadVoices().catch(() => {}); loadStatus(); }, 30000);
+</script>
+</body>
+</html>

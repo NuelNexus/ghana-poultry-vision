@@ -9,6 +9,8 @@ set -euo pipefail
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 APP=/opt/poultrygrid
 cp "$SRC/twi_tts.py" "$SRC/requirements-tts.txt" "$APP/edge/"
+# Our fine-tuned NELVIN voice (Git LFS: run `git lfs pull` in the checkout first)
+[[ -d "$SRC/voices/nelvin" ]] && mkdir -p "$APP/edge/voices" && cp -r "$SRC/voices/nelvin" "$APP/edge/voices/" && chown -R poultrygrid:poultrygrid "$APP/edge/voices"
 mkdir -p /var/lib/poultrygrid/tts && chown -R poultrygrid:poultrygrid /var/lib/poultrygrid
 
 echo "==> Python packages (onnxruntime, Twi front-end)"

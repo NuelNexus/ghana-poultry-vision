@@ -432,7 +432,8 @@ void maintainWifi() {
   siteOnline = false;
   if (millis() - lastWifiAttempt < WIFI_RETRY_MS && lastWifiAttempt != 0) return;
   lastWifiAttempt = millis();
-  Serial.println("Connecting to WiFi...");
+  // Status: 1 = network not found, 4 = wrong password / rejected, 6 = disconnected
+  Serial.printf("Connecting to WiFi... (last status %d)\n", WiFi.status());
   WiFi.disconnect();
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }

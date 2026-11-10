@@ -1,0 +1,17 @@
+{
+ "voices": [
+  {
+   "name": "nelvin",
+   "speaker_id": 0,
+   "language": "twi",
+   "hours": 0.11,
+   "clips": 78,
+   "source_speaker": "NELVIN"
+  }
+ ],
+ "default": {
+  "twi_only": "nelvin",
+  "codeswitch": "nelvin"
+ },
+ "note": "Fine-tuned from stable-twi-tts on 78 NELVIN clips; checkpoint last.ckpt"
+}

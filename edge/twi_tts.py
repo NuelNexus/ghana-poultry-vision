@@ -10,7 +10,9 @@ The worker needs no open ports: it polls the app with the Pi's device key
 It checks every 20 s, and every second while someone is talking to Ama in Twi.
 
 Settings (env or agent.env):
-  PG_TTS_VOICE    voice, default twi-6 (male; see `stable-twi-tts --list-voices`)
+  PG_TTS_VOICE    voice, default nelvin (our fine-tuned male voice), else twi-6
+  PG_TTS_NELVIN_MODEL  folder with the NELVIN model, default edge/voices/nelvin
+  PG_TTS_NELVIN_SPEED  NELVIN speaking speed, default 0.85 (1 = as trained, lower = slower)
   PG_TTS_THREADS  CPU threads for synthesis, default 4 (a Pi 4/5 has 4 cores)
   PG_TTS_CACHE    where the 80 MB voice model is cached
   PG_TTS_TOKEN    bearer token required by `serve` (recommended whenever it is reachable)
@@ -115,11 +117,25 @@ class Voice:
 
         _lenient_symbols()
         cache = os.environ.get("PG_TTS_CACHE") or None
-        self.voice = os.environ.get("PG_TTS_VOICE", "twi-6")
-        self.tts = StableTwiTTS(ensure_model(cache), num_threads=int(os.environ.get("PG_TTS_THREADS", "4")))
+        threads = int(os.environ.get("PG_TTS_THREADS", "4"))
+        self.tts = StableTwiTTS(ensure_model(cache), num_threads=threads)
+        # NELVIN: our own male voice, fine-tuned from stable-twi-tts (edge/voices/nelvin).
+        # It is a separate 80 MB model; without it, "nelvin" falls back to stock twi-6.
+        nelvin_dir = Path(os.environ.get("PG_TTS_NELVIN_MODEL", HERE / "voices" / "nelvin"))
+        self.nelvin = StableTwiTTS(nelvin_dir, num_threads=threads) if (nelvin_dir / "model.onnx").exists() else None
+        self.nelvin_speed = float(os.environ.get("PG_TTS_NELVIN_SPEED", "0.85"))  # below 1 = slower
+        self.voice = os.environ.get("PG_TTS_VOICE", "nelvin" if self.nelvin else "twi-6")
         self.lock = threading.Lock()  # one synthesis at a time; the Pi has no cores to spare
         self.cache: "OrderedDict[tuple[str, str], tuple[bytes, float]]" = OrderedDict()  # recent sentences
-        self.tts.synthesize("Akwaaba", voice=self.voice)  # warm up
+        self._synth("Akwaaba", self.voice, "twi")  # warm up
+
+    def _synth(self, text: str, voice: str, language: str):
+        if voice == "nelvin":
+            if self.nelvin:
+                return self.nelvin.synthesize(text, voice="nelvin", language=language,
+                                              length_scale=1.0 / self.nelvin_speed)
+            voice = "twi-6"
+        return self.tts.synthesize(text, voice=voice, language=language)
 
     def wav(self, text: str, voice: str | None = None) -> tuple[bytes, float]:
         """Speak Twi text. Returns (WAV bytes, seconds of audio)."""
@@ -133,10 +149,10 @@ class Voice:
                 self.cache.move_to_end(key)
                 return self.cache[key]
             try:
-                s = self.tts.synthesize(said, voice=v, language="mixed")
+                s = self._synth(said, v, "mixed")
             except Exception as e:  # English support (espeak) missing, or an odd symbol
                 log.warning("mixed synthesis failed (%s); retrying as plain Twi", e)
-                s = self.tts.synthesize(re.sub(r"[\[\]]", "", said), voice=v, language="twi")
+                s = self._synth(re.sub(r"[\[\]]", "", said), v, "twi")
         buf = io.BytesIO()
         with wave.open(buf, "wb") as w:
             w.setnchannels(1)
