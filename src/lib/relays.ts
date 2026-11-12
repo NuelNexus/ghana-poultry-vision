@@ -10,8 +10,8 @@ export type RelayState = Record<RelayName, boolean>;
 export const RELAY_INFO: Record<RelayName, { label: string; part: string; pin: number }> = {
   incubator: { label: "Incubator controller", part: "Heater and egg turner", pin: 22 },
   fan: { label: "Fan", part: "Air circulation", pin: 23 },
-  light: { label: "Light", part: "Inside lamp", pin: 21 },
-  strip: { label: "Strip light", part: "LED strip on the door", pin: 19 },
+  light: { label: "Lamp", part: "Lamp in the incubator", pin: 21 },
+  strip: { label: "Strip lights", part: "LED strip in the brooding area", pin: 19 },
 };
 
 // The board's own default at power-up: everything on.

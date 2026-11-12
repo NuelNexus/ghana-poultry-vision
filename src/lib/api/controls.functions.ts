@@ -158,3 +158,26 @@ export const updateCoopControls = createServerFn({ method: "POST" })
     );
     return { version: row!.version, summary };
   });
+
+/**
+ * Remove a coop unit that is no longer used. Refused while it is online, so a
+ * running coop can't be removed by mistake. Its readings and settings history go
+ * with it; alerts it raised stay, without the link to the coop.
+ */
+export const deleteCoop = createServerFn({ method: "POST" })
+  .middleware([requireManager])
+  .inputValidator(z.object({ deviceId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    const coop = await queryOne<{ device_id: string; last_seen: string | null }>(
+      "select device_id, last_seen from devices where id = $1 and owner_id = $2 and unit = 'coop'",
+      [data.deviceId, context.user.id],
+    );
+    if (!coop) throw new Error("Coop unit not found");
+    if (coop.last_seen && Date.now() - new Date(coop.last_seen).getTime() < FRESHNESS_MS.live)
+      throw new Error(`${coop.device_id} is online. Unplug it first, then remove it.`);
+    await query("delete from devices where id = $1 and owner_id = $2", [
+      data.deviceId,
+      context.user.id,
+    ]);
+    return { device_id: coop.device_id };
+  });

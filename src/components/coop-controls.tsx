@@ -1,8 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Droplets, Loader2 } from "lucide-react";
+import { CheckCircle2, Droplets, FlaskConical, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { listCoops, updateCoopControls, type CoopUnit } from "@/lib/api/controls.functions";
+import {
+  deleteCoop,
+  listCoops,
+  updateCoopControls,
+  type CoopUnit,
+} from "@/lib/api/controls.functions";
+import { useCoopSim } from "@/lib/coop-sim";
+import { IncubatorUnitDrawing } from "@/components/incubator-controls";
 import {
   COOP_ZONES,
   coopControlsSchema,
@@ -20,6 +27,7 @@ import {
   Field,
   Grid,
   Input,
+  Modal,
   RelativeTime,
   Section,
   SegmentedControl,
@@ -36,6 +44,8 @@ import {
 // Unit 2, the ESP32 coop controller (firmware/coop_unit), on the Automation
 // page. Every change is a new settings version; the coop fetches it on its
 // next check-in (~10 s) and reports back which version it is running.
+// "Demo" swaps in a simulated coop (lib/coop-sim) that needs no hardware and no
+// server, so the controls can still be shown when the coop isn't connected.
 
 const ZONE_LABEL: Record<CoopZone, string> = { layers: "Layers", broilers: "Broilers" };
 const MODE_OPTIONS = [
@@ -43,40 +53,81 @@ const MODE_OPTIONS = [
   { value: "manual", label: "Manual" },
 ] as const;
 
+const VIEW_OPTIONS = [
+  { value: "live", label: "Live" },
+  { value: "demo", label: "Demo" },
+] as const;
+
 export function CoopControlsSection({ canManage }: { canManage: boolean }) {
   const q = useQuery({ queryKey: ["coops"], queryFn: () => listCoops(), refetchInterval: 5_000 });
+  const [choice, setChoice] = useState<"live" | "demo" | null>(null);
+  // With no coop online (or the site unreachable) open on the demo. Decided once, on
+  // the first answer, so a flaky refresh can't flip the view back and forth; after
+  // that only the Live / Demo switch changes it.
+  const noLive = q.isError || (!!q.data && !q.data.some((c) => c.online));
+  const [initial, setInitial] = useState<"live" | "demo" | null>(null);
+  useEffect(() => {
+    if (initial === null && !q.isPending) setInitial(noLive ? "demo" : "live");
+  }, [initial, q.isPending, noLive]);
+  const view = choice ?? initial ?? "demo";
+  const reason = q.isError
+    ? "The site can’t reach the coop data right now"
+    : q.data?.length === 0
+      ? "No coop unit is registered yet"
+      : noLive
+        ? "No coop is online right now"
+        : null;
 
   return (
     <Section
       title="Coop · unit 2"
       description="The ESP32 runs fans and lamps in the layers and broilers zones and checks the drinking water. Changes reach it within about 10 seconds."
+      action={
+        <SegmentedControl
+          ariaLabel="Show the live coop or the demo coop"
+          value={view}
+          options={VIEW_OPTIONS}
+          onChange={setChoice}
+        />
+      }
     >
-      {q.isPending ? (
-        <SkeletonRows rows={3} cols={4} />
-      ) : q.isError || !q.data ? (
-        <ErrorState
-          title="Couldn’t load the coop"
-          error={q.error}
-          onRetry={() => void q.refetch()}
-        />
-      ) : q.data.length === 0 ? (
-        <EmptyState
-          title="No coop unit registered"
-          description="Register the ESP32 coop controller under Devices, upload firmware/coop_unit, and its zones show here."
-          action={<EmptyAction to="/app/devices">Open devices</EmptyAction>}
-        />
-      ) : (
-        <div className="flex flex-col gap-8">
-          {q.data.map((coop) => (
-            <CoopPanel
-              key={coop.id}
-              coop={coop}
-              canManage={canManage}
-              onSaved={() => void q.refetch()}
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:items-stretch xl:grid-cols-[minmax(0,500px)_minmax(0,1fr)]">
+        <IncubatorUnitDrawing canManage={canManage} demo={view === "demo"} caption={false} fit />
+        <div className="flex min-w-0 flex-col gap-4">
+          <p className="pg-t-caption">
+            Tap the controller screen, a button on the top panel, the fan, the lamp or the strip
+            lights. A dashed ring means the board hasn’t confirmed the change yet.
+          </p>
+          {view === "demo" ? (
+            <DemoCoop reason={reason} />
+          ) : q.isPending ? (
+            <SkeletonRows rows={3} cols={4} />
+          ) : !q.data ? (
+            <ErrorState
+              title="Couldn’t load the coop"
+              error={q.error}
+              onRetry={() => void q.refetch()}
             />
-          ))}
+          ) : q.data.length === 0 ? (
+            <EmptyState
+              title="No coop unit registered"
+              description="Register the ESP32 coop controller under Devices, upload firmware/coop_unit, and its zones show here. Until then, Demo shows a simulated coop."
+              action={<EmptyAction to="/app/devices">Open devices</EmptyAction>}
+            />
+          ) : (
+            <div className="flex flex-col gap-8">
+              {q.data.map((coop) => (
+                <CoopPanel
+                  key={coop.id}
+                  coop={coop}
+                  canManage={canManage}
+                  onSaved={() => void q.refetch()}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </Section>
   );
 }
@@ -128,6 +179,8 @@ function CoopPanel({
     zones: { ...draft.zones, [zone]: { ...draft.zones[zone], ...patch } },
   });
 
+  const [removing, setRemoving] = useState(false);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -149,8 +202,22 @@ function CoopPanel({
               {coop.last_seen ? "Offline" : "Never connected"}
             </StatusPill>
           )}
+          {canManage && !coop.online && (
+            <Button size="sm" variant="ghost" icon={Trash2} onClick={() => setRemoving(true)}>
+              Remove
+            </Button>
+          )}
         </div>
       </div>
+
+      <RemoveCoopModal
+        coop={removing ? coop : null}
+        onClose={() => setRemoving(false)}
+        onRemoved={() => {
+          setRemoving(false);
+          onSaved();
+        }}
+      />
 
       <Grid cols={2}>
         {COOP_ZONES.map((zone) => (
@@ -430,5 +497,155 @@ function Water({ coop }: { coop: CoopUnit }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Demo coop                                                                  */
+/* -------------------------------------------------------------------------- */
+
+function DemoCoop({ reason }: { reason: string | null }) {
+  const { sim, setZone, setWater, changeWater, reset } = useCoopSim();
+  const toggle = (zone: CoopZone, what: "fan" | "lamp", on: boolean) => {
+    const cur = sim.zones[zone];
+    setZone(
+      zone,
+      what === "fan"
+        ? { mode: "manual", fan: on, lamp: on ? false : cur.lamp }
+        : { mode: "manual", lamp: on, fan: on ? false : cur.fan },
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="pg-panel flex flex-wrap items-start gap-3 px-4 py-3">
+        <FlaskConical className="mt-0.5 size-4 shrink-0 text-info" aria-hidden strokeWidth={1.75} />
+        <p className="min-w-0 flex-1 text-[13px] leading-[19px] text-ink-2">
+          <span className="font-medium text-ink">Demo coop.</span>{" "}
+          {reason ? `${reason}, so this` : "This"} is a simulated coop running in your browser. It
+          follows the real coop’s rules, but nothing is sent to any hardware. Switch to Live for the
+          real one.
+        </p>
+        <Button size="sm" variant="ghost" icon={RotateCcw} onClick={reset}>
+          Reset
+        </Button>
+      </div>
+
+      <Grid cols={2}>
+        {COOP_ZONES.map((zone) => (
+          <ZoneCard
+            key={zone}
+            zone={zone}
+            coopId="demo coop"
+            draft={sim.controls.zones[zone]}
+            state={sim.zones[zone]}
+            readOnly={false}
+            onMode={(mode) => setZone(zone, { mode, fan: false, lamp: false })}
+            onSwitch={(what, on) => toggle(zone, what, on)}
+            onSetpoint={(patch) => setZone(zone, patch)}
+          />
+        ))}
+      </Grid>
+
+      <Card
+        title="Drinking water"
+        description="Simulated turbidity sensor"
+        action={
+          <Button size="sm" icon={Droplets} onClick={changeWater}>
+            Change the water
+          </Button>
+        }
+      >
+        <div className="mb-4 flex items-center gap-3">
+          <Droplets
+            className={`size-7 ${sim.water.ok === false ? "text-crit" : "text-ok"}`}
+            aria-hidden
+            strokeWidth={1.75}
+          />
+          <div>
+            <div className="font-medium text-ink">
+              {sim.water.ok === false ? "Dirty: change the water" : "Clean"}
+            </div>
+            <div className="pg-t-caption">{sim.water.v.toFixed(2)} V</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Dirty below (V)">
+            <Input
+              type="number"
+              step={0.05}
+              inputMode="decimal"
+              value={sim.controls.water.bad_v}
+              onChange={(e) => setWater({ bad_v: Number(e.target.value) })}
+            />
+          </Field>
+          <Field label="Clean above (V)">
+            <Input
+              type="number"
+              step={0.05}
+              inputMode="decimal"
+              value={sim.controls.water.good_v}
+              onChange={(e) => setWater({ good_v: Number(e.target.value) })}
+            />
+          </Field>
+        </div>
+        <p className="pg-t-caption mt-2">
+          The demo water gets dirtier every second. Change it with the button above.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+function RemoveCoopModal({
+  coop,
+  onClose,
+  onRemoved,
+}: {
+  coop: CoopUnit | null;
+  onClose: () => void;
+  onRemoved: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  async function remove() {
+    if (!coop) return;
+    setBusy(true);
+    try {
+      await deleteCoop({ data: { deviceId: coop.id } });
+      toast.success(`${coop.device_id} removed`);
+      onRemoved();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn’t remove the coop");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal
+      open={!!coop}
+      onOpenChange={(o) => !o && onClose()}
+      title={`Remove ${coop?.device_id ?? "coop"}?`}
+      description="It disappears from Automation and Devices for everyone, with its readings and settings history. Its device key stops working. Register it again under Devices to use it later."
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="danger" loading={busy} onClick={() => void remove()}>
+            Remove coop
+          </Button>
+        </>
+      }
+    >
+      <p className="text-[13px] text-ink-2">
+        {coop?.last_seen ? (
+          <>
+            Last checked in <RelativeTime iso={coop.last_seen} />.
+          </>
+        ) : (
+          "This coop has never connected."
+        )}
+      </p>
+    </Modal>
   );
 }

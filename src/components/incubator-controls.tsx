@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { listRelayBoards, setRelays, type RelayBoard } from "@/lib/api/relays.functions";
-import { RELAYS, RELAY_INFO, type RelayName, type RelayState } from "@/lib/relays";
+import { DEFAULT_RELAYS, RELAYS, RELAY_INFO, type RelayName, type RelayState } from "@/lib/relays";
 import { IncubatorDiagram } from "@/components/incubator-diagram";
 import {
   Button,
@@ -23,17 +23,19 @@ import {
 
 const KEY = ["relay-boards"];
 
+// The real board only. The demo unit lives in the Coop section (IncubatorUnitDrawing).
 export function IncubatorControlsSection({ canManage }: { canManage: boolean }) {
   const q = useQuery({ queryKey: KEY, queryFn: () => listRelayBoards(), refetchInterval: 2_000 });
 
   return (
     <Section
-      title="Incubator · relay board"
-      description="Tap a part of the incubator to switch it on or off. The ESP32 relay board picks up the change in a second or two."
+      title="Incubator & brooder · relay board"
+      description="Tap a part of the unit or a button on its panel to switch it. The ESP32 relay board picks up the change in a second or two."
     >
       {q.isPending ? (
         <SkeletonRows rows={3} cols={3} />
-      ) : q.isError || !q.data ? (
+      ) : !q.data ? (
+        // Keep showing the last good data through a failed refresh; only error with none.
         <ErrorState
           title="Couldn’t load the relay board"
           error={q.error}
@@ -57,16 +59,12 @@ export function IncubatorControlsSection({ canManage }: { canManage: boolean }) 
   );
 }
 
-function BoardPanel({ board, canManage }: { board: RelayBoard; canManage: boolean }) {
+/** Switch relays on a real board: shows the change at once, rolls back on failure. */
+function useBoardSend(board: RelayBoard | undefined, canManage: boolean) {
   const qc = useQueryClient();
   const [sending, setSending] = useState(false);
-  const want = board.desired;
-  const have = board.reported;
-  // Waiting for the board to report a change the site asked for.
-  const pending = (k: RelayName) => !!have && have[k] !== want[k];
-
   async function send(patch: Partial<RelayState>) {
-    if (!canManage) return;
+    if (!canManage || !board) return;
     const before = qc.getQueryData<RelayBoard[]>(KEY);
     // Show the change at once; the dashed ring stays until the board confirms it.
     qc.setQueryData<RelayBoard[]>(KEY, (rows) =>
@@ -87,7 +85,17 @@ function BoardPanel({ board, canManage }: { board: RelayBoard; canManage: boolea
       void qc.invalidateQueries({ queryKey: KEY });
     }
   }
+  return { send, sending };
+}
 
+/** Waiting for the board to report a change the site asked for. */
+const pendingOf = (board: RelayBoard) => (k: RelayName) =>
+  !!board.reported && board.reported[k] !== board.desired[k];
+
+function BoardPanel({ board, canManage }: { board: RelayBoard; canManage: boolean }) {
+  const { send, sending } = useBoardSend(board, canManage);
+  const want = board.desired;
+  const pending = pendingOf(board);
   const toggle = (k: RelayName) => void send({ [k]: !want[k] });
   const allOn = RELAYS.every((k) => want[k]);
   const allOff = RELAYS.every((k) => !want[k]);
@@ -116,7 +124,7 @@ function BoardPanel({ board, canManage }: { board: RelayBoard; canManage: boolea
         </div>
       </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 md:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
         <IncubatorDiagram
           state={want}
           pending={pending}
@@ -185,5 +193,100 @@ function BoardPanel({ board, canManage }: { board: RelayBoard; canManage: boolea
         </div>
       </div>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Demo: a simulated unit in the browser, for when no board is connected.      */
+/* One shared state, so every drawing of the demo unit on the page agrees.     */
+/* -------------------------------------------------------------------------- */
+
+type Demo = { state: RelayState; temp: number };
+const DEMO_START: Demo = { state: DEFAULT_RELAYS, temp: 37.4 };
+let demo: Demo = DEMO_START;
+const listeners = new Set<() => void>();
+let ticker: number | undefined;
+
+function setDemo(next: Demo) {
+  demo = next;
+  listeners.forEach((l) => l());
+}
+function subscribeDemo(l: () => void) {
+  listeners.add(l);
+  // The controller's reading drifts toward 37.8 °C with the heat on and cools without it.
+  if (ticker === undefined)
+    ticker = window.setInterval(() => {
+      if (document.hidden) return;
+      const target = demo.state.incubator ? 37.8 : 29;
+      const t = demo.temp + (target - demo.temp) * 0.06 + (Math.random() - 0.5) * 0.06;
+      setDemo({ ...demo, temp: Math.round(t * 10) / 10 });
+    }, 1_000);
+  return () => {
+    listeners.delete(l);
+    if (!listeners.size && ticker !== undefined) {
+      window.clearInterval(ticker);
+      ticker = undefined;
+    }
+  };
+}
+
+function useDemoUnit() {
+  const d = useSyncExternalStore(
+    subscribeDemo,
+    () => demo,
+    () => DEMO_START,
+  );
+  return {
+    state: d.state,
+    temp: d.temp,
+    set: (patch: Partial<RelayState>) => setDemo({ ...demo, state: { ...demo.state, ...patch } }),
+    reset: () => setDemo(DEMO_START),
+  };
+}
+
+/**
+ * The same unit drawing on its own, for other sections (the Coop section shows it
+ * too). Live: the first relay board, online ones first. Demo, or with no board
+ * registered: the shared demo unit.
+ */
+export function IncubatorUnitDrawing({
+  canManage,
+  demo: showDemo,
+  caption,
+  fit,
+}: {
+  canManage: boolean;
+  demo: boolean;
+  caption?: boolean;
+  fit?: boolean;
+}) {
+  const q = useQuery({ queryKey: KEY, queryFn: () => listRelayBoards(), refetchInterval: 2_000 });
+  const board = q.data?.find((b) => b.online) ?? q.data?.[0];
+  const { send } = useBoardSend(board, canManage);
+  const d = useDemoUnit();
+
+  if (showDemo || !board)
+    return (
+      <IncubatorDiagram
+        state={d.state}
+        pending={() => false}
+        offline={false}
+        disabled={false}
+        display={d.temp.toFixed(1)}
+        onToggle={(k) => d.set({ [k]: !d.state[k] })}
+        caption={caption}
+        fit={fit}
+      />
+    );
+  return (
+    <IncubatorDiagram
+      state={board.desired}
+      pending={pendingOf(board)}
+      offline={!board.online}
+      disabled={!canManage}
+      onToggle={(k) => void send({ [k]: !board.desired[k] })}
+      caption={caption}
+      fit={fit}
+    />
   );
 }

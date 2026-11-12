@@ -1414,3 +1414,44 @@ html:not([lang="en"]) .pg-console .pg-seg button {
     animation: none;
   }
 }
+
+/* Walking, pecking chicks in the incubator drawing (incubator-diagram.tsx). */
+.pg-coop-bird {
+  transition: transform 1.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pg-coop-peck {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: pg-coop-peck 4.5s ease-in-out infinite;
+}
+@keyframes pg-coop-peck {
+  0%,
+  70%,
+  100% {
+    transform: rotate(0deg);
+  }
+  78% {
+    transform: rotate(18deg);
+  }
+  86% {
+    transform: rotate(4deg);
+  }
+  92% {
+    transform: rotate(16deg);
+  }
+}
+/* Phones have no hover: outline the pressable parts faintly so they read as buttons. */
+@media (hover: none) {
+  .pg-inc-part:not([aria-disabled="true"]):not(.pg-inc-part--pending) .pg-inc-ring {
+    stroke: color-mix(in srgb, var(--pg-focus) 35%, transparent);
+    stroke-dasharray: 2 4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pg-coop-bird {
+    transition: none;
+  }
+  .pg-coop-peck {
+    animation: none;
+  }
+}
