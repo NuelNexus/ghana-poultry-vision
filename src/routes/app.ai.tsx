@@ -1352,11 +1352,12 @@ function VoiceChat({ active }: { active: boolean }) {
           english: r.amaEnglish?.slice(0, 4000) ?? null,
         },
       );
-      saveTurn(text, r.ama, {
-        language: "Twi",
-        you_english: r.youEnglish ?? "",
-        ama_english: r.amaEnglish ?? "",
-      });
+      saveTurn(
+        text,
+        r.ama,
+        { language: "Twi", you_english: r.youEnglish ?? "", ama_english: r.amaEnglish ?? "" },
+        true, // twiReply already switched any devices asked for
+      );
       // Tell the live model what she said, so the rest of the call follows on.
       send({
         type: "conversation.item.create",
@@ -1390,6 +1391,7 @@ function VoiceChat({ active }: { active: boolean }) {
     you: string,
     ama: string,
     t?: { language: string; you_english: string; ama_english: string },
+    acted = false,
   ) => {
     saveChain.current = saveChain.current
       .catch(() => {})
@@ -1402,6 +1404,7 @@ function VoiceChat({ active }: { active: boolean }) {
             language: t?.language.slice(0, 40),
             youEnglish: t?.you_english.slice(0, 4000),
             amaEnglish: t?.ama_english.slice(0, 4000),
+            act: !acted,
           },
         }),
       )

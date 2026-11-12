@@ -1,14 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useSyncExternalStore } from "react";
+import { FlaskConical, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { listRelayBoards, setRelays, type RelayBoard } from "@/lib/api/relays.functions";
 import { DEFAULT_RELAYS, RELAYS, RELAY_INFO, type RelayName, type RelayState } from "@/lib/relays";
 import { IncubatorDiagram } from "@/components/incubator-diagram";
 import {
   Button,
-  EmptyAction,
-  EmptyState,
-  ErrorState,
   RelativeTime,
   Section,
   SkeletonRows,
@@ -34,26 +32,22 @@ export function IncubatorControlsSection({ canManage }: { canManage: boolean }) 
     >
       {q.isPending ? (
         <SkeletonRows rows={3} cols={3} />
-      ) : !q.data ? (
-        // Keep showing the last good data through a failed refresh; only error with none.
-        <ErrorState
-          title="Couldn’t load the relay board"
-          error={q.error}
-          onRetry={() => void q.refetch()}
-        />
-      ) : q.data.length === 0 ? (
-        <EmptyState
-          title="No relay board registered"
-          description="Register the ESP32 relay board under Devices (Incubator relay board), upload firmware/relay_board, and the incubator shows here."
-          action={<EmptyAction to="/app/devices">Open devices</EmptyAction>}
-          note={!canManage ? "Ask a farm manager to register it." : undefined}
-        />
-      ) : (
+      ) : q.data?.length ? (
+        // A failed refresh keeps the last good data, so the drawing never disappears.
         <div className="flex flex-col gap-10">
           {q.data.map((b) => (
             <BoardPanel key={b.id} board={b} canManage={canManage} />
           ))}
         </div>
+      ) : (
+        <DemoUnitPanel
+          reason={
+            q.data
+              ? "No relay board is registered yet"
+              : "The site can’t reach the relay board right now"
+          }
+          canManage={canManage}
+        />
       )}
     </Section>
   );
@@ -244,49 +238,70 @@ function useDemoUnit() {
   };
 }
 
-/**
- * The same unit drawing on its own, for other sections (the Coop section shows it
- * too). Live: the first relay board, online ones first. Demo, or with no board
- * registered: the shared demo unit.
- */
-export function IncubatorUnitDrawing({
-  canManage,
-  demo: showDemo,
-  caption,
-  fit,
-}: {
-  canManage: boolean;
-  demo: boolean;
-  caption?: boolean;
-  fit?: boolean;
-}) {
-  const q = useQuery({ queryKey: KEY, queryFn: () => listRelayBoards(), refetchInterval: 2_000 });
-  const board = q.data?.find((b) => b.online) ?? q.data?.[0];
-  const { send } = useBoardSend(board, canManage);
-  const d = useDemoUnit();
-
-  if (showDemo || !board)
-    return (
-      <IncubatorDiagram
-        state={d.state}
-        pending={() => false}
-        offline={false}
-        disabled={false}
-        display={d.temp.toFixed(1)}
-        onToggle={(k) => d.set({ [k]: !d.state[k] })}
-        caption={caption}
-        fit={fit}
-      />
-    );
+/** The incubator unit as a demo, until a relay board is registered (or reachable). */
+function DemoUnitPanel({ reason, canManage }: { reason: string; canManage: boolean }) {
+  const { state, temp, set, reset } = useDemoUnit();
   return (
-    <IncubatorDiagram
-      state={board.desired}
-      pending={pendingOf(board)}
-      offline={!board.online}
-      disabled={!canManage}
-      onToggle={(k) => void send({ [k]: !board.desired[k] })}
-      caption={caption}
-      fit={fit}
-    />
+    <div className="flex flex-col gap-4">
+      <div className="pg-panel flex flex-wrap items-start gap-3 px-4 py-3">
+        <FlaskConical className="mt-0.5 size-4 shrink-0 text-info" aria-hidden strokeWidth={1.75} />
+        <p className="min-w-0 flex-1 text-[13px] leading-[19px] text-ink-2">
+          <span className="font-medium text-ink">Demo unit.</span> {reason}, so this is a simulated
+          incubator running in your browser. Nothing is sent to any hardware.
+          {canManage ? " Register the board under Devices and the real one shows here." : ""}
+        </p>
+        <Button size="sm" variant="ghost" icon={RotateCcw} onClick={reset}>
+          Reset
+        </Button>
+      </div>
+      <div className="grid items-start gap-6 md:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
+        <IncubatorDiagram
+          state={state}
+          pending={() => false}
+          offline={false}
+          disabled={false}
+          display={temp.toFixed(1)}
+          onToggle={(k) => set({ [k]: !state[k] })}
+        />
+        <div className="flex flex-col gap-3">
+          <ul className="pg-panel divide-y divide-hairline">
+            {RELAYS.map((k) => (
+              <li key={k} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <div className="text-[14px] font-medium text-ink">{RELAY_INFO[k].label}</div>
+                  <div className="pg-t-caption">
+                    {state[k] ? "On" : "Off"} · {RELAY_INFO[k].part} · GPIO {RELAY_INFO[k].pin}
+                  </div>
+                </div>
+                <Switch
+                  checked={state[k]}
+                  label={RELAY_INFO[k].label}
+                  onCheckedChange={(v) => set({ [k]: v })}
+                />
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              disabled={RELAYS.every((k) => state[k])}
+              onClick={() => set({ incubator: true, fan: true, light: true, strip: true })}
+            >
+              All on
+            </Button>
+            <Button
+              size="sm"
+              disabled={RELAYS.every((k) => !state[k])}
+              onClick={() => set({ incubator: false, fan: false, light: false, strip: false })}
+            >
+              All off
+            </Button>
+          </div>
+          <p className="pg-t-caption">
+            Incubator {temp.toFixed(1)} °C (simulated): it warms toward 37.8 °C with the heat on.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }

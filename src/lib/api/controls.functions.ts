@@ -8,6 +8,7 @@ import {
   type CoopZoneState,
 } from "../controls";
 import { requireManager, requireUser } from "./middleware";
+import { applyCoopControls } from "../device-commands.server";
 import { FRESHNESS_MS } from "./types";
 
 // Remote control of unit 2, the ESP32 coop controller (firmware/coop_unit).
@@ -94,70 +95,10 @@ export const listCoops = createServerFn({ method: "GET" })
     );
   });
 
-/** One line per change, e.g. "Layers: manual, fan on" or "Broilers fan on above 24 → 26 °C". */
-function describeChange(before: CoopControls, after: CoopControls) {
-  const parts: string[] = [];
-  const name = { layers: "Layers", broilers: "Broilers" } as const;
-  const label = {
-    high_temp: "fan on above",
-    fan_off_temp: "fan off at",
-    lamp_off_temp: "lamp off at",
-    low_temp: "lamp on below",
-  } as const;
-  for (const zone of ["layers", "broilers"] as const) {
-    const a = before.zones[zone];
-    const b = after.zones[zone];
-    const bits: string[] = [];
-    if (a.mode !== b.mode) bits.push(b.mode === "manual" ? "manual" : "auto");
-    if (b.mode === "manual" && (a.fan !== b.fan || a.mode !== b.mode))
-      bits.push(`fan ${b.fan ? "on" : "off"}`);
-    if (b.mode === "manual" && (a.lamp !== b.lamp || a.mode !== b.mode))
-      bits.push(`lamp ${b.lamp ? "on" : "off"}`);
-    for (const k of Object.keys(label) as (keyof typeof label)[]) {
-      if (a[k] !== b[k]) bits.push(`${label[k]} ${a[k]} → ${b[k]} °C`);
-    }
-    if (bits.length) parts.push(`${name[zone]}: ${bits.join(", ")}`);
-  }
-  if (before.water.bad_v !== after.water.bad_v || before.water.good_v !== after.water.good_v) {
-    parts.push(`Water: dirty below ${after.water.bad_v} V, clean above ${after.water.good_v} V`);
-  }
-  return parts.join("; ") || "No change";
-}
-
 export const updateCoopControls = createServerFn({ method: "POST" })
   .middleware([requireManager])
   .inputValidator(z.object({ deviceId: z.string().uuid(), config: coopControlsSchema }))
-  .handler(async ({ data, context }) => {
-    const own = await queryOne(
-      "select 1 from devices where id = $1 and owner_id = $2 and unit = 'coop'",
-      [data.deviceId, context.user.id],
-    );
-    if (!own) throw new Error("Coop unit not found");
-    const current = await queryOne<{ config: CoopControls }>(
-      "select config from device_controls where device_id = $1",
-      [data.deviceId],
-    );
-    const summary = describeChange(current?.config ?? DEFAULT_COOP_CONTROLS, data.config);
-    const row = await queryOne<{ version: number }>(
-      `insert into device_controls (device_id, config, version, updated_by, updated_at)
-       values ($1, $2, 1, $3, now())
-       on conflict (device_id) do update
-         set config = excluded.config, version = device_controls.version + 1,
-             updated_by = excluded.updated_by, updated_at = now()
-       returning version`,
-      [data.deviceId, JSON.stringify(data.config), context.user.id],
-    );
-    await query(
-      "insert into control_log (device_id, user_id, change, version) values ($1, $2, $3, $4)",
-      [
-        data.deviceId,
-        context.user.id,
-        JSON.stringify({ summary, config: data.config }),
-        row!.version,
-      ],
-    );
-    return { version: row!.version, summary };
-  });
+  .handler(({ data, context }) => applyCoopControls(context.user.id, data.deviceId, data.config));
 
 /**
  * Remove a coop unit that is no longer used. Refused while it is online, so a

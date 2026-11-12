@@ -485,7 +485,7 @@ function Chick() {
 }
 
 /** One pressable part of the drawing, with the ring shown on hover, focus and while pending. */
-function Part({
+export function Part({
   on,
   pending,
   disabled,

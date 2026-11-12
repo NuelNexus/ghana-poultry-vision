@@ -9,7 +9,7 @@ import {
   type CoopUnit,
 } from "@/lib/api/controls.functions";
 import { useCoopSim } from "@/lib/coop-sim";
-import { IncubatorUnitDrawing } from "@/components/incubator-controls";
+import { CoopDrawing, type CoopZoneView } from "@/components/coop-drawing";
 import {
   COOP_ZONES,
   coopControlsSchema,
@@ -91,43 +91,34 @@ export function CoopControlsSection({ canManage }: { canManage: boolean }) {
         />
       }
     >
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:items-stretch xl:grid-cols-[minmax(0,500px)_minmax(0,1fr)]">
-        <IncubatorUnitDrawing canManage={canManage} demo={view === "demo"} caption={false} fit />
-        <div className="flex min-w-0 flex-col gap-4">
-          <p className="pg-t-caption">
-            Tap the controller screen, a button on the top panel, the fan, the lamp or the strip
-            lights. A dashed ring means the board hasn’t confirmed the change yet.
-          </p>
-          {view === "demo" ? (
-            <DemoCoop reason={reason} />
-          ) : q.isPending ? (
-            <SkeletonRows rows={3} cols={4} />
-          ) : !q.data ? (
-            <ErrorState
-              title="Couldn’t load the coop"
-              error={q.error}
-              onRetry={() => void q.refetch()}
+      {view === "demo" ? (
+        <DemoCoop reason={reason} />
+      ) : q.isPending ? (
+        <SkeletonRows rows={3} cols={4} />
+      ) : !q.data ? (
+        <ErrorState
+          title="Couldn’t load the coop"
+          error={q.error}
+          onRetry={() => void q.refetch()}
+        />
+      ) : q.data.length === 0 ? (
+        <EmptyState
+          title="No coop unit registered"
+          description="Register the ESP32 coop controller under Devices, upload firmware/coop_unit, and its zones show here. Until then, Demo shows a simulated coop."
+          action={<EmptyAction to="/app/devices">Open devices</EmptyAction>}
+        />
+      ) : (
+        <div className="flex flex-col gap-8">
+          {q.data.map((coop) => (
+            <CoopPanel
+              key={coop.id}
+              coop={coop}
+              canManage={canManage}
+              onSaved={() => void q.refetch()}
             />
-          ) : q.data.length === 0 ? (
-            <EmptyState
-              title="No coop unit registered"
-              description="Register the ESP32 coop controller under Devices, upload firmware/coop_unit, and its zones show here. Until then, Demo shows a simulated coop."
-              action={<EmptyAction to="/app/devices">Open devices</EmptyAction>}
-            />
-          ) : (
-            <div className="flex flex-col gap-8">
-              {q.data.map((coop) => (
-                <CoopPanel
-                  key={coop.id}
-                  coop={coop}
-                  canManage={canManage}
-                  onSaved={() => void q.refetch()}
-                />
-              ))}
-            </div>
-          )}
+          ))}
         </div>
-      </div>
+      )}
     </Section>
   );
 }
@@ -181,6 +172,20 @@ function CoopPanel({
 
   const [removing, setRemoving] = useState(false);
 
+  // The drawing shows what the coop reports, or in manual mode what was asked for
+  // (with a dashed ring until the coop reports it).
+  const shown = Object.fromEntries(
+    COOP_ZONES.map((z) => {
+      const s = coop.latest?.zones?.[z];
+      const d = draft.zones[z];
+      const manual = d.mode === "manual";
+      return [
+        z,
+        { ...s, mode: d.mode, fan: manual ? d.fan : !!s?.fan, lamp: manual ? d.lamp : !!s?.lamp },
+      ];
+    }),
+  ) as Record<CoopZone, CoopZoneView>;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -217,6 +222,39 @@ function CoopPanel({
           setRemoving(false);
           onSaved();
         }}
+      />
+
+      <CoopDrawing
+        zones={shown}
+        settings={draft.zones}
+        offline={!coop.online}
+        disabled={!canManage || saving}
+        pending={(z, w) =>
+          draft.zones[z].mode === "manual" &&
+          !!coop.latest?.zones?.[z] &&
+          draft.zones[z][w] !== !!coop.latest.zones[z][w]
+        }
+        onToggle={(z, w) => {
+          const cur = shown[z];
+          const on = !cur[w];
+          void save(
+            withZone(
+              z,
+              w === "fan"
+                ? { mode: "manual", fan: on, lamp: on ? false : cur.lamp }
+                : { mode: "manual", lamp: on, fan: on ? false : cur.fan },
+            ),
+          );
+        }}
+        onMode={(z) =>
+          void save(
+            withZone(z, {
+              mode: draft.zones[z].mode === "auto" ? "manual" : "auto",
+              fan: false,
+              lamp: false,
+            }),
+          )
+        }
       />
 
       <Grid cols={2}>
@@ -530,6 +568,19 @@ function DemoCoop({ reason }: { reason: string | null }) {
           Reset
         </Button>
       </div>
+
+      <CoopDrawing
+        zones={sim.zones}
+        settings={sim.controls.zones}
+        onToggle={(z, w) => toggle(z, w, !sim.zones[z][w])}
+        onMode={(z) =>
+          setZone(z, {
+            mode: sim.controls.zones[z].mode === "auto" ? "manual" : "auto",
+            fan: false,
+            lamp: false,
+          })
+        }
+      />
 
       <Grid cols={2}>
         {COOP_ZONES.map((zone) => (

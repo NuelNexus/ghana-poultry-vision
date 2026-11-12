@@ -17,6 +17,7 @@ import { speakIn } from "../voice.server";
 import { SITE_LANG_IDS, siteLang, speechLangFor, type SiteLang } from "../site-lang";
 import { twiSuggest, twiWordsEnabled } from "../twi-nlp.server";
 import { requireUser } from "./middleware";
+import { commandNote, runDeviceCommands } from "../device-commands.server";
 import type { Alert, AiSnapshot } from "./types";
 import type { CoopZoneState } from "../controls";
 import { AVATAR_ACTIONS, AVATAR_ACTION_IDS, type VoiceSegment } from "../avatar-actions";
@@ -126,7 +127,14 @@ const HARDWARE = `The farm's hardware is exactly this, nothing more:
   fails ("safety_tripped"). A turbidity sensor in the drinker says whether the drinking water is
   clean or dirty; it does not measure the water level. Its readings appear as "zones" and
   "drinking_water" below.
+- Optionally an incubator unit: a white box with an incubator on top and a brooding area below,
+  switched by an ESP32 relay board with four relays: the incubator controller (heat), a fan and a
+  lamp in the incubator, and LED strip lights in the brooding area. Each is only on or off.
 - One ESP32-CAM camera that the farmer can watch live in the Cameras page. You cannot see its images.
+SWITCHING: you can switch the incubator unit's heat, fan, lamp and strip lights, and each coop zone's
+fan and lamp (or hand a zone back to Auto), when the farmer asks. The app does the switching for you
+when the farmer asks in a message; you'll then see DEVICE ACTIONS below saying what was done. Only
+admins and farm managers can switch devices.
 The app also has a Marketplace where farmers sell eggs, birds, chicks, manure, feed and equipment
 to each other and message buyers; you can't see listings, but you can explain how to use it.
 There are NO water-level, feed-level, feeder, power, solar, battery,
@@ -140,6 +148,7 @@ function systemPrompt(
   voice: boolean,
   lang: SpeechLang = "auto",
   uiLang: SiteLang = "en",
+  note = "",
 ) {
   const langLine =
     lang !== "auto"
@@ -164,7 +173,7 @@ If they ask you to translate something, translate it.
 ${voice ? "This is a live voice conversation and your reply is spoken aloud. Keep it to 1-3 short sentences, no lists, no markdown, no emoji. If the farmer interrupts, stop and listen." : "Keep replies short and easy to read. Plain text, short lists are fine."}
 
 LIVE FARM DATA (JSON, one entry per Pi, latest reading):
-${farm}`;
+${farm}${note}`;
 }
 
 const historySchema = z
@@ -208,12 +217,13 @@ async function answer(
   lang: SpeechLang,
   voice: boolean,
   uiLang: SiteLang = "en",
+  note = "",
 ) {
   const direct = async () => ({
     reply: stripBold(
       await chatCompletion(
         [
-          { role: "system", content: systemPrompt(farm, voice, lang, uiLang) },
+          { role: "system", content: systemPrompt(farm, voice, lang, uiLang, note) },
           ...turns.map((t) => ({ role: t.role, content: t.content })),
         ],
         { model: modelFor(lang, uiLang) },
@@ -246,7 +256,7 @@ async function answer(
       await chatCompletion([
         {
           role: "system",
-          content: `${systemPrompt(farm, voice, "en")}
+          content: `${systemPrompt(farm, voice, "en", "en", note)}
 
 LANGUAGE: The farmer speaks ${name}. Their messages may come with a machine translation into
 English; use it with the original to understand them (the translation can be rough). Always write
@@ -430,12 +440,20 @@ export const askAssistant = createServerFn({ method: "POST" })
       loadSnapshot(context.user.id).then(describeFarm),
       conversationFor(context.user.id, data.conversationId, last.content),
     ]);
+    const actions = await runDeviceCommands({
+      userId: context.user.id,
+      roles: context.user.roles,
+      text: last.content,
+      english: last.english,
+      local: lang !== "auto" && lang !== "en" && lang !== "fr",
+    });
     const { reply, english, youEnglish } = await answer(
       farm,
       data.messages,
       lang,
       false,
       data.uiLang,
+      commandNote(actions),
     );
     const language = lang !== "auto" ? langName(lang) : null;
     await saveMessages(conversationId, [
@@ -452,7 +470,7 @@ export const askAssistant = createServerFn({ method: "POST" })
         : []),
       { role: "assistant", content: reply, mode: "text", language, english },
     ]);
-    return { reply, english, youEnglish, conversationId };
+    return { reply, english, youEnglish, conversationId, switched: Boolean(actions?.done.length) };
   });
 
 // Dictation for the text chat: a short recording from the browser -> text.
@@ -496,12 +514,22 @@ export const twiReply = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .inputValidator(z.object({ text: z.string().min(1).max(4000), history: historySchema.max(12) }))
   .handler(async ({ data, context }) => {
-    const farm = describeFarm(await loadSnapshot(context.user.id));
+    const [farm, actions] = await Promise.all([
+      loadSnapshot(context.user.id).then(describeFarm),
+      runDeviceCommands({
+        userId: context.user.id,
+        roles: context.user.roles,
+        text: data.text,
+        local: true,
+      }),
+    ]);
     const turn = await answer(
       farm,
       [...data.history, { role: "user", content: data.text }],
       "tw",
       true,
+      "en",
+      commandNote(actions),
     );
     // Text only: the browser speaks it sentence by sentence (speakReply), so her
     // words show at once and the first sentence plays while the rest is made.
@@ -547,10 +575,21 @@ export const saveVoiceTurn = createServerFn({ method: "POST" })
       language: z.string().max(40).optional(),
       youEnglish: z.string().max(4000).optional(),
       amaEnglish: z.string().max(4000).optional(),
+      /** Switch any devices the farmer asked for (false when twiReply already did). */
+      act: z.boolean().default(true),
     }),
   )
   .handler(async ({ data, context }) => {
     const you = data.you.trim();
+    const actions =
+      you && data.act
+        ? await runDeviceCommands({
+            userId: context.user.id,
+            roles: context.user.roles,
+            text: you,
+            english: data.youEnglish,
+          })
+        : null;
     const id = await conversationFor(
       context.user.id,
       data.conversationId,
@@ -579,7 +618,7 @@ export const saveVoiceTurn = createServerFn({ method: "POST" })
         english: english(data.amaEnglish, data.ama),
       },
     ]);
-    return { conversationId: id };
+    return { conversationId: id, actions };
   });
 
 // Voice gestures + translation ------------------------------------------------

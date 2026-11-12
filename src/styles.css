@@ -1447,8 +1447,12 @@ html:not([lang="en"]) .pg-console .pg-seg button {
     stroke-dasharray: 2 4;
   }
 }
+.pg-coop-door {
+  transition: transform 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
 @media (prefers-reduced-motion: reduce) {
-  .pg-coop-bird {
+  .pg-coop-bird,
+  .pg-coop-door {
     transition: none;
   }
   .pg-coop-peck {

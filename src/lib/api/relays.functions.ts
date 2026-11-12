@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { query, queryOne } from "../db.server";
+import { query } from "../db.server";
 import { relayState, type RelayState } from "../relays";
 import { requireManager, requireUser } from "./middleware";
+import { applyRelays } from "../device-commands.server";
 
 // The incubator relay board (firmware/relay_board) on the Automation page.
 // Each change bumps a version; the board picks it up on its next check-in and
@@ -80,22 +81,4 @@ export const setRelays = createServerFn({ method: "POST" })
       }),
     }),
   )
-  .handler(async ({ data, context }) => {
-    const own = await queryOne(
-      "select 1 from devices where id = $1 and owner_id = $2 and type = 'relay'",
-      [data.id, context.user.id],
-    );
-    if (!own) throw new Error("Relay board not found");
-    const patch = Object.fromEntries(Object.entries(data.state).filter(([, v]) => v !== undefined));
-    const row = await queryOne<{ desired: unknown; version: number }>(
-      `insert into relay_boards (device_id, desired, version, updated_by, updated_at, watched_until)
-         values ($1, '{"incubator": true, "fan": true, "light": true, "strip": true}'::jsonb || $2::jsonb,
-                 2, $3, now(), now() + interval '45 seconds')
-       on conflict (device_id) do update
-         set desired = relay_boards.desired || $2::jsonb, version = relay_boards.version + 1,
-             updated_by = $3, updated_at = now(), watched_until = now() + interval '45 seconds'
-       returning desired, version`,
-      [data.id, JSON.stringify(patch), context.user.id],
-    );
-    return { desired: relayState(row!.desired), version: row!.version };
-  });
+  .handler(({ data, context }) => applyRelays(context.user.id, data.id, data.state));
