@@ -17,6 +17,14 @@ const run = (cmd, args, opts = {}) => {
   }
 };
 
+// On Vercel (or any CI) `npm start` must only build the site: the voice services and
+// the dev server are for this PC and would never finish there.
+if (process.env.VERCEL || process.env.CI) {
+  console.log("==> Build server: building the site only (npm run build)");
+  run("npm", ["run", "build"]);
+  process.exit(0);
+}
+
 // 1. Site packages
 if (!fs.existsSync(path.join(root, "node_modules", "vite"))) {
   console.log("==> Installing the site's packages (first run only)");
