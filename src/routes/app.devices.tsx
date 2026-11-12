@@ -50,15 +50,19 @@ export const Route = createFileRoute("/app/devices")({ component: Devices });
 const TYPE_LABEL: Record<string, string> = {
   pi: "Unit 1 · Incubator & brooder (Pi)",
   coop: "Unit 2 · Coop (ESP32)",
+  relay: "Incubator relay board (ESP32)",
 };
 
-type Kind = "pi" | "coop" | "cam";
+type Kind = "pi" | "coop" | "relay" | "cam";
+type UnitKind = Exclude<Kind, "cam">;
 const KIND_LABEL: Record<Kind, string> = {
   pi: "Unit 1 · Incubator & brooder (Raspberry Pi)",
   coop: "Unit 2 · Coop controller (ESP32)",
+  relay: "Incubator relay board (ESP32, 4 relays)",
   cam: "ESP32-CAM camera",
 };
-type Created = { deviceId: string; apiKey: string; kind: "pi" | "coop" };
+type Created = { deviceId: string; apiKey: string; kind: UnitKind };
+const UNIT_NAME: Record<UnitKind, string> = { pi: "Pi", coop: "coop", relay: "relay board" };
 
 const FAN_LABEL: Record<FanLevel, string> = { on: "On", off: "Off" };
 
@@ -664,7 +668,7 @@ function RegisterModal({
     setErrors({});
   }
 
-  async function submitUnit(type: "pi" | "coop") {
+  async function submitUnit(type: UnitKind) {
     const id = deviceId.trim();
     if (!id) return setErrors({ id: "Enter a device ID." });
     setBusy(true);
@@ -731,13 +735,15 @@ function RegisterModal({
           ? "You’ll get the Pi’s API key and agent.env after this step."
           : kind === "coop"
             ? "You’ll get the coop’s API key and the lines to paste into its code after this step."
-            : "The camera needs no key. Your browser opens its stream directly."
+            : kind === "relay"
+              ? "You’ll get the board’s API key and the lines for its secrets.h after this step."
+              : "The camera needs no key. Your browser opens its stream directly."
       }
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button variant="primary" type="submit" form="register-device" loading={busy}>
-            {kind === "pi" ? "Register Pi" : kind === "coop" ? "Register coop" : "Add camera"}
+            {kind === "cam" ? "Add camera" : `Register ${UNIT_NAME[kind]}`}
           </Button>
         </>
       }
@@ -766,7 +772,7 @@ function RegisterModal({
             hint={
               kind === "pi"
                 ? "Unique, up to 64 characters, no spaces. It becomes PG_DEVICE_ID on the Pi."
-                : "Unique, up to 64 characters, no spaces. It becomes PG_DEVICE_ID in the coop’s code."
+                : `Unique, up to 64 characters, no spaces. It becomes PG_DEVICE_ID in the ${UNIT_NAME[kind]}’s code.`
             }
             error={errors.id}
           >
@@ -777,7 +783,9 @@ function RegisterModal({
               autoComplete="off"
               spellCheck={false}
               className="pg-mono"
-              placeholder={kind === "pi" ? "PI-HOUSE-A…" : "COOP-1…"}
+              placeholder={
+                kind === "pi" ? "PI-HOUSE-A…" : kind === "relay" ? "INCUBATOR-1…" : "COOP-1…"
+              }
               onChange={(e) => {
                 setDeviceId(e.target.value.replace(/\s/g, ""));
                 if (errors.id) setErrors({});
@@ -853,9 +861,11 @@ function RegisterModal({
 function CreatedModal({ created, onClose }: { created: Created | null; onClose: () => void }) {
   const [copied, setCopied] = useState<"key" | "env" | null>(null);
   const coop = created?.kind === "coop";
+  const relay = created?.kind === "relay";
+  const name = created ? UNIT_NAME[created.kind] : "";
   const env = !created
     ? ""
-    : coop
+    : coop || relay
       ? `#define PG_API_URL        "${origin()}"\n#define PG_DEVICE_ID      "${created.deviceId}"\n#define PG_DEVICE_API_KEY "${created.apiKey}"\n`
       : `PG_API_URL=${origin()}\nPG_DEVICE_ID=${created.deviceId}\nPG_DEVICE_API_KEY=${created.apiKey}\n`;
   // The Pi can't reach "localhost" on this computer.
@@ -880,7 +890,7 @@ function CreatedModal({ created, onClose }: { created: Created | null; onClose: 
           onClose();
         }
       }}
-      title={coop ? "Coop unit registered" : "Pi registered"}
+      title={coop ? "Coop unit registered" : relay ? "Relay board registered" : "Pi registered"}
       description={
         created ? <span className="pg-mono text-ink-2">{created.deviceId}</span> : undefined
       }
@@ -906,7 +916,7 @@ function CreatedModal({ created, onClose }: { created: Created | null; onClose: 
             />
             <p>
               <span className="font-medium">Store this key now.</span> Anyone with it can post data
-              as this {coop ? "coop" : "Pi"}. Managers can reveal it again from the devices table.
+              as this {name}. Managers can reveal it again from the devices table.
             </p>
           </div>
 
@@ -929,12 +939,20 @@ function CreatedModal({ created, onClose }: { created: Created | null; onClose: 
           <div>
             <div className="mb-1.5 flex items-end justify-between gap-3">
               <div>
-                <div className="pg-t-label">{coop ? "coop_unit.ino" : "agent.env"}</div>
-                {coop ? (
+                <div className="pg-t-label">
+                  {coop ? "coop_unit.ino" : relay ? "secrets.h" : "agent.env"}
+                </div>
+                {relay ? (
                   <p className="pg-t-caption mt-0.5">
-                    In <code className="pg-mono">firmware/coop_unit/coop_unit.ino</code>, replace the
-                    three matching lines in the SETTINGS block at the top, and put your Wi-Fi name
-                    and password there too.
+                    Copy <code className="pg-mono">firmware/relay_board/secrets.example.h</code> to{" "}
+                    <code className="pg-mono">secrets.h</code> in the same folder, replace these
+                    three lines, and put your Wi-Fi name and password there too.
+                  </p>
+                ) : coop ? (
+                  <p className="pg-t-caption mt-0.5">
+                    In <code className="pg-mono">firmware/coop_unit/coop_unit.ino</code>, replace
+                    the three matching lines in the SETTINGS block at the top, and put your Wi-Fi
+                    name and password there too.
                   </p>
                 ) : (
                   <p className="pg-t-caption mt-0.5">
@@ -959,13 +977,32 @@ function CreatedModal({ created, onClose }: { created: Created | null; onClose: 
             {localOrigin && (
               <p className="pg-t-caption mt-1.5">
                 <span className="font-medium text-warn">Change PG_API_URL.</span> This page is open
-                on {window.location.host}, which the {coop ? "coop" : "Pi"} can’t reach. Use the
-                app’s LAN or public address.
+                on {window.location.host}, which the {name} can’t reach. Use the app’s LAN or public
+                address.
               </p>
             )}
           </div>
 
-          {coop ? (
+          {relay ? (
+            <div>
+              <div className="pg-t-label mb-1.5">Then on the ESP32</div>
+              <Steps>
+                <li>
+                  In the Arduino IDE, install the library <Code>ArduinoJson</Code> and pick the
+                  board <Code>ESP32 Dev Module</Code>.
+                </li>
+                <li>
+                  Open <Code>firmware/relay_board/relay_board.ino</Code>, upload it, and open the
+                  serial monitor at 115200 baud. It prints its IP address and{" "}
+                  <Code>Site: online</Code>, and shows Online here within about 15 s.
+                </li>
+                <li>
+                  Switch the incubator from Automation by tapping its parts. Its own page at the
+                  printed IP address keeps working on the farm Wi-Fi too.
+                </li>
+              </Steps>
+            </div>
+          ) : coop ? (
             <div>
               <div className="pg-t-label mb-1.5">Then on the ESP32</div>
               <Steps>

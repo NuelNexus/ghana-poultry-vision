@@ -1355,3 +1355,62 @@ html:not([lang="en"]) .pg-console .pg-seg button {
   white-space: normal;
   text-align: center;
 }
+
+/* Incubator diagram on Automation (src/components/incubator-controls.tsx) */
+.pg-inc-part {
+  cursor: pointer;
+  outline: none;
+}
+.pg-inc-part[aria-disabled="true"] {
+  cursor: default;
+}
+.pg-inc-ring {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 2.5;
+  pointer-events: none;
+  transition: stroke 120ms var(--pg-ease);
+}
+.pg-inc-part:not([aria-disabled="true"]):hover .pg-inc-ring {
+  stroke: color-mix(in srgb, var(--pg-focus) 70%, transparent);
+}
+.pg-inc-part:focus-visible .pg-inc-ring {
+  stroke: var(--pg-focus);
+  stroke-width: 3.5;
+}
+.pg-inc-part--pending .pg-inc-ring {
+  stroke: var(--pg-info);
+  stroke-dasharray: 7 6;
+  animation: pg-inc-dash 0.9s linear infinite;
+}
+.pg-inc--offline svg {
+  opacity: 0.75;
+}
+.pg-inc-spin {
+  animation: pg-inc-spin 0.6s linear infinite;
+}
+.pg-inc-led {
+  animation: pg-inc-twinkle 2.4s ease-in-out infinite;
+}
+@keyframes pg-inc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pg-inc-dash {
+  to {
+    stroke-dashoffset: -26;
+  }
+}
+@keyframes pg-inc-twinkle {
+  50% {
+    opacity: 0.65;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pg-inc-spin,
+  .pg-inc-led,
+  .pg-inc-part--pending .pg-inc-ring {
+    animation: none;
+  }
+}

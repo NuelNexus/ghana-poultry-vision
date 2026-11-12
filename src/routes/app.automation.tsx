@@ -23,6 +23,7 @@ import {
 } from "@/components/ui-kit";
 import { useAuth } from "@/lib/auth";
 import { CoopControlsSection } from "@/components/coop-controls";
+import { IncubatorControlsSection } from "@/components/incubator-controls";
 
 export const Route = createFileRoute("/app/automation")({ component: Automation });
 
@@ -167,6 +168,8 @@ function Automation() {
           </p>
         )}
       </PageHeader>
+
+      <IncubatorControlsSection canManage={canManage} />
 
       <CoopControlsSection canManage={canManage} />
 

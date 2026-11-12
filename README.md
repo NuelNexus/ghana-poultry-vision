@@ -115,6 +115,13 @@ Pages refresh every 10–15 s. Without a Pi, `python edge/agent.py --simulate` s
 Without the ESP32, `python firmware/coop_unit/emulator.py --url <site> --device <id> --key <key>`
 runs the same control logic against the site.
 
+## Connect the incubator relay board
+
+An ESP32 with four relays (incubator controller, fan, light, strip light). Register it under
+Devices as **Incubator relay board**, fill in `firmware/relay_board/secrets.h` (copy
+`secrets.example.h`) and upload `firmware/relay_board/relay_board.ino`. Then switch each part from
+**Automation** by tapping it on the 2D incubator. Details: `firmware/relay_board/README.md`.
+
 ## Marketplace
 
 **Marketplace** (`/app/market`) is shared by every account: farmers list eggs, birds, chicks,

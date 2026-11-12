@@ -51,3 +51,6 @@ videos/build/
 Twi AI - Copy/
 # Python caches in the training code
 tts-finetune/**/__pycache__/
+
+# ESP32 Wi-Fi and device keys
+firmware/*/secrets.h

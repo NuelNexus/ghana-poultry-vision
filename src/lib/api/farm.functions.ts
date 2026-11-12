@@ -278,7 +278,8 @@ export const createDevice = createServerFn({ method: "POST" })
       // Devices that post readings: the Raspberry Pi (unit 1, incubator &
       // brooder) and the ESP32 coop controller (unit 2). The ESP32-CAM has no
       // API key: it is added under Cameras by its stream URL.
-      type: z.enum(["pi", "coop"]).default("pi"),
+      // The incubator relay board (firmware/relay_board) checks in at /devices/relays.
+      type: z.enum(["pi", "coop", "relay"]).default("pi"),
       location: z.string().optional(),
       houseId: z.string().uuid().optional(),
     }),
@@ -300,7 +301,7 @@ export const createDevice = createServerFn({ method: "POST" })
           data.houseId || null,
           farmId,
           context.user.id,
-          data.type === "coop" ? "coop" : "brooder",
+          data.type === "coop" ? "coop" : data.type === "pi" ? "brooder" : null,
         ],
       );
     } catch (e) {

@@ -27,6 +27,7 @@ import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppMarketIndexRouteImport } from './routes/app.market.index'
 import { Route as AppMarketListingIdRouteImport } from './routes/app.market.$listingId'
 import { Route as ApiPublicDevicesIngestRouteImport } from './routes/api/public/devices/ingest'
+import { Route as ApiPublicDevicesRelaysRouteImport } from './routes/api/public/devices/relays'
 import { Route as ApiPublicDevicesTtsRouteImport } from './routes/api/public/devices/tts'
 import { Route as ApiPublicMarketImagesImageIdRouteImport } from './routes/api/public/market/images/$imageId'
 
@@ -120,6 +121,11 @@ const ApiPublicDevicesIngestRoute = ApiPublicDevicesIngestRouteImport.update({
   path: '/api/public/devices/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicDevicesRelaysRoute = ApiPublicDevicesRelaysRouteImport.update({
+  id: '/api/public/devices/relays',
+  path: '/api/public/devices/relays',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicDevicesTtsRoute = ApiPublicDevicesTtsRouteImport.update({
   id: '/api/public/devices/tts',
   path: '/api/public/devices/tts',
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/app/market/$listingId': typeof AppMarketListingIdRoute
   '/app/market/': typeof AppMarketIndexRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
+  '/api/public/devices/relays': typeof ApiPublicDevicesRelaysRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
   '/api/public/market/images/$imageId': typeof ApiPublicMarketImagesImageIdRoute
 }
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/app/market/$listingId': typeof AppMarketListingIdRoute
   '/app/market': typeof AppMarketIndexRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
+  '/api/public/devices/relays': typeof ApiPublicDevicesRelaysRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
   '/api/public/market/images/$imageId': typeof ApiPublicMarketImagesImageIdRoute
 }
@@ -195,6 +203,7 @@ export interface FileRoutesById {
   '/app/market/$listingId': typeof AppMarketListingIdRoute
   '/app/market/': typeof AppMarketIndexRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
+  '/api/public/devices/relays': typeof ApiPublicDevicesRelaysRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
   '/api/public/market/images/$imageId': typeof ApiPublicMarketImagesImageIdRoute
 }
@@ -219,6 +228,7 @@ export interface FileRouteTypes {
     | '/app/market/$listingId'
     | '/app/market/'
     | '/api/public/devices/ingest'
+    | '/api/public/devices/relays'
     | '/api/public/devices/tts'
     | '/api/public/market/images/$imageId'
   fileRoutesByTo: FileRoutesByTo
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
     | '/app/market/$listingId'
     | '/app/market'
     | '/api/public/devices/ingest'
+    | '/api/public/devices/relays'
     | '/api/public/devices/tts'
     | '/api/public/market/images/$imageId'
   id:
@@ -262,6 +273,7 @@ export interface FileRouteTypes {
     | '/app/market/$listingId'
     | '/app/market/'
     | '/api/public/devices/ingest'
+    | '/api/public/devices/relays'
     | '/api/public/devices/tts'
     | '/api/public/market/images/$imageId'
   fileRoutesById: FileRoutesById
@@ -271,6 +283,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiPublicDevicesIngestRoute: typeof ApiPublicDevicesIngestRoute
+  ApiPublicDevicesRelaysRoute: typeof ApiPublicDevicesRelaysRoute
   ApiPublicDevicesTtsRoute: typeof ApiPublicDevicesTtsRoute
   ApiPublicMarketImagesImageIdRoute: typeof ApiPublicMarketImagesImageIdRoute
 }
@@ -403,6 +416,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDevicesIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/devices/relays': {
+      id: '/api/public/devices/relays'
+      path: '/api/public/devices/relays'
+      fullPath: '/api/public/devices/relays'
+      preLoaderRoute: typeof ApiPublicDevicesRelaysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/devices/tts': {
       id: '/api/public/devices/tts'
       path: '/api/public/devices/tts'
@@ -461,6 +481,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiPublicDevicesIngestRoute: ApiPublicDevicesIngestRoute,
+  ApiPublicDevicesRelaysRoute: ApiPublicDevicesRelaysRoute,
   ApiPublicDevicesTtsRoute: ApiPublicDevicesTtsRoute,
   ApiPublicMarketImagesImageIdRoute: ApiPublicMarketImagesImageIdRoute,
 }
