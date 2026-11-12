@@ -28,13 +28,13 @@
 // =====================================================
 
 // ---- WiFi ----
-#define WIFI_SSID     "your-wifi-name"
-#define WIFI_PASSWORD "your-wifi-password"
+#define WIFI_SSID     "TECNO SPARK 20"
+#define WIFI_PASSWORD "Nuelnexus12"
 
 // ---- PoultryGrid site (paste the three lines from Devices -> Add device) ----
-#define PG_API_URL        "https://your-site.example.com"
-#define PG_DEVICE_ID      "COOP-1"
-#define PG_DEVICE_API_KEY "paste-the-device-api-key-here"
+#define PG_API_URL        "https://ghana-poultry-vision.vercel.app"
+#define PG_DEVICE_ID      "coopfinal"
+#define PG_DEVICE_API_KEY "87684922f94808e93e1b94627876cc1a39a19d17ef31dcc8"
 
 // How often to report to the site and pick up new settings (milliseconds).
 // Changes made on the site reach the coop within about this long.
