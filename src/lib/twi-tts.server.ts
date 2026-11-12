@@ -24,9 +24,8 @@ const VOICE = (v: VoiceChoice) =>
       : process.env.TWI_TTS_VOICE_NELVIN || "nelvin";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** True when some Pi's voice service polled in the last minute (or a direct URL is set). */
-export async function twiVoiceOnline() {
-  if (process.env.TWI_TTS_URL) return true;
+/** True when a voice worker (the Pi, or the PC running `npm start`) polled in the last minute. */
+async function workerOnline() {
   const row = await queryOne<{ n: number }>(
     "select count(*)::int as n from devices where tts_seen_at > now() - interval '1 minute'",
   ).catch(() => null);
@@ -34,11 +33,25 @@ export async function twiVoiceOnline() {
 }
 
 /**
- * Someone is about to talk to Ama in Twi: tell the Pi to poll every second for
+ * On Vercel a worker beats TWI_TTS_URL: that address is often a tunnel that is off, and
+ * every reply would wait for it to time out. On this PC the direct URL comes first.
+ */
+async function viaQueue() {
+  if (!process.env.TWI_TTS_URL) return true;
+  return Boolean(process.env.VERCEL) && (await workerOnline());
+}
+
+/** True when some voice worker is online, or a direct URL is set. */
+export async function twiVoiceOnline() {
+  return Boolean(process.env.TWI_TTS_URL) || (await workerOnline());
+}
+
+/**
+ * Someone is about to talk to Ama in Twi: tell the worker to poll every second for
  * the next five minutes, so replies don't wait for its slow 20 s poll.
  */
 export async function wakeTwiVoice() {
-  if (process.env.TWI_TTS_URL) return;
+  if (!(await viaQueue())) return;
   await query(
     `update devices set tts_wanted_until = now() + interval '5 minutes'
       where tts_seen_at > now() - interval '2 minutes'`,
@@ -56,7 +69,7 @@ export async function twiSpeak(
   timeoutMs = 12_000,
 ): Promise<Uint8Array> {
   const url = process.env.TWI_TTS_URL;
-  if (url) {
+  if (url && !(await viaQueue())) {
     const token = process.env.TWI_TTS_TOKEN;
     const res = await fetch(`${url.replace(/\/$/, "")}/synthesize`, {
       method: "POST",
@@ -74,7 +87,7 @@ export async function twiSpeak(
 }
 
 async function relaySpeak(text: string, voiceId: string, timeoutMs: number) {
-  if (!(await twiVoiceOnline())) throw new Error("No Pi is running the Twi voice service");
+  if (!(await workerOnline())) throw new Error("No Pi or PC is running the Twi voice worker");
   await wakeTwiVoice();
   // Tidy up old jobs (and their audio) while we're here.
   void query("delete from tts_jobs where created_at < now() - interval '10 minutes'").catch(
