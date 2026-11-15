@@ -1,24 +1,27 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import type * as THREE_NS from "three";
 import { AVATAR_ACTIONS, type AvatarAction } from "@/lib/avatar-actions";
+import { GUIDES, type GuideId } from "@/lib/guide";
 
-// The female explorer (VRoid-style "J_Bip_*" skeleton) driven by Mixamo clips
-// ("mixamorig*" skeleton). The clips play on a hidden Mixamo rig; every frame
-// each bone's rotation, relative to its rest pose, is copied onto the matching
-// explorer bone in world space, so the two rigs don't need the same bone axes.
+// The 3D guide, driven by Mixamo clips ("mixamorig*" skeleton):
+//   Ama   the female explorer (VRoid-style "J_Bip_*" skeleton, FBX)
+//   Kofi  the farmer (Tripo model rigged by Mixamo, GLB, so already "mixamorig*")
+// The clips play on a hidden Mixamo rig; every frame each bone's rotation,
+// relative to its rest pose, is copied onto the matching guide bone in world
+// space, so the two rigs don't need the same bone axes or rest pose.
 
 export interface ExplorerAvatarHandle {
   /** Switch animation. `then` plays when a one-shot move (backflip) ends. */
   play: (action: AvatarAction, then?: AvatarAction) => void;
 }
 
-const MODEL_URL = "/ai/explorer.fbx";
 const ONE_SHOT: AvatarAction[] = ["backflip"];
 
 // Every clip she can play. The Mixamo FBX files carry one clip each; the two
 // .glb files are three.js's example Mixamo rigs (Xbot, Soldier), stripped to
 // skeleton + animation, which add more idles.
-type ClipSource = { id: string; url: string; clip?: string; once?: boolean };
+// `hold` = how long a short idle loops before the next one (seconds).
+type ClipSource = { id: string; url: string; clip?: string; once?: boolean; hold?: number };
 const CLIPS: ClipSource[] = [
   ...(Object.keys(AVATAR_ACTIONS) as AvatarAction[]).map((id) => ({
     id,
@@ -30,8 +33,17 @@ const CLIPS: ClipSource[] = [
   { id: "idle:agree", url: "/ai/anims/xbot.glb", clip: "agree" },
   { id: "idle:headshake", url: "/ai/anims/xbot.glb", clip: "headShake" },
 ];
-// She rotates through these while nobody is talking.
+// The guide rotates through these while nobody is talking.
 const IDLE_POOL = ["idle", "idle:xbot", "idle:soldier", "idle:agree", "idle:headshake"];
+
+type Character = {
+  model: string;
+  /** guide bone -> Mixamo bone name; null = the model is a Mixamo rig itself. */
+  boneMap: Record<string, string> | null;
+  hips: string;
+  clips: ClipSource[];
+  idles: string[];
+};
 
 const SIDES = { L: "Left", R: "Right" } as const;
 const BONE_MAP: Record<string, string> = {
@@ -63,6 +75,30 @@ for (const [s, side] of Object.entries(SIDES)) {
     for (const i of [1, 2, 3]) BONE_MAP[`J_Bip_${s}_${vroid}${i}`] = `${side}Hand${mixamo}${i}`;
   }
 }
+
+// Kofi's own Mixamo clips (wave, dig), stripped to skeleton + animation.
+const KOFI_MOVES = "/ai/anims/kofi-moves.glb";
+const CHARACTERS: Record<GuideId, Character> = {
+  ama: {
+    model: "/ai/explorer.fbx",
+    boneMap: BONE_MAP,
+    hips: "J_Bip_C_Hips",
+    clips: CLIPS,
+    idles: IDLE_POOL,
+  },
+  kofi: {
+    model: "/ai/kofi.glb",
+    boneMap: null,
+    hips: "mixamorigHips",
+    clips: [
+      ...CLIPS,
+      { id: "idle:wave", url: KOFI_MOVES, clip: "wave", hold: 2.2 },
+      { id: "idle:dig", url: KOFI_MOVES, clip: "dig" },
+    ],
+    idles: [...IDLE_POOL, "idle:wave", "idle:dig"],
+  },
+};
+const MIXAMO_NAME = /^mixamorig\d*:?(.+)$/;
 
 // The set: tiled grass under her and the chicken coop behind, fading into a
 // sky-coloured fog. Sizes are in units of her height `h` (her feet are at y=0).
@@ -210,11 +246,14 @@ export function ExplorerAvatar({
   ref,
   className,
   active = true,
+  guide = "ama",
 }: {
   ref?: Ref<ExplorerAvatarHandle>;
   className?: string;
   /** false = pause rendering (default true). */
   active?: boolean;
+  /** Which guide to show. Changing it reloads the scene. */
+  guide?: GuideId;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const playRef = useRef<ExplorerAvatarHandle["play"]>(() => {});
@@ -245,6 +284,7 @@ export function ExplorerAvatar({
       else disposers.push(fn);
     };
     const isDisposed = () => disposed;
+    const cfg = CHARACTERS[guide];
 
     (async () => {
       const THREE = await import("three");
@@ -294,11 +334,22 @@ export function ExplorerAvatar({
           loader.load(url, res, (e) => e.total && onProgress?.(e.loaded / e.total), rej),
         );
 
+      const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
+      const { MeshoptDecoder } = await import("three/examples/jsm/libs/meshopt_decoder.module.js");
+      const gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+
       let model: THREE_NS.Group;
       try {
-        model = await load(MODEL_URL, (p) => {
+        const onProgress = (p: number) => {
           if (!disposed) setProgress(p);
-        });
+        };
+        model = cfg.model.endsWith(".glb")
+          ? (
+              await gltfLoader.loadAsync(cfg.model, (e) => {
+                if (e.total) onProgress(e.loaded / e.total);
+              })
+            ).scene
+          : await load(cfg.model, onProgress);
       } catch (e) {
         if (!disposed) setError(`Could not load the 3D model (${String(e)})`);
         return;
@@ -344,11 +395,20 @@ export function ExplorerAvatar({
         /* the set is decoration: she still works without it */
       });
 
+      // guide bone -> Mixamo name. Kofi is a Mixamo rig: each bone maps to itself.
+      const boneMap: Record<string, string> = cfg.boneMap ?? {};
+      if (!cfg.boneMap) {
+        model.traverse((o) => {
+          const m = (o as THREE_NS.Bone).isBone && o.name.match(MIXAMO_NAME);
+          if (m) boneMap[o.name] = m[1];
+        });
+      }
+
       // Target bones, parent-first, with their original rest pose so each
       // source rig can be aligned from the same starting point.
       const targetBones: THREE_NS.Bone[] = [];
       model.traverse((o) => {
-        if ((o as THREE_NS.Bone).isBone && BONE_MAP[o.name]) targetBones.push(o as THREE_NS.Bone);
+        if ((o as THREE_NS.Bone).isBone && boneMap[o.name]) targetBones.push(o as THREE_NS.Bone);
       });
       const original = targetBones.map((b) => ({
         b,
@@ -364,10 +424,7 @@ export function ExplorerAvatar({
       };
 
       // Load every clip file once (several clips can share a file).
-      const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
-      const { MeshoptDecoder } = await import("three/examples/jsm/libs/meshopt_decoder.module.js");
-      const gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-      const urls = [...new Set(CLIPS.map((c) => c.url))];
+      const urls = [...new Set(cfg.clips.map((c) => c.url))];
       const files = new Map<string, { root: THREE_NS.Object3D; clips: THREE_NS.AnimationClip[] }>();
       await Promise.all(
         urls.map(async (url) => {
@@ -411,7 +468,7 @@ export function ExplorerAvatar({
       };
       const wp = (o: THREE_NS.Object3D) => o.getWorldPosition(new THREE.Vector3());
       const pickChild = (b: THREE_NS.Object3D) => {
-        const kids = b.children.filter((c) => BONE_MAP[c.name]);
+        const kids = b.children.filter((c) => boneMap[c.name]);
         return kids.find((c) => /Spine|Chest|Neck|Head|Middle1/.test(c.name)) ?? kids[0];
       };
       const buildRig = (root: THREE_NS.Object3D): Rig | null => {
@@ -420,7 +477,7 @@ export function ExplorerAvatar({
         root.updateMatrixWorld(true);
         const srcByName = new Map<string, THREE_NS.Object3D>();
         root.traverse((o) => {
-          const m = o.name.match(/^mixamorig\d*:?(.+)$/);
+          const m = o.name.match(MIXAMO_NAME);
           if (m && !srcByName.has(m[1])) srcByName.set(m[1], o);
         });
         const l = srcByName.get("LeftUpLeg");
@@ -436,10 +493,10 @@ export function ExplorerAvatar({
         // both share one rest pose before rotations are copied.
         restoreTarget();
         for (const tgt of targetBones) {
-          if (tgt.name === "J_Bip_C_Hips") continue;
+          if (tgt.name === cfg.hips) continue;
           const tChild = pickChild(tgt);
-          const src = srcByName.get(BONE_MAP[tgt.name]);
-          const sChild = tChild && srcByName.get(BONE_MAP[tChild.name]);
+          const src = srcByName.get(boneMap[tgt.name]);
+          const sChild = tChild && srcByName.get(boneMap[tChild.name]);
           if (!tChild || !src || !sChild) continue;
           const tDir = wp(tChild).sub(wp(tgt)).normalize();
           const sDir = wp(sChild).sub(wp(src)).normalize();
@@ -451,7 +508,7 @@ export function ExplorerAvatar({
         }
         const pairs: Pair[] = [];
         for (const tgt of targetBones) {
-          const src = srcByName.get(BONE_MAP[tgt.name]);
+          const src = srcByName.get(boneMap[tgt.name]);
           if (!src) continue;
           pairs.push({
             tgt,
@@ -460,7 +517,7 @@ export function ExplorerAvatar({
             tgtRest: tgt.getWorldQuaternion(new THREE.Quaternion()),
           });
         }
-        const hips = pairs.find((p) => p.tgt.name === "J_Bip_C_Hips");
+        const hips = pairs.find((p) => p.tgt.name === cfg.hips);
         const srcHipsRest = hips && wp(hips.src);
         const tgtHipsRest = hips && wp(hips.tgt);
         restoreTarget();
@@ -485,7 +542,8 @@ export function ExplorerAvatar({
 
       // id -> the rig that plays it and its action.
       const actions = new Map<string, { rig: Rig; action: THREE_NS.AnimationAction }>();
-      for (const c of CLIPS) {
+      const holds = new Map<string, number>();
+      for (const c of cfg.clips) {
         const rig = rigs.get(c.url);
         const f = files.get(c.url);
         const clip = c.clip ? f?.clips.find((k) => k.name === c.clip) : f?.clips[0];
@@ -496,8 +554,9 @@ export function ExplorerAvatar({
           action.clampWhenFinished = true;
         }
         actions.set(c.id, { rig, action });
+        if (c.hold) holds.set(c.id, c.hold);
       }
-      const idles = IDLE_POOL.filter((id) => actions.has(id));
+      const idles = cfg.idles.filter((id) => actions.has(id));
 
       // Switching moves blends from her current pose over FADE seconds, which
       // also works between clips that live on different rigs.
@@ -515,7 +574,7 @@ export function ExplorerAvatar({
         const next = actions.get(id);
         if (!next || id === currentId) return;
         for (const b of targetBones) fromQ.set(b, b.quaternion.clone());
-        const hipsBone = targetBones.find((b) => b.name === "J_Bip_C_Hips");
+        const hipsBone = targetBones.find((b) => b.name === cfg.hips);
         if (hipsBone) fromHips.copy(hipsBone.position);
         fade = current ? 0 : 1;
         if (current) current.action.stop();
@@ -530,7 +589,8 @@ export function ExplorerAvatar({
         if (!id) return;
         start(id);
         const len = actions.get(id)!.action.getClip().duration;
-        idleLeft = Math.min(16, Math.max(7, len * (1 + Math.floor(Math.random() * 2))));
+        idleLeft =
+          holds.get(id) ?? Math.min(16, Math.max(7, len * (1 + Math.floor(Math.random() * 2))));
       };
       const play = (id: AvatarAction, then: AvatarAction = "idle") => {
         after = then;
@@ -642,7 +702,7 @@ export function ExplorerAvatar({
       }
       disposers.length = 0;
     };
-  }, []);
+  }, [guide]);
 
   return (
     <div className={className} style={{ position: "relative" }}>
@@ -651,7 +711,9 @@ export function ExplorerAvatar({
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-ink-2">
           {error ?? (
             <>
-              <span className="tabular-nums">Loading Ama… {Math.round(progress * 100)}%</span>
+              <span className="tabular-nums">
+                Loading {GUIDES[guide].name}… {Math.round(progress * 100)}%
+              </span>
               <div className="h-1 w-40 overflow-hidden rounded-full bg-hairline">
                 <div
                   className="h-full bg-brand transition-[width]"

@@ -17,6 +17,7 @@ import { speakIn } from "../voice.server";
 import { SITE_LANG_IDS, siteLang, speechLangFor, type SiteLang } from "../site-lang";
 import { twiSuggest, twiWordsEnabled } from "../twi-nlp.server";
 import { requireUser } from "./middleware";
+import { GUIDES, guideFor, type Guide } from "../guide";
 import { commandNote, runDeviceCommands } from "../device-commands.server";
 import type { Alert, AiSnapshot } from "./types";
 import type { CoopZoneState } from "../controls";
@@ -149,6 +150,7 @@ function systemPrompt(
   lang: SpeechLang = "auto",
   uiLang: SiteLang = "en",
   note = "",
+  guide: Guide = GUIDES.ama,
 ) {
   const langLine =
     lang !== "auto"
@@ -156,7 +158,7 @@ function systemPrompt(
       : uiLang !== "en"
         ? `\nThe farmer uses the app in ${siteLang(uiLang).name}. If you can't tell which language they used, reply in ${siteLang(uiLang).name}.`
         : "";
-  return `You are Ama, the AI assistant inside PoultryGrid, a smart poultry farm dashboard used in Ghana.
+  return `You are ${guide.name}, the AI assistant inside PoultryGrid, a smart poultry farm dashboard used in Ghana.
 You help farmers understand their poultry houses and act on them: temperature, humidity, gas and
 ammonia, ventilation, bird health, water, feed and biosecurity. Give practical, specific advice.
 
@@ -218,12 +220,13 @@ async function answer(
   voice: boolean,
   uiLang: SiteLang = "en",
   note = "",
+  guide: Guide = GUIDES.ama,
 ) {
   const direct = async () => ({
     reply: stripBold(
       await chatCompletion(
         [
-          { role: "system", content: systemPrompt(farm, voice, lang, uiLang, note) },
+          { role: "system", content: systemPrompt(farm, voice, lang, uiLang, note, guide) },
           ...turns.map((t) => ({ role: t.role, content: t.content })),
         ],
         { model: modelFor(lang, uiLang) },
@@ -256,7 +259,7 @@ async function answer(
       await chatCompletion([
         {
           role: "system",
-          content: `${systemPrompt(farm, voice, "en", "en", note)}
+          content: `${systemPrompt(farm, voice, "en", "en", note, guide)}
 
 LANGUAGE: The farmer speaks ${name}. Their messages may come with a machine translation into
 English; use it with the original to understand them (the translation can be rough). Always write
@@ -454,6 +457,7 @@ export const askAssistant = createServerFn({ method: "POST" })
       false,
       data.uiLang,
       commandNote(actions),
+      guideFor(context.user.voice),
     );
     const language = lang !== "auto" ? langName(lang) : null;
     await saveMessages(conversationId, [
@@ -530,6 +534,7 @@ export const twiReply = createServerFn({ method: "POST" })
       true,
       "en",
       commandNote(actions),
+      guideFor(context.user.voice),
     );
     // Text only: the browser speaks it sentence by sentence (speakReply), so her
     // words show at once and the first sentence plays while the rest is made.
@@ -557,10 +562,14 @@ export const createVoiceSession = createServerFn({ method: "POST" })
     // The site language steers speech recognition toward that language's spelling.
     const hint =
       data.uiLang === "en" || data.uiLang === "fr" ? "auto" : siteLang(data.uiLang).speech;
-    return createRealtimeClientSecret(systemPrompt(farm, true, "auto", data.uiLang), hint, {
-      manualResponse: data.twiRouting,
-      voice: context.user.voice,
-    });
+    return createRealtimeClientSecret(
+      systemPrompt(farm, true, "auto", data.uiLang, "", guideFor(context.user.voice)),
+      hint,
+      {
+        manualResponse: data.twiRouting,
+        voice: context.user.voice,
+      },
+    );
   });
 
 // Each finished voice turn is saved into that call's conversation, with English
@@ -667,19 +676,23 @@ const annotateSchema = {
 export const annotateVoiceTurn = createServerFn({ method: "POST" })
   .middleware([requireUser])
   .inputValidator(z.object({ you: z.string().max(4000), ama: z.string().min(1).max(4000) }))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const g = guideFor(context.user.voice);
     const raw = await chatCompletion(
       [
         {
           role: "system",
-          content: `You annotate one turn of a spoken conversation between a farmer and Ama, a 3D farm assistant.
-Split Ama's reply into 1-4 consecutive parts that together are exactly her reply (same words, same order, original language).
-Pick a body animation for each part that matches what she says in it:
+          content: `You annotate one turn of a spoken conversation between a farmer and ${g.name}, a 3D farm assistant.
+Split ${g.name}'s reply into 1-4 consecutive parts that together are exactly ${g.her} reply (same words, same order, original language).
+Pick a body animation for each part that matches what ${g.she} says in it:
 ${gestureList}
 Use talking/talking2 most of the time; excited only for greetings or good news; backflip almost never.
 Also name the farmer's language and translate both lines to English (repeat them unchanged if already English).`,
         },
-        { role: "user", content: `Farmer: ${data.you || "(not transcribed)"}\nAma: ${data.ama}` },
+        {
+          role: "user",
+          content: `Farmer: ${data.you || "(not transcribed)"}\n${g.name}: ${data.ama}`,
+        },
       ],
       { jsonSchema: annotateSchema, maxTokens: 900 },
     );

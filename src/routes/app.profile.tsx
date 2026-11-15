@@ -7,7 +7,6 @@ import { useAuth } from "@/lib/auth";
 import {
   changePassword,
   getAccount,
-  setMyVoice,
   signOutOtherSessions,
   updateProfile,
 } from "@/lib/api/auth.functions";
@@ -41,8 +40,8 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useLanguage } from "@/components/LanguageProvider";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import { speakText } from "@/lib/api/i18n.functions";
-import { SpeechPlayer, cachedChunk, clearSpeechCache } from "@/lib/speech-client";
-import { voiceChoice, type VoiceChoice } from "@/lib/voice-choice";
+import { SpeechPlayer, cachedChunk } from "@/lib/speech-client";
+import { useGuide } from "@/lib/use-guide";
 import {
   ACCENTS,
   FAMILIES,
@@ -1108,35 +1107,24 @@ function LanguageSection() {
   );
 }
 
-const VOICE_SAMPLE = "Akwaaba. Me din de Ama. Mɛboa wo ama wo nkokɔ ho atɔ wo.";
+const voiceSample = (name: string) =>
+  `Akwaaba. Me din de ${name}. Mɛboa wo ama wo nkokɔ ho atɔ wo.`;
 
-/** Ama's voice: NELVIN (our fine-tuned Twi voice), stock male twi-6 or female twi-1. Saved on the account. */
+/**
+ * The 3D guide on the AI page and the voice they speak with, saved on the account.
+ * Ama speaks with the stock female twi-1 voice; Kofi with NELVIN (our fine-tuned
+ * Twi voice) or the stock male twi-6.
+ */
 function VoiceCard() {
-  const { user, patchUser } = useAuth();
-  const qc = useQueryClient();
-  const voice = voiceChoice(user?.voice);
+  const { id, guide, voice, choose, setVoice } = useGuide();
   const [player, setPlayer] = useState<SpeechPlayer | null>(null);
   const [playing, setPlaying] = useState(false);
   useEffect(() => {
     const p = new SpeechPlayer();
-    p.onChange = (id) => setPlaying(id !== null);
+    p.onChange = (pid) => setPlaying(pid !== null);
     setPlayer(p);
     return () => p.dispose();
   }, []);
-
-  const save = useMutation({
-    mutationFn: (v: VoiceChoice) => setMyVoice({ data: { voice: v } }),
-    onMutate: (v) => {
-      // Audio already fetched was spoken in the old voice.
-      clearSpeechCache();
-      qc.setQueryData<typeof user>(["me"], (u) => (u ? { ...u, voice: v } : u));
-    },
-    onSuccess: (r) => void patchUser({ voice: r.voice }),
-    onError: () => {
-      toast.error("Couldn’t save the voice. Try again.");
-      void patchUser({});
-    },
-  });
 
   const hear = () => {
     if (!player) return;
@@ -1145,7 +1133,7 @@ function VoiceCard() {
     void player
       .speak(
         `voice-${voice}`,
-        VOICE_SAMPLE,
+        voiceSample(guide.name),
         (text, slowTwi) =>
           cachedChunk(`voice\u0000${voice}\u0000${text}`, () =>
             speakText({ data: { text, lang: "tw", slowTwi } }),
@@ -1157,26 +1145,44 @@ function VoiceCard() {
 
   return (
     <Card padding="md">
-      <h3 className="pg-t-h3 mb-1">Ama’s voice</h3>
+      <h3 className="pg-t-h3 mb-1">Your guide</h3>
       <p className="pg-t-caption mb-4">
-        The voice that reads replies, alerts and pages aloud. NELVIN is our own Twi voice,
-        trained on a real speaker; Male and Female are the stock stable-twi-tts voices. They run
-        on your Pi or computer.
+        Who appears in voice mode on the AI page and reads replies, alerts and pages aloud. Ama
+        speaks with the female Twi voice. Kofi speaks with NELVIN, our own Twi voice trained on a
+        real speaker, or the stock male voice. They run on your Pi or computer.
       </p>
-      <div className="flex flex-wrap items-center gap-3">
-        <SegmentedControl
-          ariaLabel="Ama’s voice"
-          value={voice}
-          onChange={(v) => save.mutate(v)}
-          options={[
-            { value: "nelvin", label: "NELVIN" },
-            { value: "male", label: "Male" },
-            { value: "female", label: "Female" },
-          ]}
-        />
-        <Button variant="secondary" onClick={hear}>
-          {playing ? "Stop" : "Hear it"}
-        </Button>
+      <div className="flex flex-col gap-4">
+        <SettingRow label="Guide" hint={id === "ama" ? "Female voice" : "Male voices"}>
+          <SegmentedControl
+            ariaLabel="Your guide"
+            value={id}
+            onChange={choose}
+            options={[
+              { value: "ama", label: "Ama" },
+              { value: "kofi", label: "Kofi" },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow label={`${guide.name}’s voice`}>
+          <div className="flex flex-wrap items-center gap-3">
+            {id === "kofi" ? (
+              <SegmentedControl
+                ariaLabel="Kofi’s voice"
+                value={voice === "male" ? "male" : "nelvin"}
+                onChange={setVoice}
+                options={[
+                  { value: "nelvin", label: "NELVIN" },
+                  { value: "male", label: "Male" },
+                ]}
+              />
+            ) : (
+              <span className="text-[13px] leading-[18px] text-ink-2">Female</span>
+            )}
+            <Button variant="secondary" onClick={hear}>
+              {playing ? "Stop" : "Hear it"}
+            </Button>
+          </div>
+        </SettingRow>
       </div>
     </Card>
   );

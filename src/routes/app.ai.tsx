@@ -53,10 +53,12 @@ import { speechLangFor, type SiteLang } from "@/lib/site-lang";
 import { AiStatusBadge, isStale } from "@/components/ai-status";
 import type { VoiceSegment } from "@/lib/avatar-actions";
 import { ExplorerAvatar, type ExplorerAvatarHandle } from "@/components/ExplorerAvatar";
+import { useGuide } from "@/lib/use-guide";
 import {
   Button,
   ErrorState,
   RelativeTime,
+  SegmentedControl,
   Select,
   Skeleton,
   StatusDot,
@@ -106,6 +108,8 @@ function AiAssistant() {
   useWakeTwiVoice();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  const { guide } = useGuide();
+  const She = guide.she === "he" ? "He" : "She";
   // The live call is OpenAI only. Without it the chat mic is how you talk to Ama.
   const liveVoice = useQuery(enginesQuery).data?.liveVoice !== false;
   const mode: Mode = liveVoice ? (search.mode ?? "chat") : "chat";
@@ -125,10 +129,10 @@ function AiAssistant() {
           <h1 className="pg-t-h2">AI assistant</h1>
           <p className="ai-head-sub">
             {!liveVoice
-              ? "Type, or tap the mic and talk: she answers out loud."
+              ? `Type, or tap the mic and talk: ${guide.she} answers out loud.`
               : mode === "chat"
-                ? "Ask Ama about your farm in any language."
-                : "Talk to Ama out loud. She answers out loud too."}
+                ? `Ask ${guide.name} about your farm in any language.`
+                : `Talk to ${guide.name} out loud. ${She} answers out loud too.`}
           </p>
         </div>
         {liveVoice && <ModeToggle voice={mode === "voice"} onChange={toggle} />}
@@ -1200,6 +1204,7 @@ function VoiceChat({ active }: { active: boolean }) {
   const { lang: uiLang } = useLanguage();
   const qc = useQueryClient();
   const avatar = useRef<ExplorerAvatarHandle>(null);
+  const { id: guideId, guide, choose: chooseGuide } = useGuide();
   // Her voice plays through this element; it lives in the page so phones keep it.
   const audioRef = useRef<HTMLAudioElement>(null);
   // Twi replies (GhanaNLP voice) play through their own element.
@@ -1672,7 +1677,7 @@ function VoiceChat({ active }: { active: boolean }) {
   return (
     <div className="ai-fade relative h-full">
       <div className="absolute inset-0">
-        <ExplorerAvatar ref={avatar} className="h-full w-full" />
+        <ExplorerAvatar ref={avatar} guide={guideId} className="h-full w-full" />
       </div>
 
       {(you || ama) && (
@@ -1694,7 +1699,7 @@ function VoiceChat({ active }: { active: boolean }) {
           )}
           {ama && (
             <div className="ai-float">
-              <p className="ai-float-label">Ama</p>
+              <p className="ai-float-label">{guide.name}</p>
               <p className="mt-0.5 text-ink" translate="no">
                 {ama}
               </p>
@@ -1718,6 +1723,18 @@ function VoiceChat({ active }: { active: boolean }) {
           <p role="alert" className="ai-float ai-float--error">
             {error}
           </p>
+        )}
+        {!on && (
+          <SegmentedControl
+            ariaLabel="Choose your guide"
+            className="ai-guide"
+            value={guideId}
+            onChange={chooseGuide}
+            options={[
+              { value: "ama", label: "Ama" },
+              { value: "kofi", label: "Kofi" },
+            ]}
+          />
         )}
         <button
           type="button"
@@ -1910,6 +1927,7 @@ textarea.ai-input {
   display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none;
 }
 .ai-mic-dock > * { pointer-events: auto; }
+.ai-guide { background: var(--pg-surface); box-shadow: var(--pg-shadow-pop); border-radius: 8px; }
 .ai-mic {
   width: 72px; height: 72px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
