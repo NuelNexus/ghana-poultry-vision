@@ -148,6 +148,45 @@ bool startCamera() {
   return true;
 }
 
+// ---- Speed in the dark ----
+// In a dark room the sensor's auto exposure keeps lengthening each exposure to gather
+// light, down to ~2-3 frames a second: a slow, jerky picture. When that happens, the
+// exposure is capped (and the gain left free to brighten it): darker and grainier, but
+// live. Every few minutes auto exposure gets another try, in case the lights came on.
+#define SLOW_FRAME_MS     125     // slower than 8 fps = too slow
+#define EXPOSURE_CAP      300     // OV2640 exposure lines: keeps VGA at ~15+ fps
+#define AUTO_RETRY_MS     300000  // try auto exposure again after 5 minutes
+bool exposureCapped = false;
+float frameMs = 0;
+unsigned long lastFrameAt = 0, cappedAt = 0;
+
+void setExposureCap(bool on) {
+  sensor_t* s = esp_camera_sensor_get();
+  if (!s || on == exposureCapped) return;
+  exposureCapped = on;
+  cappedAt = millis();
+  frameMs = 0;
+  if (on) {
+    s->set_exposure_ctrl(s, 0);
+    s->set_aec_value(s, EXPOSURE_CAP);
+    s->set_gain_ctrl(s, 1);
+  } else {
+    s->set_exposure_ctrl(s, 1);
+  }
+  Serial.printf("Low light: exposure %s\n", on ? "capped for speed" : "back to auto");
+}
+
+void trackFrameSpeed() {
+  unsigned long now = millis();
+  if (lastFrameAt) {
+    float dt = now - lastFrameAt;
+    frameMs = frameMs == 0 ? dt : frameMs * 0.85f + dt * 0.15f;
+  }
+  lastFrameAt = now;
+  if (!exposureCapped && frameMs > SLOW_FRAME_MS && now - cappedAt > 3000) setExposureCap(true);
+  else if (exposureCapped && now - cappedAt > AUTO_RETRY_MS) setExposureCap(false);
+}
+
 // Upside down = flip both ways (a 180 degree turn), done by the sensor itself.
 void applyFlip(bool on) {
   sensor_t* s = esp_camera_sensor_get();
@@ -398,6 +437,7 @@ void pushTask(void*) {
       esp_camera_fb_return(fb);
       if (!ok) break;
       pushedFrames++;
+      trackFrameSpeed();
     }
     relay.stop();
     Serial.println("Relay gone: serving /stream directly");
