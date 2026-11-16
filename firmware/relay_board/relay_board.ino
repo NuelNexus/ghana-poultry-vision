@@ -12,7 +12,14 @@
 //     so the site always shows the real state.
 // With no Wi-Fi or no site, the relays keep their last state.
 //
-// Library (Arduino Library Manager): ArduinoJson (v7)
+// A DHT22 inside the incubator (data on GPIO 14) is read every 2.5 s and sent
+// with each check-in, so the site shows the temperature and humidity on the
+// Automation page. It only reports: the incubator controller keeps its own
+// thermostat. Wiring: DHT22 VCC to 3.3 V, GND to GND, DATA to GPIO 14, with a
+// 10k pull-up from DATA to 3.3 V if it's a bare 4-pin sensor (modules have one).
+//
+// Libraries (Arduino Library Manager): ArduinoJson (v7),
+//   "DHT sensor library" by Adafruit (+ "Adafruit Unified Sensor")
 // Board: ESP32 Dev Module (arduino-esp32 core 2.x or 3.x)
 //
 // Setup: copy secrets.example.h to secrets.h (same folder) and fill it in with
@@ -25,17 +32,24 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <DHT.h>
 
 #include "secrets.h"
 #include "root_ca.h"
 
-#define FIRMWARE_VERSION "relay-board 1.0"
+#define FIRMWARE_VERSION "relay-board 1.1"
 
 // ---- Relay pins ----
 #define INCUBATOR_PIN 22
 #define FAN_PIN       23
 #define LIGHT_PIN     21
 #define STRIP_PIN     19
+
+// ---- Incubator sensor ----
+#define DHT_PIN       14
+#define DHT_TYPE      DHT22
+#define DHT_EVERY_MS  2500   // the DHT22 needs at least 2 s between reads
+#define DHT_STALE_MS  15000  // no good read for this long = sensor fault
 
 // Relay modules differ: most switch ON with HIGH, some ("active low") with LOW.
 #define RELAY_ON  HIGH
@@ -53,6 +67,13 @@
 #define MAX_CHECKIN_MS    30000
 
 WebServer server(80);
+DHT dht(DHT_PIN, DHT_TYPE);
+
+// Latest good DHT22 reading. NAN until the first one.
+float incTemp = NAN;
+float incHumidity = NAN;
+unsigned long lastDhtRead = 0;
+unsigned long lastDhtGood = 0;
 
 struct Relay {
   const char* name;   // the site's name for it
@@ -76,6 +97,21 @@ unsigned long nextCheckin = 0;
 unsigned long checkinEvery = 15000;
 unsigned long lastWifiAttempt = 0;
 bool siteOnline = false;
+
+// ---- Incubator sensor (DHT22) ----
+bool dhtOk() { return lastDhtGood != 0 && millis() - lastDhtGood < DHT_STALE_MS; }
+
+void readDht() {
+  if (lastDhtRead != 0 && millis() - lastDhtRead < DHT_EVERY_MS) return;
+  lastDhtRead = millis();
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+  // A failed read gives NaN; keep the last good one until it goes stale.
+  if (isnan(h) || isnan(t) || t < -20 || t > 80 || h < 0 || h > 100) return;
+  incTemp = t;
+  incHumidity = h;
+  lastDhtGood = millis();
+}
 
 const char htmlPage[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -135,6 +171,11 @@ const char htmlPage[] PROGMEM = R"rawliteral(
     <button class="btn-off" onclick="setRelay('strip',0)">Turn OFF</button>
   </div>
 
+  <div class="card">
+    <h2>Inside the incubator</h2>
+    <div class="status"><span id="temp">--</span> &deg;C &middot; <span id="hum">--</span> % RH</div>
+  </div>
+
   <p class="site">PoultryGrid site: <span id="site">...</span></p>
 
   <script>
@@ -149,6 +190,8 @@ const char htmlPage[] PROGMEM = R"rawliteral(
           el.className = isOn ? 'on' : 'off';
         });
         document.getElementById('site').textContent = d.site ? 'connected' : 'not connected';
+        document.getElementById('temp').textContent = d.sensor_ok ? d.temp.toFixed(1) : 'sensor error';
+        document.getElementById('hum').textContent = d.sensor_ok ? Math.round(d.humidity) : '--';
       });
     }
 
@@ -189,6 +232,11 @@ void handleStatus() {
   JsonDocument doc;
   for (int i = 0; i < RELAY_COUNT; i++) doc[relays[i].name] = relays[i].on;
   doc["site"] = siteOnline;
+  doc["sensor_ok"] = dhtOk();
+  if (dhtOk()) {
+    doc["temp"] = incTemp;
+    doc["humidity"] = incHumidity;
+  }
   String json;
   serializeJson(doc, json);
   server.send(200, "application/json", json);
@@ -222,6 +270,15 @@ String buildCheckin() {
   doc["local"] = changedLocally;
   doc["firmware"] = FIRMWARE_VERSION;
   doc["rssi"] = WiFi.RSSI();
+  JsonObject reading = doc["reading"].to<JsonObject>();
+  reading["ok"] = dhtOk();
+  if (dhtOk()) {
+    reading["temp"] = roundf(incTemp * 10) / 10;
+    reading["humidity"] = roundf(incHumidity * 10) / 10;
+  } else {
+    reading["temp"] = nullptr;
+    reading["humidity"] = nullptr;
+  }
   String out;
   serializeJson(doc, out);
   return out;
@@ -305,6 +362,7 @@ void setup() {
   }
 
   Serial.begin(115200);
+  dht.begin();
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -337,6 +395,7 @@ void setup() {
 void loop() {
   server.handleClient();
   maintainWifi();
+  readDht();
 
   static bool wasConnected = false;
   bool connected = WiFi.status() == WL_CONNECTED;

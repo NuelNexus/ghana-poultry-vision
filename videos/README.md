@@ -19,6 +19,7 @@ They play on the **Guides** page and in the first-login tour.
 |-|-|
 | `guides.mjs` | What each video says and shows, in English and Twi. Edit this. |
 | `build.mjs` | Turns each guide into a HyperFrames project per language and renders it |
+| `voice.py` | Speaks every caption with NELVIN and mixes the voice track |
 | `shots/` | Real screenshots of the app (1920×1080) and `rects.json`, the boxes the camera moves to |
 | `vendor/gsap-3.14.2.min.js` | GSAP from npm, copied into each project so renders never fetch from a CDN |
 | `build/` | Generated projects (gitignored) |
@@ -50,5 +51,9 @@ elements the guides point at (the keys used in `guides.mjs`).
 - The screenshots show the English interface; people who use the site in Twi see it translated.
 - The Twi captions were written for these videos and **should be checked by a native speaker**.
   Fix a line in `guides.mjs` and re-render that guide.
-- The videos are silent. There was no music source when they were made: a voiceover or music
-  bed needs a HeyGen sign-in (`npx hyperframes media-use resolve --doctor`) or your own track.
+- Every caption is spoken by **NELVIN**, the same voice Ama uses (`edge/voices/nelvin`):
+  English lines in its English mode, Twi lines in Twi with the app's English words (Overview,
+  Alerts, Raspberry Pi…) read in English. `voice.py` makes the lines (cached in
+  `build/voice/`) and lays them over the render; each scene lasts as long as its lines take.
+  It runs with `.venv-twi`'s Python (or `PG_TWI_PYTHON`). `--silent` renders without a voice.
+- FFmpeg must include `ffprobe` (on Windows: `winget install Gyan.FFmpeg`).

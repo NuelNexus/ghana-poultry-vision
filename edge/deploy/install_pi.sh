@@ -27,6 +27,7 @@ echo "==> Python environment"
 python3 -m venv "$APP/venv"
 "$APP/venv/bin/pip" install -q --upgrade pip
 "$APP/venv/bin/pip" install -q -r "$APP/edge/requirements-pi.txt"
+"$APP/venv/bin/pip" install -q -r "$APP/edge/requirements-vision.txt"
 
 if [[ ! -f /etc/poultrygrid/agent.env ]]; then
   echo "==> Connect to the app (Devices -> Register device shows these values)"
@@ -43,8 +44,12 @@ echo "==> Service"
 cp "$APP/edge/deploy/poultrygrid-agent.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now poultrygrid-agent
+# Camera vision runs only once the YOLO model is there (edge/models/yolo11n.onnx).
+cp "$APP/edge/deploy/poultrygrid-vision.service" /etc/systemd/system/
+systemctl daemon-reload
+if [[ -f "$APP/edge/models/yolo11n.onnx" ]]; then systemctl enable --now poultrygrid-vision; fi
 sleep 3
 systemctl --no-pager status poultrygrid-agent | head -5
 echo
-echo "Done. Live log: journalctl -u poultrygrid-agent -f"
+echo "Done. Live log: journalctl -u poultrygrid-agent -f  (cameras: journalctl -u poultrygrid-vision -f)"
 echo "Calibrate the MQ-135 in clean air: sudo -u poultrygrid $APP/venv/bin/python $APP/edge/agent.py calibrate --env /etc/poultrygrid/agent.env"

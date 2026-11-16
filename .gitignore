@@ -39,6 +39,7 @@ __pycache__/
 *.pyc
 edge/agent.env
 edge/outbox.sqlite3
+edge/outbox-*.sqlite3
 edge/.venv
 .venv-twi/
 .certs/
@@ -54,3 +55,6 @@ tts-finetune/**/__pycache__/
 
 # ESP32 Wi-Fi and device keys
 firmware/*/secrets.h
+
+# YOLO weights for fine-tuning (edge/models/yolo11n.onnx is what runs)
+edge/models/*.pt

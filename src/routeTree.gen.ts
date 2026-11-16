@@ -26,9 +26,11 @@ import { Route as AppProfileRouteImport } from './routes/app.profile'
 import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppMarketIndexRouteImport } from './routes/app.market.index'
 import { Route as AppMarketListingIdRouteImport } from './routes/app.market.$listingId'
+import { Route as ApiPublicDevicesCameraRouteImport } from './routes/api/public/devices/camera'
 import { Route as ApiPublicDevicesIngestRouteImport } from './routes/api/public/devices/ingest'
 import { Route as ApiPublicDevicesRelaysRouteImport } from './routes/api/public/devices/relays'
 import { Route as ApiPublicDevicesTtsRouteImport } from './routes/api/public/devices/tts'
+import { Route as ApiPublicDevicesVisionRouteImport } from './routes/api/public/devices/vision'
 import { Route as ApiPublicMarketImagesImageIdRouteImport } from './routes/api/public/market/images/$imageId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -116,6 +118,11 @@ const AppMarketListingIdRoute = AppMarketListingIdRouteImport.update({
   path: '/market/$listingId',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicDevicesCameraRoute = ApiPublicDevicesCameraRouteImport.update({
+  id: '/api/public/devices/camera',
+  path: '/api/public/devices/camera',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicDevicesIngestRoute = ApiPublicDevicesIngestRouteImport.update({
   id: '/api/public/devices/ingest',
   path: '/api/public/devices/ingest',
@@ -129,6 +136,11 @@ const ApiPublicDevicesRelaysRoute = ApiPublicDevicesRelaysRouteImport.update({
 const ApiPublicDevicesTtsRoute = ApiPublicDevicesTtsRouteImport.update({
   id: '/api/public/devices/tts',
   path: '/api/public/devices/tts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDevicesVisionRoute = ApiPublicDevicesVisionRouteImport.update({
+  id: '/api/public/devices/vision',
+  path: '/api/public/devices/vision',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicMarketImagesImageIdRoute =
@@ -156,9 +168,11 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AppIndexRoute
   '/app/market/$listingId': typeof AppMarketListingIdRoute
   '/app/market/': typeof AppMarketIndexRoute
+  '/api/public/devices/camera': typeof ApiPublicDevicesCameraRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
   '/api/public/devices/relays': typeof ApiPublicDevicesRelaysRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
+  '/api/public/devices/vision': typeof ApiPublicDevicesVisionRoute
   '/api/public/market/images/$imageId': typeof ApiPublicMarketImagesImageIdRoute
 }
 export interface FileRoutesByTo {
@@ -178,9 +192,11 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/app/market/$listingId': typeof AppMarketListingIdRoute
   '/app/market': typeof AppMarketIndexRoute
+  '/api/public/devices/camera': typeof ApiPublicDevicesCameraRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
   '/api/public/devices/relays': typeof ApiPublicDevicesRelaysRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
+  '/api/public/devices/vision': typeof ApiPublicDevicesVisionRoute
   '/api/public/market/images/$imageId': typeof ApiPublicMarketImagesImageIdRoute
 }
 export interface FileRoutesById {
@@ -202,9 +218,11 @@ export interface FileRoutesById {
   '/app/': typeof AppIndexRoute
   '/app/market/$listingId': typeof AppMarketListingIdRoute
   '/app/market/': typeof AppMarketIndexRoute
+  '/api/public/devices/camera': typeof ApiPublicDevicesCameraRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
   '/api/public/devices/relays': typeof ApiPublicDevicesRelaysRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
+  '/api/public/devices/vision': typeof ApiPublicDevicesVisionRoute
   '/api/public/market/images/$imageId': typeof ApiPublicMarketImagesImageIdRoute
 }
 export interface FileRouteTypes {
@@ -227,9 +245,11 @@ export interface FileRouteTypes {
     | '/app/'
     | '/app/market/$listingId'
     | '/app/market/'
+    | '/api/public/devices/camera'
     | '/api/public/devices/ingest'
     | '/api/public/devices/relays'
     | '/api/public/devices/tts'
+    | '/api/public/devices/vision'
     | '/api/public/market/images/$imageId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -249,9 +269,11 @@ export interface FileRouteTypes {
     | '/app'
     | '/app/market/$listingId'
     | '/app/market'
+    | '/api/public/devices/camera'
     | '/api/public/devices/ingest'
     | '/api/public/devices/relays'
     | '/api/public/devices/tts'
+    | '/api/public/devices/vision'
     | '/api/public/market/images/$imageId'
   id:
     | '__root__'
@@ -272,9 +294,11 @@ export interface FileRouteTypes {
     | '/app/'
     | '/app/market/$listingId'
     | '/app/market/'
+    | '/api/public/devices/camera'
     | '/api/public/devices/ingest'
     | '/api/public/devices/relays'
     | '/api/public/devices/tts'
+    | '/api/public/devices/vision'
     | '/api/public/market/images/$imageId'
   fileRoutesById: FileRoutesById
 }
@@ -282,9 +306,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicDevicesCameraRoute: typeof ApiPublicDevicesCameraRoute
   ApiPublicDevicesIngestRoute: typeof ApiPublicDevicesIngestRoute
   ApiPublicDevicesRelaysRoute: typeof ApiPublicDevicesRelaysRoute
   ApiPublicDevicesTtsRoute: typeof ApiPublicDevicesTtsRoute
+  ApiPublicDevicesVisionRoute: typeof ApiPublicDevicesVisionRoute
   ApiPublicMarketImagesImageIdRoute: typeof ApiPublicMarketImagesImageIdRoute
 }
 
@@ -409,6 +435,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMarketListingIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/devices/camera': {
+      id: '/api/public/devices/camera'
+      path: '/api/public/devices/camera'
+      fullPath: '/api/public/devices/camera'
+      preLoaderRoute: typeof ApiPublicDevicesCameraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/devices/ingest': {
       id: '/api/public/devices/ingest'
       path: '/api/public/devices/ingest'
@@ -428,6 +461,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/devices/tts'
       fullPath: '/api/public/devices/tts'
       preLoaderRoute: typeof ApiPublicDevicesTtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/devices/vision': {
+      id: '/api/public/devices/vision'
+      path: '/api/public/devices/vision'
+      fullPath: '/api/public/devices/vision'
+      preLoaderRoute: typeof ApiPublicDevicesVisionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/market/images/$imageId': {
@@ -480,9 +520,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicDevicesCameraRoute: ApiPublicDevicesCameraRoute,
   ApiPublicDevicesIngestRoute: ApiPublicDevicesIngestRoute,
   ApiPublicDevicesRelaysRoute: ApiPublicDevicesRelaysRoute,
   ApiPublicDevicesTtsRoute: ApiPublicDevicesTtsRoute,
+  ApiPublicDevicesVisionRoute: ApiPublicDevicesVisionRoute,
   ApiPublicMarketImagesImageIdRoute: ApiPublicMarketImagesImageIdRoute,
 }
 export const routeTree = rootRouteImport

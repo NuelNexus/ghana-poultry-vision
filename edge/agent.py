@@ -207,6 +207,8 @@ class Agent:
         cleaned, health = clean_window(rows)
         if getattr(self.hw, "mode", None) == "none":  # PG_SENSOR_MODE=none: not wired, not broken
             health["gas_index"] = health["light"] = "not_wired"
+        for k in getattr(self.hw, "not_wired", ()):  # e.g. the ESP32 brooder unit has no LDR
+            health["gas_index" if k == "gas" else k] = "not_wired"
         age = self.cfg.age_days(self.server_age)
         if hasattr(self.hw, "age"):  # keep the simulated flock in step with the app's batch date
             self.hw.age = age

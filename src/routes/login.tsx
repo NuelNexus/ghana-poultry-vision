@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/components/LanguageProvider";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import { HatchLoop } from "@/components/HatchLoop";
+import { COOP_PRESETS, COOP_PRESET_IDS, type CoopPresetId } from "@/lib/presets";
 
 const search = z.object({
   mode: z.enum(["signin", "signup"]).optional().default("signin"),
@@ -24,8 +25,12 @@ function LoginPage() {
   const navigate = useNavigate();
   const { user, refresh } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">(initial);
-  // Sign-up starts by choosing a language, so the rest of the form is in it.
-  const [step, setStep] = useState<"lang" | "form">(initial === "signup" ? "lang" : "form");
+  // Sign-up starts by choosing a language, so the rest of the form is in it, then
+  // the birds they keep (a preset for Automation's thermostat and incubator).
+  const [step, setStep] = useState<"lang" | "preset" | "form">(
+    initial === "signup" ? "lang" : "form",
+  );
+  const [preset, setPreset] = useState<CoopPresetId | null>(null);
   const { lang } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,7 +46,9 @@ function LoginPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        await signUp({ data: { email, password, fullName, language: lang } });
+        await signUp({
+          data: { email, password, fullName, language: lang, preset: preset ?? undefined },
+        });
         toast.success("Account created");
       } else {
         await signIn({ data: { email, password } });
@@ -77,11 +84,40 @@ function LoginPage() {
               <div className="mt-6 mb-8">
                 <LanguagePicker />
               </div>
-              <button type="button" className="auth-button" onClick={() => setStep("form")}>
+              <button type="button" className="auth-button" onClick={() => setStep("preset")}>
                 Continue
               </button>
               <button onClick={() => setMode("signin")} className="auth-toggle">
                 Already have an account? Sign in
+              </button>
+            </>
+          ) : mode === "signup" && step === "preset" ? (
+            <>
+              <h1 className="auth-title">What do you keep?</h1>
+              <p className="auth-subtitle">
+                Pick a preset and Automation starts with the right temperatures for your birds and
+                eggs. You can change it any time.
+              </p>
+              <div className="auth-presets" role="radiogroup" aria-label="Poultry preset">
+                {COOP_PRESET_IDS.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={preset === id}
+                    className="auth-preset"
+                    onClick={() => setPreset(id)}
+                  >
+                    <span className="auth-preset-title">{COOP_PRESETS[id].label}</span>
+                    <span className="auth-preset-note">{COOP_PRESETS[id].note}</span>
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="auth-button mt-6" onClick={() => setStep("form")}>
+                {preset ? "Continue" : "Skip for now"}
+              </button>
+              <button type="button" onClick={() => setStep("lang")} className="auth-toggle">
+                Back
               </button>
             </>
           ) : (

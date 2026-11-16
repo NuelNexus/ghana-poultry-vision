@@ -5,7 +5,8 @@ import { relayState, relayStateSchema } from "@/lib/relays";
 
 // The incubator relay board (firmware/relay_board) checks in here.
 // Headers: x-device-id, x-api-key
-// Body:    { state: {incubator, fan, light, strip}, version, local?, firmware?, rssi? }
+// Body:    { state: {incubator, fan, light, strip}, version, local?, firmware?, rssi?,
+//            reading?: {temp, humidity, ok} }   (the DHT22 on GPIO 14, relay-board 1.1+)
 //   state    what its relays are now
 //   version  the settings version it last applied
 //   local    true when someone switched a relay on the board's own web page since the
@@ -23,6 +24,13 @@ const bodySchema = z.object({
   local: z.boolean().optional(),
   firmware: z.string().max(40).optional(),
   rssi: z.number().int().optional(),
+  reading: z
+    .object({
+      temp: z.number().min(-20).max(80).nullable(),
+      humidity: z.number().min(0).max(100).nullable(),
+      ok: z.boolean(),
+    })
+    .optional(),
 });
 
 export const Route = createFileRoute("/api/public/devices/relays")({
@@ -53,6 +61,23 @@ export const Route = createFileRoute("/api/public/devices/relays")({
         await query("insert into relay_boards (device_id) values ($1) on conflict do nothing", [
           device.id,
         ]);
+        if (b.reading) {
+          const r = b.reading;
+          const reading = { temp: r.temp, humidity: r.humidity, sensor_ok: r.ok };
+          await query(
+            "update relay_boards set reading = $2, reading_at = now() where device_id = $1",
+            [device.id, JSON.stringify(reading)],
+          );
+          // History for the chart: one row a minute is plenty.
+          if (r.ok && r.temp != null)
+            await query(
+              `insert into relay_readings (device_id, temp, humidity)
+               select $1, $2, $3
+                where not exists (select 1 from relay_readings
+                                   where device_id = $1 and created_at > now() - interval '55 seconds')`,
+              [device.id, r.temp, r.humidity],
+            );
+        }
         // Switched on the board's own page: that becomes what the site wants too.
         const row = b.local
           ? await queryOne<{ desired: unknown; version: number; watched: boolean }>(

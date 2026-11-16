@@ -19,6 +19,8 @@ export interface SessionUser {
   onboarded_at: string | null;
   /** Ama's voice (Profile > Language and voice). */
   voice: VoiceChoice;
+  /** The birds they keep, picked at sign-up (src/lib/presets.ts); null = not chosen. */
+  poultry_preset: string | null;
 }
 
 const COOKIE = "pg_session";
@@ -96,8 +98,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     language: string;
     onboarded_at: string | null;
     voice: VoiceChoice;
+    poultry_preset: string | null;
   }>(
-    `select u.id, u.email, u.full_name, u.language, u.onboarded_at, u.voice,
+    `select u.id, u.email, u.full_name, u.language, u.onboarded_at, u.voice, u.poultry_preset,
             coalesce(array_agg(r.role::text) filter (where r.role is not null), '{}') as roles
        from sessions s
        join users u on u.id = s.user_id

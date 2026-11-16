@@ -183,6 +183,80 @@ On the same network, or behind a tunnel, the app can call the Pi directly instea
 `python twi_tts.py serve --host 0.0.0.0 --port 5002` with `PG_TTS_TOKEN` set on the Pi, and
 `TWI_TTS_URL=http://<pi>:5002` plus the same `TWI_TTS_TOKEN` in the app's environment.
 
+## Camera vision: pests and inactive birds (YOLO11n)
+
+`vision.py` watches every ESP32-CAM on the Cameras page with
+[YOLO11n](https://docs.ultralytics.com/models/yolo11/) and reports to the app:
+
+| It reports | How |
+|-|-|
+| **Birds** | every `bird` (stock model) or `chicken`/`chick`/`hen`… (fine-tuned model) box |
+| **Inactive birds** | each bird is tracked from frame to frame; one whose box hasn't moved for `PG_INACTIVE_MIN` minutes (10) is inactive. Sick, injured and dead birds sit still |
+| **Activity** | share of tracked birds that moved in the last minute; under `PG_LOW_ACTIVITY` (15 %) for 10 minutes is "low flock activity" (heat, no water, disease) |
+| **Pests and predators** | any of `PG_PEST_CLASSES` (cat, dog, and rat, snake, hawk, mongoose… with a fine-tuned model) |
+
+Each pest, inactive bird or low activity is an event on the Cameras page and opens an
+alert. Between `PG_VISION_QUIET_HOURS` (19-6) the birds roost, so stillness isn't
+reported then (pests still are). The Cameras page also gets an **AI view**: the last
+annotated frame, which works over https where the camera's own http stream is blocked.
+
+It runs on the **Pi or any PC** on the farm network (Windows, macOS, Linux), with only
+onnxruntime, numpy and Pillow: no PyTorch, no OpenCV. It grabs one JPEG at a time from the
+camera's `/capture` (port 80), so it doesn't take the camera's single MJPEG stream from people
+watching it.
+
+**On a PC** (this one): `npm start` runs it with the live voice worker, using the same
+device key (`PG_DEVICE_ID` / `PG_DEVICE_API_KEY` in `edge/agent.env`). `PG_VISION=off`
+leaves it out. To run it on its own:
+
+```bash
+pip install -r edge/requirements-vision.txt
+python edge/vision.py                       # all cameras of that device's account
+python edge/vision.py --image coop.jpg      # try the model on a photo -> coop.annotated.jpg
+python edge/vision.py --camera http://192.168.1.40:81/stream --dry-run --save-frames .
+```
+
+The PC must be on the same network as the cameras. On a PC with an NVIDIA GPU,
+`pip install onnxruntime-gpu` instead and it is used automatically.
+
+**On the Pi:** `install_pi.sh` installs it as `poultrygrid-vision` next to the agent
+(it reads `/etc/poultrygrid/agent.env`). YOLO11n at 640 px takes about 0.5-1 s a frame
+on a Pi 4 and 0.2-0.4 s on a Pi 5, so a few cameras at one frame every 3 s is fine.
+`journalctl -u poultrygrid-vision -f` shows what it sees.
+
+| Setting | Default | |
+|-|-|-|
+| `PG_VISION_MODEL` | `models/yolo11n.onnx` | any YOLO11/YOLOv8 ONNX export; class names come from the file |
+| `PG_VISION_CONF` | 0.35 | minimum confidence |
+| `PG_VISION_INTERVAL_S` | 3 | seconds between passes over the cameras |
+| `PG_VISION_REPORT_S` | 30 | how often counts and the frame are sent (events go at once) |
+| `PG_INACTIVE_MIN` | 10 | minutes without moving before a bird counts as inactive |
+| `PG_LOW_ACTIVITY` | 0.15 | flock activity below this for `PG_INACTIVE_MIN` is reported |
+| `PG_VISION_QUIET_HOURS` | 19-6 | roosting hours with no stillness events; `0` = never quiet |
+| `PG_BIRD_CLASSES` | bird, chicken, hen, rooster, chick, … | which classes are your birds |
+| `PG_PEST_CLASSES` | cat, dog, rat, mouse, snake, hawk, … | which classes are pests (COCO's computer "mouse" is ignored) |
+| `PG_VISION_WORKER` | hostname | shown on the Cameras page |
+
+### The model
+
+`models/yolo11n.onnx` is the official Ultralytics YOLO11n (COCO, 80 classes), exported
+from `yolo11n.pt` (from the Ultralytics release assets). Stock COCO sees a chicken as
+`bird` and knows cats and dogs, but has **no rats or snakes**, and a small top-down
+ESP32-CAM picture is harder than the photos it learned from. For dependable results,
+fine-tune it on your own coop (on a PC, not the Pi):
+
+```bash
+pip install ultralytics
+# label ~200+ frames (Roboflow, CVAT or Label Studio, YOLO format) with classes like
+# chicken, chick, rat, snake, hawk, cat, dog   (save frames with vision.py --save-frames)
+yolo detect train model=yolo11n.pt data=coop.yaml epochs=100 imgsz=640
+yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz=640 opset=12 simplify=True
+# copy best.onnx to edge/models/ and set PG_VISION_MODEL to it
+```
+
+`yolo11n.pt` itself is not in git (the ONNX file is what runs); `yolo detect train`
+downloads it if it's missing.
+
 ## Try it without hardware
 
 ```bash

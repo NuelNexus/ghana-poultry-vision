@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { VOICES } from "../voice-choice";
+import { COOP_PRESET_IDS } from "../presets";
 import { z } from "zod";
 import {
   createSession,
@@ -36,6 +37,7 @@ export const signUp = createServerFn({ method: "POST" })
       password: z.string().min(8, "Password must be at least 8 characters"),
       fullName: z.string().min(1).max(120),
       language: z.enum(SITE_LANG_IDS).default("en"),
+      preset: z.enum(COOP_PRESET_IDS as [string, ...string[]]).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -44,8 +46,15 @@ export const signUp = createServerFn({ method: "POST" })
     ]);
     if (exists) throw new Error("An account with this email already exists");
     const user = await queryOne<{ id: string }>(
-      "insert into users (email, password_hash, full_name, language) values ($1, $2, $3, $4) returning id",
-      [data.email.trim(), await hashPassword(data.password), data.fullName.trim(), data.language],
+      `insert into users (email, password_hash, full_name, language, poultry_preset)
+       values ($1, $2, $3, $4, $5) returning id`,
+      [
+        data.email.trim(),
+        await hashPassword(data.password),
+        data.fullName.trim(),
+        data.language,
+        data.preset ?? null,
+      ],
     );
     // Every account runs its own farm, so it gets admin rights over its own
     // devices and data (and sees nobody else's, see farm.functions.ts).
@@ -143,6 +152,18 @@ export const setMyVoice = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await query("update users set voice = $1 where id = $2", [data.voice, context.user.id]);
     return { ok: true, voice: data.voice };
+  });
+
+/** The birds this account keeps (a coop preset), used as the default on Automation. */
+export const setMyPreset = createServerFn({ method: "POST" })
+  .middleware([requireUser])
+  .inputValidator(z.object({ preset: z.enum(COOP_PRESET_IDS as [string, ...string[]]) }))
+  .handler(async ({ data, context }) => {
+    await query("update users set poultry_preset = $1 where id = $2", [
+      data.preset,
+      context.user.id,
+    ]);
+    return { ok: true, poultry_preset: data.preset };
   });
 
 export const changePassword = createServerFn({ method: "POST" })

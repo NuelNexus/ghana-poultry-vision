@@ -23,6 +23,8 @@ export function IncubatorDiagram({
   disabled,
   onToggle,
   display,
+  sensor,
+  brooder,
   caption = true,
   fit = false,
 }: {
@@ -33,6 +35,10 @@ export function IncubatorDiagram({
   onToggle: (k: RelayName) => void;
   /** What the controller's screen shows, e.g. the demo's temperature. */
   display?: string;
+  /** The DHT22 inside the incubator (GPIO 14 on the relay board). */
+  sensor?: IncubatorSensorView;
+  /** The brooding-area unit's latest reading (its own DHT22) and the AI's status. */
+  brooder?: BrooderView;
   caption?: boolean;
   /** On wide screens, grow to the height of the cell (the Coop section's left column). */
   fit?: boolean;
@@ -172,10 +178,25 @@ export function IncubatorDiagram({
               fontSize={18}
               fontWeight={700}
               fontFamily="var(--pg-font-mono)"
-              fill={incubator ? "#ff4a3d" : "#4a2a28"}
+              fill={incubator ? "#ff4a3d" : display ? "#a0574d" : "#4a2a28"}
             >
-              {incubator ? (display ?? "HEAT") : "OFF"}
+              {/* The DHT22's temperature whenever there is one, heat on or off. */}
+              {display ?? (incubator ? "HEAT" : "OFF")}
             </text>
+            {display && (
+              <text
+                x={92}
+                y={70}
+                textAnchor="middle"
+                fontSize={7.5}
+                fontWeight={700}
+                letterSpacing="0.08em"
+                fontFamily="var(--pg-font-mono)"
+                fill={incubator ? "#ff8a7f" : "#6b4a46"}
+              >
+                °C · HEAT {incubator ? "ON" : "OFF"}
+              </text>
+            )}
             <circle cx={127} cy={40} r={2.5} fill={incubator ? "#ff7a2f" : "#3a3d3a"} />
             <circle cx={127} cy={48} r={2.5} fill={incubator ? "#5ee38b" : "#3a3d3a"} />
             <text
@@ -291,6 +312,7 @@ export function IncubatorDiagram({
           >
             INCUBATOR
           </text>
+          {sensor && <Dht22 sensor={sensor} />}
 
           {/* Fan on the incubator's back wall */}
           {part(
@@ -430,6 +452,7 @@ export function IncubatorDiagram({
             >
               BROODER
             </text>
+            {brooder && <BrooderReadout brooder={brooder} />}
 
             {/* LED strip lights on the brooder ceiling */}
             {part(
@@ -459,6 +482,114 @@ export function IncubatorDiagram({
         </figcaption>
       )}
     </figure>
+  );
+}
+
+export interface BrooderView {
+  temp: number | null;
+  humidity: number | null;
+  status: "healthy" | "warning" | "critical" | null;
+}
+
+const BROODER_COLOR = { healthy: "#2f8f57", warning: "#b7791f", critical: "#d23b2f" };
+
+/** The brooding-area unit's reading, under the BROODER label. */
+function BrooderReadout({ brooder }: { brooder: BrooderView }) {
+  const c = brooder.status ? BROODER_COLOR[brooder.status] : "#8a8f86";
+  return (
+    <g aria-hidden>
+      <rect x={226} y={394} width={80} height={36} rx={6} fill="#151816" opacity={0.88} />
+      <circle cx={236} cy={404} r={3.5} fill={c} />
+      <text
+        x={274}
+        y={409}
+        textAnchor="middle"
+        fontSize={13}
+        fontWeight={700}
+        fontFamily="var(--pg-font-mono)"
+        fill="#ffffff"
+      >
+        {brooder.temp == null ? "--.-" : brooder.temp.toFixed(1)}°C
+      </text>
+      <text
+        x={266}
+        y={423}
+        textAnchor="middle"
+        fontSize={9.5}
+        fontWeight={600}
+        fontFamily="var(--pg-font-mono)"
+        fill={c === "#8a8f86" ? "#8a8f86" : "#cfd3cb"}
+      >
+        {brooder.humidity == null ? "--" : Math.round(brooder.humidity)}% ·{" "}
+        {brooder.status ? brooder.status.toUpperCase() : "NO AI"}
+      </text>
+    </g>
+  );
+}
+
+export interface IncubatorSensorView {
+  temp: number | null;
+  humidity: number | null;
+  status: "ok" | "warn" | "crit" | "fault";
+}
+
+const SENSOR_COLOR = { ok: "#2f8f57", warn: "#b7791f", crit: "#d23b2f", fault: "#8a8f86" };
+
+/** The DHT22 on the incubator's right wall, with its reading beside it. */
+function Dht22({ sensor }: { sensor: IncubatorSensorView }) {
+  const c = SENSOR_COLOR[sensor.status];
+  const t = sensor.temp == null ? "--.-" : sensor.temp.toFixed(1);
+  const h = sensor.humidity == null ? "--" : Math.round(sensor.humidity);
+  return (
+    <g aria-hidden>
+      <title>DHT22 temperature and humidity sensor</title>
+      {/* the white grille box on its little board */}
+      <rect x={279} y={200} width={26} height={8} rx={1.5} fill="#2c6e9e" />
+      <rect x={281} y={206} width={22} height={30} rx={2} fill="#fbfbf8" stroke="#a3a89f" />
+      {[0, 1, 2, 3, 4].map((r) =>
+        [0, 1, 2].map((col) => (
+          <rect
+            key={`${r}-${col}`}
+            x={284 + col * 6}
+            y={209 + r * 5.2}
+            width={4}
+            height={3}
+            rx={0.6}
+            fill="#c9ccc4"
+          />
+        )),
+      )}
+      <circle
+        cx={292}
+        cy={242}
+        r={3}
+        fill={c}
+        className={sensor.status === "fault" ? undefined : "pg-inc-led"}
+      />
+      <rect x={232} y={250} width={74} height={34} rx={6} fill="#151816" opacity={0.9} />
+      <text
+        x={269}
+        y={265}
+        textAnchor="middle"
+        fontSize={13}
+        fontWeight={700}
+        fontFamily="var(--pg-font-mono)"
+        fill={sensor.status === "fault" ? "#8a8f86" : "#ffffff"}
+      >
+        {t}°C
+      </text>
+      <text
+        x={269}
+        y={278}
+        textAnchor="middle"
+        fontSize={10}
+        fontWeight={600}
+        fontFamily="var(--pg-font-mono)"
+        fill={c === SENSOR_COLOR.fault ? "#8a8f86" : "#9fe0b8"}
+      >
+        {h}% RH
+      </text>
+    </g>
   );
 }
 

@@ -10,6 +10,9 @@
 // <slug>-<lang>.mp4 and a poster .jpg in public/guides/. Screenshots come from
 // videos/shots/ (real screens of the app; rects.json has the boxes the camera
 // moves to). Needs Node 22, FFmpeg and Chrome (`npx hyperframes browser ensure`).
+//
+// Every caption is spoken by NELVIN (videos/voice.py, run with .venv-twi's Python or
+// PG_TWI_PYTHON); a scene lasts as long as its lines take to say. --silent skips the voice.
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -38,6 +41,68 @@ const LANGS = ["en", "tw"];
 const words = (s) => s.trim().split(/\s+/).length;
 /** Long enough to read: 0.9 s plus 0.33 s a word, never under 2.8 s. */
 const beatLen = (text) => Math.max(2.8, 0.9 + 0.33 * words(text));
+const VOICE_AT = 0.25; // a beat's line starts this long after its caption appears
+
+// --- narration (NELVIN) -------------------------------------------------------
+const PY =
+  process.env.PG_TWI_PYTHON ||
+  [join(ROOT, ".venv-twi", "Scripts", "python.exe"), join(ROOT, ".venv-twi", "bin", "python")].find((p) => existsSync(p));
+let SPOKEN = new Map(); // "<lang>|<text>" -> { wav, dur }
+const spoken = (text, lang) => SPOKEN.get(`${lang}|${text}`)?.dur ?? 0;
+/** How long a beat stays up: long enough to read, and to hear its line out. */
+const beatDur = (text, lang) => Math.max(beatLen(text), VOICE_AT + spoken(text, lang) + 0.7);
+const beatVoice = (beats, lang) => beats.map((b) => ({ at: b.t + VOICE_AT, text: b.text[lang] }));
+const titleLine = (s, lang) => `${s.title[lang]}. ${s.sub[lang]}`;
+
+const TWI_NAMES = new Set(["Ama"]);
+/** In Twi lines, the app's English words (found in the English line too) are read in English. */
+function sayTwi(tw, en) {
+  const enWords = new Set(en.toLowerCase().match(/[a-z0-9][a-z0-9'’-]*/g) ?? []);
+  const isEn = (w) => {
+    const bare = w.replace(/[.,:;!?()“”"]/g, "");
+    if (!bare || !/^[A-Za-z0-9'’-]+$/.test(bare) || TWI_NAMES.has(bare)) return false;
+    if (/\d/.test(bare)) return /[A-Za-z]/.test(bare) && enWords.has(bare.toLowerCase());
+    return enWords.has(bare.toLowerCase()) && (/^[A-Z]/.test(bare) || bare.length >= 4);
+  };
+  const out = [];
+  let run = [];
+  const flush = () => {
+    if (!run.length) return;
+    const tail = (run.at(-1).match(/[.,:;!?]+$/) ?? [""])[0];
+    out.push(`[${run.join(" ").replace(/[.,:;!?]+$/, "")}]${tail}`);
+    run = [];
+  };
+  for (const w of tw.split(/\s+/)) {
+    if (isEn(w)) run.push(w);
+    else {
+      flush();
+      out.push(w);
+    }
+  }
+  flush();
+  return out.join(" ");
+}
+
+/** Every line a guide says in one language, for voice.py. */
+function narration(guide, lang) {
+  const items = [];
+  const add = (t) => items.push({ text: t[lang], lang, say: lang === "tw" ? sayTwi(t.tw, t.en) : t.en });
+  for (const s of guide.scenes) {
+    if (s.type === "title") add({ en: titleLine(s, "en"), tw: titleLine(s, "tw") });
+    else if (s.type === "end") add(s.text);
+    else for (const b of s.beats ?? []) add(b.text);
+  }
+  return items;
+}
+
+function voice(cmd, data) {
+  return execFileSync(PY, ["-X", "utf8", join(HERE, "voice.py"), cmd], {
+    input: JSON.stringify(data),
+    encoding: "utf8",
+    stdio: ["pipe", "pipe", "inherit"],
+    maxBuffer: 64 << 20,
+  });
+}
 const FADE = 0.35;
 
 const esc = (s) =>
@@ -105,7 +170,7 @@ function layout(beats, lang, lead) {
   let t = lead;
   for (const b of beats) {
     b.t = t;
-    b.d = beatLen(b.text[lang]);
+    b.d = beatDur(b.text[lang], lang);
     t += b.d;
   }
   return t + 0.4;
@@ -114,7 +179,12 @@ function layout(beats, lang, lead) {
 // --- scene: title / end ------------------------------------------------------
 
 function titleScene(id, s, lang, kicker, first) {
-  const dur = Math.max(4.2, 1.6 + 0.3 * words(s.title[lang] + " " + s.sub[lang]));
+  const say = first ? 0.4 : 0.9;
+  const dur = Math.max(
+    4.2,
+    1.6 + 0.3 * words(s.title[lang] + " " + s.sub[lang]),
+    say + spoken(titleLine(s, lang), lang) + 0.9,
+  );
   const css = `
     #${id}-bg { position: absolute; inset: 0; background: ${BRAND}; }
     #${id}-brand { position: absolute; left: 160px; top: 140px; display: flex; align-items: center; gap: 20px;
@@ -140,11 +210,11 @@ function titleScene(id, s, lang, kicker, first) {
     tl.fromTo("#${id}-title", { opacity: ${o}, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, ${first ? 0 : 0.5});
     tl.fromTo("#${id}-sub", { opacity: ${o}, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, ${first ? 0.1 : 0.85});
     tl.fromTo("#${id}-title", { scale: 1 }, { scale: 1.03, duration: ${r1(dur - 0.6)}, ease: "none" }, 0.6);`;
-  return { dur, html: sceneFile(id, css, body, js, dur, first) };
+  return { dur, html: sceneFile(id, css, body, js, dur, first), voice: [{ at: say, text: titleLine(s, lang) }] };
 }
 
 function endScene(id, s, lang) {
-  const dur = Math.max(3.6, 1.4 + 0.33 * words(s.text[lang]));
+  const dur = Math.max(3.6, 1.4 + 0.33 * words(s.text[lang]), 0.35 + spoken(s.text[lang], lang) + 1.1);
   const css = `
     #${id}-bg { position: absolute; inset: 0; background: ${PAPER}; }
     #${id}-line { position: absolute; left: 200px; right: 200px; top: 360px; text-align: center; font-size: 76px;
@@ -160,7 +230,7 @@ function endScene(id, s, lang) {
     tl.fromTo("#${id}-line", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.2);
     tl.fromTo("#${id}-brand", { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.6)" }, 0.75);
     tl.fromTo("#${id}-line", { scale: 1 }, { scale: 1.03, duration: ${r1(dur - 0.8)}, ease: "none" }, 0.75);`;
-  return { dur, html: sceneFile(id, css, body, js, dur) };
+  return { dur, html: sceneFile(id, css, body, js, dur), voice: [{ at: 0.35, text: s.text[lang] }] };
 }
 
 // --- scene: screenshot with camera moves ------------------------------------------
@@ -234,7 +304,7 @@ tl.fromTo("#${id}-h${i} .hl", { opacity: 0, scale: 1.06 }, { opacity: 1, scale: 
     )
     .join("\n");
   const js = `tl.set("#${id}-cam", { x: 0, y: 0, scale: 1 }, 0);\n${moves}\n${cap.js}`;
-  return { dur, html: sceneFile(id, css, body, js, dur), assets: [`${s.img}.png`] };
+  return { dur, html: sceneFile(id, css, body, js, dur), assets: [`${s.img}.png`], voice: beatVoice(beats, lang) };
 }
 
 // --- scene: phone ------------------------------------------------------------------------
@@ -258,7 +328,7 @@ function phoneScene(id, s, lang) {
   const js = `tl.fromTo("#${id}-phone", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: "power3.out" }, 0.1);
 tl.to("#${id}-phone", { y: -40, duration: ${r1(Math.max(0.5, dur - 0.8))}, ease: "none" }, 0.8);
 ${cap.js}`;
-  return { dur, html: sceneFile(id, css, body, js, dur), assets: [`${s.img}.png`] };
+  return { dur, html: sceneFile(id, css, body, js, dur), assets: [`${s.img}.png`], voice: beatVoice(beats, lang) };
 }
 
 // --- scene: unit diagrams -------------------------------------------------------------------
@@ -339,7 +409,11 @@ function diagramScene(id, s, lang, parts, extraJs = () => "") {
   const body = `<div id="${id}-bg"></div><div id="${id}-stage" class="fade" style="transform-origin:50% 40%">${parts.html}\n${rings}</div>\n${cap.html}`;
   const js = `${reveals}\n${ringJs}\n${extraJs(beats, firstBeat)}\n${cap.js}
 tl.fromTo("#${id}-stage", { scale: 1 }, { scale: 1.035, duration: ${r1(dur)}, ease: "none" }, 0);`;
-  return { dur, html: sceneFile(id, DIAGRAM_CSS(id) + (parts.css ?? ""), body, js, dur) };
+  return {
+    dur,
+    html: sceneFile(id, DIAGRAM_CSS(id) + (parts.css ?? ""), body, js, dur),
+    voice: beatVoice(beats, lang),
+  };
 }
 
 function brooderParts(id, lang) {
@@ -506,7 +580,7 @@ function lcdScene(id, s, lang) {
   const js = `tl.fromTo("#${id}-pcb, #${id}-bezel, #${id}-glass", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.05);
 tl.fromTo("#${id}-stage", { scale: 1 }, { scale: 1.04, duration: ${r1(dur)}, ease: "none" }, 0);
 ${cap.js}`;
-  return { dur, html: sceneFile(id, css, body, js, dur) };
+  return { dur, html: sceneFile(id, css, body, js, dur), voice: beatVoice(beats, lang) };
 }
 
 // --- project -----------------------------------------------------------------------------------
@@ -521,6 +595,7 @@ function buildProject(guide, lang) {
 
   let t = 0;
   const hosts = [];
+  const clips = [];
   guide.scenes.forEach((s, i) => {
     const id = `s${i}`;
     let r;
@@ -534,6 +609,10 @@ function buildProject(guide, lang) {
     else throw new Error(`Unknown scene type ${s.type}`);
     writeFileSync(join(dir, "compositions", `${id}.html`), r.html);
     for (const a of r.assets ?? []) copyFileSync(join(SHOTS, a), join(dir, "assets", a));
+    for (const v of r.voice ?? []) {
+      const line = SPOKEN.get(`${lang}|${v.text}`);
+      if (line) clips.push({ wav: line.wav, at: r1(t + v.at) });
+    }
     hosts.push(
       `<div id="${id}" data-composition-id="${id}" data-composition-src="compositions/${id}.html" data-start="${r1(t)}" data-duration="${r1(r.dur)}" data-track-index="1" data-track-kind="graphics" data-width="${W}" data-height="${H}"></div>`,
     );
@@ -562,15 +641,21 @@ function buildProject(guide, lang) {
 </html>
 `,
   );
-  return { dir, duration: t };
+  return { dir, duration: t, clips };
 }
 
+// Windows can't spawn npx.cmd without a shell, so run npm's npx script with this Node.
+const NPX_CLI = join(dirname(process.execPath), "node_modules", "npm", "bin", "npx-cli.js");
+const NPX = process.platform === "win32" && existsSync(NPX_CLI) ? [process.execPath, [NPX_CLI]] : ["npx", []];
+
 function run(args, cwd) {
-  return execFileSync("npx", [...HF, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8", maxBuffer: 64 << 20 });
+  return execFileSync(NPX[0], [...NPX[1], ...HF, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8", maxBuffer: 64 << 20 });
 }
 
 const argv = process.argv.slice(2);
 const noRender = argv.includes("--no-render");
+const silent = argv.includes("--silent");
+if (!silent && !PY) throw new Error("No Python for the voice: set up .venv-twi or set PG_TWI_PYTHON (or pass --silent).");
 const [onlySlug, onlyLang] = argv.filter((a) => !a.startsWith("--"));
 mkdirSync(OUT, { recursive: true });
 
@@ -578,11 +663,23 @@ for (const guide of GUIDES) {
   if (onlySlug && guide.slug !== onlySlug) continue;
   for (const lang of LANGS) {
     if (onlyLang && lang !== onlyLang) continue;
-    const { dir, duration } = buildProject(guide, lang);
+    SPOKEN = silent ? new Map() : new Map(Object.entries(JSON.parse(voice("lines", narration(guide, lang)))));
+    const { dir, duration, clips } = buildProject(guide, lang);
     console.log(`${guide.slug}-${lang}: ${duration.toFixed(1)} s → ${dir}`);
     if (noRender) continue;
     const mp4 = join(OUT, `${guide.slug}-${lang}.mp4`);
-    run(["render", ".", "-o", mp4, "--crf", "30", "--quality", "standard", "--quiet", "--skill", "hyperframes"], dir);
+    const picture = clips.length ? join(dir, "picture.mp4") : mp4;
+    run(["render", ".", "-o", picture, "--crf", "30", "--quality", "standard", "--quiet", "--skill", "hyperframes"], dir);
+    if (clips.length) {
+      // NELVIN's lines, each at its caption, laid over the silent render.
+      const wav = join(dir, "voice.wav");
+      voice("mix", { out: wav, duration, clips });
+      execFileSync("ffmpeg", [
+        "-y", "-loglevel", "error", "-i", picture, "-i", wav,
+        "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "96k", "-ac", "1",
+        "-t", String(r1(duration)), "-movflags", "+faststart", mp4,
+      ]);
+    }
     // Poster: the title card, once its text has landed.
     execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-ss", "2.2", "-i", mp4, "-frames:v", "1", "-vf", "scale=960:-2", "-q:v", "4", join(OUT, `${guide.slug}-${lang}.jpg`)]);
     console.log(`  ${(statSync(mp4).size / 1e6).toFixed(1)} MB`);

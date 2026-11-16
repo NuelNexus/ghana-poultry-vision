@@ -1,7 +1,8 @@
 // One command for everything on this PC:  npm start
 //   1. installs the site's packages and the Twi Python environment (.venv-twi) the first time
 //   2. fetches the NELVIN voice model from Git LFS if only its pointer was cloned
-//   3. starts the Twi voice (:5002), the Twi word helper (:5003) and the website (vite dev)
+//   3. starts the Twi voice (:5002), the Twi word helper (:5003), the brooder AI for the
+//      brooding-area ESP32 (:5004), camera vision, and the website (vite dev)
 // Ctrl+C stops all of them.
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -50,6 +51,12 @@ if (!fs.existsSync(venvPython)) {
   ]);
 }
 
+// 1c. Camera vision (edge/vision.py) needs Pillow next to the onnxruntime the voice uses.
+if (spawnSync(venvPython, ["-c", "import PIL, onnxruntime"]).status !== 0) {
+  console.log("==> Adding the camera vision packages to .venv-twi (first run only)");
+  run(venvPython, ["-m", "pip", "install", "-q", "pillow>=10", "onnxruntime>=1.17"]);
+}
+
 // 2. NELVIN model: a fresh clone without Git LFS has a 130-byte pointer instead of the model
 const model = path.join(root, "edge", "voices", "nelvin", "model.onnx");
 if (fs.existsSync(model) && fs.statSync(model).size < 10_000) {
@@ -62,7 +69,7 @@ if (!fs.existsSync(path.join(root, ".env"))) {
   console.warn("\nNo .env file: the site needs DATABASE_URL (and OPENAI_API_KEY for the assistant). See README.md.\n");
 }
 
-// 3. Everything at once
+// 3. Everything at once (the Twi services, the live voice and camera vision workers, the site)
 const children = startTwiServices();
 const site = spawn(process.execPath, [path.join(root, "node_modules", "vite", "bin", "vite.js"), "dev"], {
   cwd: root,

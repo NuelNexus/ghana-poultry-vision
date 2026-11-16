@@ -9,6 +9,8 @@ import {
   type CoopUnit,
 } from "@/lib/api/controls.functions";
 import { useCoopSim } from "@/lib/coop-sim";
+import { useAuth } from "@/lib/auth";
+import { COOP_PRESETS, COOP_PRESET_IDS, type CoopPresetId } from "@/lib/presets";
 import { CoopDrawing, type CoopZoneView } from "@/components/coop-drawing";
 import {
   COOP_ZONES,
@@ -31,6 +33,7 @@ import {
   RelativeTime,
   Section,
   SegmentedControl,
+  Select,
   SkeletonRows,
   StatusPill,
   Switch,
@@ -487,6 +490,7 @@ function ZoneCard({
         </div>
       ) : (
         <div className="mt-4">
+          <ZonePreset zone={zone} draft={draft} readOnly={readOnly} onSetpoint={onSetpoint} />
           <div className="grid grid-cols-2 gap-3">
             {setpoints.map(({ key, label }) => (
               <Field key={key} label={`${label} (${tempUnit()})`}>
@@ -512,6 +516,60 @@ function ZoneCard({
         </div>
       )}
     </Card>
+  );
+}
+
+/** Which preset the zone's setpoints match exactly, if any. */
+const matchingPreset = (d: ZoneControls) =>
+  COOP_PRESET_IDS.find((id) => {
+    const s = COOP_PRESETS[id].setpoints;
+    return (
+      s.high_temp === d.high_temp &&
+      s.fan_off_temp === d.fan_off_temp &&
+      s.lamp_off_temp === d.lamp_off_temp &&
+      s.low_temp === d.low_temp
+    );
+  });
+
+/** Presets: fill the four setpoints for chicks, broilers, layers… in one go. */
+function ZonePreset({
+  zone,
+  draft,
+  readOnly,
+  onSetpoint,
+}: {
+  zone: CoopZone;
+  draft: ZoneControls;
+  readOnly: boolean;
+  onSetpoint: (patch: Partial<ZoneControls>) => void;
+}) {
+  const { user } = useAuth();
+  const mine = user?.poultry_preset as CoopPresetId | null | undefined;
+  const current = matchingPreset(draft);
+  return (
+    <Field
+      label="Preset"
+      className="mb-3"
+      hint={current ? COOP_PRESETS[current].note : "Custom values. Pick a preset to fill them in."}
+    >
+      <Select
+        name={`preset-${zone}`}
+        value={current ?? ""}
+        disabled={readOnly}
+        onChange={(e) => {
+          const id = e.target.value as CoopPresetId;
+          if (id) onSetpoint({ ...COOP_PRESETS[id].setpoints });
+        }}
+      >
+        <option value="">Custom</option>
+        {COOP_PRESET_IDS.map((id) => (
+          <option key={id} value={id}>
+            {COOP_PRESETS[id].label}
+            {id === mine ? " (your birds)" : ""}
+          </option>
+        ))}
+      </Select>
+    </Field>
   );
 }
 

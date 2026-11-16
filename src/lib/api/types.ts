@@ -128,6 +128,11 @@ export interface Camera {
   house_id: string | null;
   house_name: string | null;
   created_at: string;
+  /** Set when the camera runs firmware/esp32cam and reports its own address. */
+  device_code: string | null;
+  /** That firmware's last check-in (every 60 s). */
+  last_seen: string | null;
+  firmware_version: string | null;
 }
 
 /** Latest edge-AI reading for one device, with where it is. */

@@ -256,7 +256,7 @@ export const listDevices = createServerFn({ method: "GET" })
     const rows = await query<Device>(
       `select d.*, h.name as house_name from devices d
          left join poultry_houses h on h.id = d.house_id
-        where d.owner_id = $1
+        where d.owner_id = $1 and d.type <> 'camera'
         order by d.created_at desc`,
       [context.user.id],
     );
@@ -442,9 +442,11 @@ export const recordHatch = createServerFn({ method: "POST" })
   });
 
 // Cameras -----------------------------------------------------------------
-// The ESP32-CAM (CameraWebServer firmware) is watched straight from the
-// browser: MJPEG at http://<cam-ip>:81/stream, a still at http://<cam-ip>/capture.
-// The server never contacts it, so there is no stored online status.
+// The ESP32-CAM is watched straight from the browser: MJPEG at
+// http://<cam-ip>:81/stream, a still at http://<cam-ip>/capture. With the stock
+// CameraWebServer firmware the address is typed in. With firmware/esp32cam the
+// camera checks in every minute (/api/public/devices/camera) with its IP, and the
+// site keeps the stream URL up to date, so a new address from the router is fine.
 
 const streamUrl = z
   .string()
@@ -456,8 +458,10 @@ export const listCameras = createServerFn({ method: "GET" })
   .middleware([requireUser])
   .handler(({ context }) =>
     query<Camera>(
-      `select c.id, c.name, c.stream_url, c.house_id, h.name as house_name, c.created_at
+      `select c.id, c.name, c.stream_url, c.house_id, h.name as house_name, c.created_at,
+              d.device_id as device_code, d.last_seen, d.firmware_version
          from cameras c left join poultry_houses h on h.id = c.house_id
+         left join devices d on d.id = c.device_id
         where c.owner_id = $1
         order by c.created_at`,
       [context.user.id],
@@ -507,6 +511,69 @@ export const deleteCamera = createServerFn({ method: "POST" })
   .middleware([requireManager])
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    await query("delete from cameras where id = $1 and owner_id = $2", [data.id, context.user.id]);
+    const cam = await queryOne<{ device_id: string | null }>(
+      "delete from cameras where id = $1 and owner_id = $2 returning device_id",
+      [data.id, context.user.id],
+    );
+    // Its check-in key goes with it.
+    if (cam?.device_id)
+      await query("delete from devices where id = $1 and owner_id = $2 and type = 'camera'", [
+        cam.device_id,
+        context.user.id,
+      ]);
     return { ok: true };
+  });
+
+/**
+ * Let a camera report its own address (firmware/esp32cam): gives it a device ID and
+ * API key for its secrets.h. Run again to get a new key (the old one stops working).
+ */
+export const linkCameraFirmware = createServerFn({ method: "POST" })
+  .middleware([requireManager])
+  .inputValidator(
+    z.object({
+      id: z.string().uuid(),
+      deviceId: z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z0-9_-]{2,64}$/, "Letters, numbers, - and _ only, e.g. CAM-HOUSE-A")
+        .optional(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const cam = await queryOne<{
+      id: string;
+      device_id: string | null;
+      farm_id: string | null;
+      house_id: string | null;
+    }>("select id, device_id, farm_id, house_id from cameras where id = $1 and owner_id = $2", [
+      data.id,
+      context.user.id,
+    ]);
+    if (!cam) throw new Error("Camera not found");
+    const apiKey = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) =>
+      b.toString(16).padStart(2, "0"),
+    ).join("");
+    if (cam.device_id) {
+      const d = await queryOne<{ device_id: string }>(
+        "update devices set api_key = $2 where id = $1 and owner_id = $3 returning device_id",
+        [cam.device_id, apiKey, context.user.id],
+      );
+      return { deviceId: d!.device_id, apiKey };
+    }
+    const code = data.deviceId || `CAM-${cam.id.slice(0, 8).toUpperCase()}`;
+    let dev: { id: string } | null;
+    try {
+      dev = await queryOne<{ id: string }>(
+        `insert into devices (device_id, api_key, type, house_id, farm_id, owner_id)
+         values ($1, $2, 'camera', $3, $4, $5) returning id`,
+        [code, apiKey, cam.house_id, cam.farm_id, context.user.id],
+      );
+    } catch (e) {
+      if (String(e).includes("devices_device_id_key"))
+        throw new Error("That device ID is already taken. Pick another, e.g. CAM-YOURFARM-A");
+      throw e;
+    }
+    await query("update cameras set device_id = $2 where id = $1", [cam.id, dev!.id]);
+    return { deviceId: code, apiKey };
   });

@@ -1,0 +1,300 @@
+// =====================================================
+// POULTRY GRID - ESP32-CAM WITH AUTO ADDRESS
+// =====================================================
+// A drop-in for the stock CameraWebServer sketch, with the same addresses:
+//   http://<cam-ip>:81/stream   MJPEG live view (Cameras page)
+//   http://<cam-ip>/capture     one JPEG (the vision worker, Snapshot button)
+//   http://<cam-ip>/            a small page with both
+// plus one thing: every 60 s, and right after it joins the Wi-Fi, it tells the
+// PoultryGrid site its current IP. The site updates the camera's stream URL, so
+// the camera keeps working when the router hands it a new address.
+//
+// Board: "AI Thinker ESP32-CAM" (arduino-esp32 core 2.x or 3.x), PSRAM enabled.
+// Library (Arduino Library Manager): ArduinoJson (v7)
+//
+// Setup: on the site, Cameras -> Add camera -> Address "Updates itself" (or the
+// camera's "Auto address" button). Copy secrets.example.h to secrets.h here and
+// paste in the three lines it shows, plus your Wi-Fi. secrets.h is not committed.
+// =====================================================
+
+#include "esp_camera.h"
+#include "esp_http_server.h"
+#include "esp_timer.h"
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+#include "secrets.h"
+#include "root_ca.h"
+
+#define FIRMWARE_VERSION "pg-cam 1.0"
+
+// Only for testing against a server with no valid HTTPS certificate.
+#ifndef PG_INSECURE_TLS
+#define PG_INSECURE_TLS 0
+#endif
+
+#define CHECKIN_MS      60000
+#define WIFI_RETRY_MS   15000
+#define HTTP_TIMEOUT_MS 8000
+
+// ---- AI Thinker ESP32-CAM pins ----
+#define PWDN_GPIO_NUM  32
+#define RESET_GPIO_NUM -1
+#define XCLK_GPIO_NUM   0
+#define SIOD_GPIO_NUM  26
+#define SIOC_GPIO_NUM  27
+#define Y9_GPIO_NUM    35
+#define Y8_GPIO_NUM    34
+#define Y7_GPIO_NUM    39
+#define Y6_GPIO_NUM    36
+#define Y5_GPIO_NUM    21
+#define Y4_GPIO_NUM    19
+#define Y3_GPIO_NUM    18
+#define Y2_GPIO_NUM     5
+#define VSYNC_GPIO_NUM 25
+#define HREF_GPIO_NUM  23
+#define PCLK_GPIO_NUM  22
+
+httpd_handle_t webHttpd = NULL;     // port 80: /, /capture, /status
+httpd_handle_t streamHttpd = NULL;  // port 81: /stream
+
+unsigned long nextCheckin = 0;
+unsigned long lastWifiAttempt = 0;
+bool siteOnline = false;
+String lastIp;
+
+// ---- Camera ----
+
+bool startCamera() {
+  camera_config_t c = {};
+  c.ledc_channel = LEDC_CHANNEL_0;
+  c.ledc_timer = LEDC_TIMER_0;
+  c.pin_d0 = Y2_GPIO_NUM;
+  c.pin_d1 = Y3_GPIO_NUM;
+  c.pin_d2 = Y4_GPIO_NUM;
+  c.pin_d3 = Y5_GPIO_NUM;
+  c.pin_d4 = Y6_GPIO_NUM;
+  c.pin_d5 = Y7_GPIO_NUM;
+  c.pin_d6 = Y8_GPIO_NUM;
+  c.pin_d7 = Y9_GPIO_NUM;
+  c.pin_xclk = XCLK_GPIO_NUM;
+  c.pin_pclk = PCLK_GPIO_NUM;
+  c.pin_vsync = VSYNC_GPIO_NUM;
+  c.pin_href = HREF_GPIO_NUM;
+  c.pin_sccb_sda = SIOD_GPIO_NUM;
+  c.pin_sccb_scl = SIOC_GPIO_NUM;
+  c.pin_pwdn = PWDN_GPIO_NUM;
+  c.pin_reset = RESET_GPIO_NUM;
+  c.xclk_freq_hz = 20000000;
+  c.pixel_format = PIXFORMAT_JPEG;
+  c.grab_mode = CAMERA_GRAB_LATEST;  // always the newest frame, never a stale one
+  if (psramFound()) {
+    c.frame_size = FRAMESIZE_VGA;    // 640x480: what YOLO11n works at
+    c.jpeg_quality = 12;
+    c.fb_count = 2;
+    c.fb_location = CAMERA_FB_IN_PSRAM;
+  } else {
+    c.frame_size = FRAMESIZE_QVGA;
+    c.jpeg_quality = 14;
+    c.fb_count = 1;
+    c.fb_location = CAMERA_FB_IN_DRAM;
+  }
+  esp_err_t err = esp_camera_init(&c);
+  if (err != ESP_OK) {
+    Serial.printf("Camera init failed: 0x%x\n", err);
+    return false;
+  }
+  return true;
+}
+
+// ---- Web servers ----
+
+static esp_err_t captureHandler(httpd_req_t* req) {
+  camera_fb_t* fb = esp_camera_fb_get();
+  if (!fb) {
+    httpd_resp_send_500(req);
+    return ESP_FAIL;
+  }
+  httpd_resp_set_type(req, "image/jpeg");
+  httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=capture.jpg");
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  esp_err_t res = httpd_resp_send(req, (const char*)fb->buf, fb->len);
+  esp_camera_fb_return(fb);
+  return res;
+}
+
+#define PART_BOUNDARY "123456789000000000000987654321"
+static const char* STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
+static const char* STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
+static const char* STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
+
+static esp_err_t streamHandler(httpd_req_t* req) {
+  char part[64];
+  esp_err_t res = httpd_resp_set_type(req, STREAM_CONTENT_TYPE);
+  if (res != ESP_OK) return res;
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  while (true) {
+    camera_fb_t* fb = esp_camera_fb_get();
+    if (!fb) {
+      res = ESP_FAIL;
+      break;
+    }
+    size_t hlen = snprintf(part, sizeof(part), STREAM_PART, fb->len);
+    res = httpd_resp_send_chunk(req, STREAM_BOUNDARY, strlen(STREAM_BOUNDARY));
+    if (res == ESP_OK) res = httpd_resp_send_chunk(req, part, hlen);
+    if (res == ESP_OK) res = httpd_resp_send_chunk(req, (const char*)fb->buf, fb->len);
+    esp_camera_fb_return(fb);
+    if (res != ESP_OK) break;  // the viewer closed the page
+  }
+  return res;
+}
+
+static esp_err_t statusHandler(httpd_req_t* req) {
+  JsonDocument doc;
+  doc["firmware"] = FIRMWARE_VERSION;
+  doc["ip"] = WiFi.localIP().toString();
+  doc["rssi"] = WiFi.RSSI();
+  doc["site"] = siteOnline;
+  doc["uptime_s"] = millis() / 1000;
+  String out;
+  serializeJson(doc, out);
+  httpd_resp_set_type(req, "application/json");
+  return httpd_resp_send(req, out.c_str(), out.length());
+}
+
+static esp_err_t indexHandler(httpd_req_t* req) {
+  String ip = WiFi.localIP().toString();
+  String html =
+      "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+      "<title>PoultryGrid camera</title><style>body{font-family:sans-serif;background:#111;color:#eee;"
+      "text-align:center;margin:0;padding:16px}img{max-width:100%;border-radius:8px}a{color:#9fe0b8}"
+      "</style></head><body><h2>PoultryGrid camera</h2><img src='http://" + ip + ":81/stream'>"
+      "<p><a href='/capture'>Snapshot</a> &middot; <a href='/status'>Status</a> &middot; "
+      FIRMWARE_VERSION "</p></body></html>";
+  httpd_resp_set_type(req, "text/html");
+  return httpd_resp_send(req, html.c_str(), html.length());
+}
+
+void startServers() {
+  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+  config.server_port = 80;
+  config.ctrl_port = 32768;
+  httpd_uri_t index = {"/", HTTP_GET, indexHandler, NULL};
+  httpd_uri_t capture = {"/capture", HTTP_GET, captureHandler, NULL};
+  httpd_uri_t status = {"/status", HTTP_GET, statusHandler, NULL};
+  if (httpd_start(&webHttpd, &config) == ESP_OK) {
+    httpd_register_uri_handler(webHttpd, &index);
+    httpd_register_uri_handler(webHttpd, &capture);
+    httpd_register_uri_handler(webHttpd, &status);
+  }
+  // The stream gets its own server so /capture still answers while someone watches.
+  config.server_port = 81;
+  config.ctrl_port = 32769;
+  httpd_uri_t stream = {"/stream", HTTP_GET, streamHandler, NULL};
+  if (httpd_start(&streamHttpd, &config) == ESP_OK) {
+    httpd_register_uri_handler(streamHttpd, &stream);
+  }
+}
+
+// ---- PoultryGrid site ----
+
+void checkinWithSite() {
+  String url = String(PG_API_URL) + "/api/public/devices/camera";
+  bool https = url.startsWith("https://");
+  WiFiClientSecure secureClient;
+  WiFiClient plainClient;
+  HTTPClient http;
+  http.setTimeout(HTTP_TIMEOUT_MS);
+
+  bool ok;
+  if (https) {
+#if PG_INSECURE_TLS
+    secureClient.setInsecure();
+#else
+    secureClient.setCACert(ROOT_CA_BUNDLE);
+#endif
+    ok = http.begin(secureClient, url);
+  } else {
+    ok = http.begin(plainClient, url);
+  }
+  if (!ok) {
+    siteOnline = false;
+    return;
+  }
+  http.addHeader("content-type", "application/json");
+  http.addHeader("x-device-id", PG_DEVICE_ID);
+  http.addHeader("x-api-key", PG_DEVICE_API_KEY);
+
+  JsonDocument doc;
+  doc["ip"] = WiFi.localIP().toString();
+  doc["stream_port"] = 81;
+  doc["firmware"] = FIRMWARE_VERSION;
+  doc["rssi"] = WiFi.RSSI();
+  String body;
+  serializeJson(doc, body);
+
+  int code = http.POST(body);
+  if (code == 200) {
+    if (!siteOnline) Serial.println("Site: online, address sent");
+    siteOnline = true;
+  } else {
+    siteOnline = false;
+    Serial.printf("Site check-in failed: HTTP %d %s\n", code,
+                  code < 0 ? http.errorToString(code).c_str() : http.getString().c_str());
+  }
+  http.end();
+}
+
+void maintainWifi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+  siteOnline = false;
+  if (lastWifiAttempt != 0 && millis() - lastWifiAttempt < WIFI_RETRY_MS) return;
+  lastWifiAttempt = millis();
+  Serial.printf("Connecting to WiFi... (last status %d)\n", WiFi.status());
+  WiFi.disconnect();
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+}
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println();
+  if (!startCamera()) {
+    delay(3000);
+    ESP.restart();  // a loose ribbon cable or brown-out: try again from scratch
+  }
+
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);  // smoother streaming
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  lastWifiAttempt = millis();
+  Serial.print("Connecting to WiFi");
+  for (int i = 0; i < 30 && WiFi.status() != WL_CONNECTED; i++) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  startServers();
+}
+
+void loop() {
+  maintainWifi();
+  bool connected = WiFi.status() == WL_CONNECTED;
+  if (connected) {
+    String ip = WiFi.localIP().toString();
+    // New address (first connect, reconnect, or the router gave a new one): tell the site now.
+    if (ip != lastIp) {
+      lastIp = ip;
+      Serial.printf("Camera ready: http://%s:81/stream  (snapshot http://%s/capture)\n",
+                    ip.c_str(), ip.c_str());
+      nextCheckin = 0;
+    }
+    if ((long)(millis() - nextCheckin) >= 0) {
+      checkinWithSite();
+      nextCheckin = millis() + (siteOnline ? CHECKIN_MS : 15000);
+    }
+  }
+  delay(50);
+}

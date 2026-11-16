@@ -41,6 +41,18 @@ export function startTwiServices() {
     console.log(
       "[live voice] off: no device key (PG_DEVICE_ID / PG_DEVICE_API_KEY or edge/agent.env).",
     );
+  // Brooder AI: the brooding-area ESP32 sends its readings to this PC (port 5004), the
+  // coop model scores them and they go to the live site with the ESP32's own key.
+  const site = (process.env.PG_LIVE_URL ?? "https://ghana-poultry-vision.vercel.app").trim();
+  if (process.env.PG_BROODER === "off" || !site || site === "off")
+    console.log("[brooder AI] off.");
+  else services.push(["brooder AI", ["edge/brooder_server.py"], { PG_API_URL: site.replace(/\/$/, "") }]);
+  // Camera vision (YOLO11n on the ESP32-CAMs), same device key. PG_VISION=off skips it.
+  const yolo = path.join(root, "edge", "models", "yolo11n.onnx");
+  if (process.env.PG_VISION === "off") console.log("[vision] off: PG_VISION=off.");
+  else if (!live) console.log("[vision] off: no device key (same as the live voice).");
+  else if (!fs.existsSync(yolo)) console.log("[vision] off: edge/models/yolo11n.onnx is missing.");
+  else services.push(["vision", ["edge/vision.py"], live]);
   // A local copy of DistilABENA (config.json, vocab.txt, model.safetensors) skips the
   // Hugging Face download, which can stall on slow connections.
   const localModel = path.join(root, ".venv-twi", "models", "distilabena-v2");

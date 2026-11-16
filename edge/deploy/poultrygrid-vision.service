@@ -1,0 +1,19 @@
+[Unit]
+Description=PoultryGrid camera vision (YOLO11n on the ESP32-CAMs -> pests, inactive birds -> app)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=poultrygrid
+Group=poultrygrid
+WorkingDirectory=/opt/poultrygrid/edge
+# Reads PG_API_URL / PG_DEVICE_ID / PG_DEVICE_API_KEY from /etc/poultrygrid/agent.env
+ExecStart=/opt/poultrygrid/venv/bin/python vision.py
+Restart=always
+RestartSec=10
+# Leave the Pi's other work some CPU
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

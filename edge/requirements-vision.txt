@@ -1,0 +1,5 @@
+# Camera vision (vision.py): YOLO11n via onnxruntime. Runs on the Pi or any PC.
+# No PyTorch or OpenCV needed.
+numpy>=1.24
+pillow>=10.0
+onnxruntime>=1.17
