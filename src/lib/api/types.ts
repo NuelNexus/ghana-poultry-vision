@@ -133,6 +133,8 @@ export interface Camera {
   /** That firmware's last check-in (every 60 s). */
   last_seen: string | null;
   firmware_version: string | null;
+  /** How the camera is mounted: 180 is flipped in the camera, 90/270 turned on screen. */
+  rotation: 0 | 90 | 180 | 270;
 }
 
 /** Latest edge-AI reading for one device, with where it is. */

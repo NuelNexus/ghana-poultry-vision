@@ -6,7 +6,9 @@ import { query, queryOne } from "@/lib/db.server";
 // runs on the Pi or on any PC on the farm network, and signs in with a registered
 // device's credentials (Devices page): headers x-device-id, x-api-key.
 //
-// GET   -> { cameras: [{ id, name, stream_url }] }   the cameras of that device's farm
+// GET   -> { cameras: [{ id, name, stream_url, rotation, device_code }] }   the cameras of
+//          that device's farm (device_code: the camera's own device ID, when it runs
+//          firmware/esp32cam; the PC relay uses this to match a pushing camera)
 // POST  -> one analysis of one camera:
 //   { camera_id, birds, inactive, activity, pests: [{label, confidence}],
 //     events: [{kind, label, detail}], frame_jpeg_b64?, worker? }
@@ -65,8 +67,16 @@ export const Route = createFileRoute("/api/public/devices/vision")({
       GET: async ({ request }) => {
         const device = await authDevice(request);
         if (!device) return json({ error: "Unauthorized" }, 401);
-        const cameras = await query<{ id: string; name: string; stream_url: string | null }>(
-          `select id, name, stream_url from cameras where owner_id = $1 order by created_at`,
+        const cameras = await query<{
+          id: string;
+          name: string;
+          stream_url: string | null;
+          rotation: number;
+          device_code: string | null;
+        }>(
+          `select c.id, c.name, c.stream_url, c.rotation, d.device_id as device_code
+             from cameras c left join devices d on d.id = c.device_id
+            where c.owner_id = $1 order by c.created_at`,
           [device.owner_id],
         );
         return json({ cameras });

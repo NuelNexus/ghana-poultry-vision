@@ -7,8 +7,13 @@ import { query, queryOne } from "@/lib/db.server";
 // to match, so the Cameras page and the vision worker follow a new address from
 // the router without anyone editing it.
 // Headers: x-device-id, x-api-key   (Cameras -> camera -> "Auto address")
-// Body:    { ip, stream_port?, firmware?, rssi? }
-// Reply:   { ok, stream_url, next_ms }
+// Body:    { ip, stream_port?, firmware?, rssi?, relay_url? }
+//   relay_url  set while the camera pushes its frames to the PC relay (edge/cam_relay.py,
+//              the PG-CAM push protocol): viewers and the vision worker then watch the
+//              relay, which fans one camera stream out to everyone with no extra delay
+// Reply:   { ok, stream_url, rotation, flip, next_ms }
+//   flip     true when the camera is mounted upside down (rotation 180): the camera
+//            flips the picture in its sensor, so every viewer gets it upright
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -20,6 +25,11 @@ const bodySchema = z.object({
   stream_port: z.number().int().min(1).max(65535).default(81),
   firmware: z.string().max(40).optional(),
   rssi: z.number().int().optional(),
+  relay_url: z
+    .string()
+    .regex(/^http:\/\/[\w.-]+:\d{2,5}\/cam\/[\w-]+\.mjpg$/)
+    .max(200)
+    .optional(),
 });
 
 function timingSafeEqual(a: string, b: string) {
@@ -48,20 +58,27 @@ export const Route = createFileRoute("/api/public/devices/camera")({
         const parsed = bodySchema.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return json({ error: "Invalid body" }, 400);
         const b = parsed.data;
-        const streamUrl = `http://${b.ip}:${b.stream_port}/stream`;
+        const streamUrl = b.relay_url ?? `http://${b.ip}:${b.stream_port}/stream`;
 
         await query(
           `update devices set last_seen = now(), firmware_version = coalesce($2, firmware_version),
                   last_rssi = coalesce($3, last_rssi) where id = $1`,
           [device.id, b.firmware ?? null, b.rssi ?? null],
         );
-        const cam = await queryOne<{ id: string }>(
+        const cam = await queryOne<{ id: string; rotation: number }>(
           `update cameras set stream_url = $2, last_seen = now(), status = 'online'
-            where device_id = $1 returning id`,
+            where device_id = $1 returning id, rotation`,
           [device.id, streamUrl],
         );
         if (!cam) return json({ error: "No camera is linked to this device" }, 404);
-        return json({ ok: true, stream_url: streamUrl, next_ms: 60_000 });
+        return json({
+          ok: true,
+          camera_id: cam.id,
+          stream_url: streamUrl,
+          rotation: cam.rotation,
+          flip: cam.rotation === 180,
+          next_ms: 60_000,
+        });
       },
     },
   },

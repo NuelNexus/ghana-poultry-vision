@@ -48,7 +48,7 @@ import {
   type Status,
 } from "@/components/ui-kit";
 import { useAuth } from "@/lib/auth";
-import { cameraUrls, isMixedContent, withBust } from "@/lib/esp32cam";
+import { cameraUrls, isMixedContent, rotationStyle, withBust } from "@/lib/esp32cam";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/cameras")({ component: Cameras });
@@ -234,6 +234,7 @@ function Cameras() {
           <div className="overflow-hidden rounded-md bg-ink">
             <img
               src={withBust(full.stream_url, 100_000 + fullN)}
+              style={rotationStyle(full.rotation)}
               alt={`Live view from ${full.name}`}
               className="mx-auto block max-h-[calc(100dvh-180px)] w-full object-contain"
             />
@@ -344,6 +345,7 @@ function CameraTile({
           <img
             key={attempt}
             src={withBust(url, attempt)}
+            style={rotationStyle(cam.rotation)}
             alt={`Live view from ${cam.name}`}
             className={cn("h-full w-full object-contain", state !== "live" && "invisible")}
             onLoad={() => setState("live")}
@@ -394,6 +396,11 @@ function CameraTile({
           <p className="pg-t-caption truncate">
             {cam.house_name ? `${cam.house_name} · ` : ""}
             {urls ? <span className="pg-mono">{urls.host}</span> : "No stream URL"}
+            {urls?.isRelay && (
+              <span title="The camera pushes its frames to the PC relay (PG-CAM push), which serves every viewer and the AI from one stream.">
+                {" · via PC relay"}
+              </span>
+            )}
             {auto && (
               <>
                 {" · "}
@@ -649,6 +656,7 @@ function CameraFormModal({
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [houseId, setHouseId] = useState("");
+  const [rotation, setRotation] = useState<Camera["rotation"]>(0);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; url?: string; form?: string }>({});
 
@@ -659,6 +667,7 @@ function CameraFormModal({
     setName(editing?.name ?? "");
     setUrl(editing?.stream_url ?? "");
     setHouseId(editing?.house_id ?? "");
+    setRotation(editing?.rotation ?? 0);
     setAddr(!editing || editing.device_code ? "auto" : "fixed");
     setErrors({});
   }
@@ -681,7 +690,13 @@ function CameraFormModal({
       let id: string;
       if (editing) {
         await updateCamera({
-          data: { id: editing.id, name: name.trim(), streamUrl, houseId: houseId || null },
+          data: {
+            id: editing.id,
+            name: name.trim(),
+            streamUrl,
+            houseId: houseId || null,
+            rotation,
+          },
         });
         id = editing.id;
         toast.success(`${name.trim()} saved`);
@@ -784,6 +799,27 @@ function CameraFormModal({
               placeholder="http://192.168.1.40:81/stream…"
               onChange={(e) => setUrl(e.target.value)}
             />
+          </Field>
+        )}
+        {editing && (
+          <Field
+            label="Mounted"
+            hint={
+              editing.device_code
+                ? "Upside down is flipped inside the camera (within a minute), so every viewer and the AI get it upright."
+                : "Upside down needs the auto-address firmware; sideways is turned on screen."
+            }
+          >
+            <Select
+              name="rotation"
+              value={String(rotation)}
+              onChange={(e) => setRotation(Number(e.target.value) as Camera["rotation"])}
+            >
+              <option value="0">Upright</option>
+              <option value="180">Upside down</option>
+              <option value="90">On its side (turn right)</option>
+              <option value="270">On its side (turn left)</option>
+            </Select>
           </Field>
         )}
         <Field label="House" hint="Optional.">

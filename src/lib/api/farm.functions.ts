@@ -459,7 +459,7 @@ export const listCameras = createServerFn({ method: "GET" })
   .handler(({ context }) =>
     query<Camera>(
       `select c.id, c.name, c.stream_url, c.house_id, h.name as house_name, c.created_at,
-              d.device_id as device_code, d.last_seen, d.firmware_version
+              c.rotation, d.device_id as device_code, d.last_seen, d.firmware_version
          from cameras c left join poultry_houses h on h.id = c.house_id
          left join devices d on d.id = c.device_id
         where c.owner_id = $1
@@ -495,14 +495,24 @@ export const updateCamera = createServerFn({ method: "POST" })
       name: z.string().trim().min(1).max(80),
       streamUrl: streamUrl.nullable(),
       houseId: z.string().uuid().nullable(),
+      rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
     }),
   )
   .handler(async ({ data, context }) => {
     const farmId = await ownHouseFarm(data.houseId, context.user.id);
     await query(
-      `update cameras set name = $2, stream_url = $3, house_id = $4, farm_id = coalesce($5, farm_id)
+      `update cameras set name = $2, stream_url = $3, house_id = $4, farm_id = coalesce($5, farm_id),
+              rotation = coalesce($7, rotation)
         where id = $1 and owner_id = $6`,
-      [data.id, data.name, data.streamUrl || null, data.houseId, farmId, context.user.id],
+      [
+        data.id,
+        data.name,
+        data.streamUrl || null,
+        data.houseId,
+        farmId,
+        context.user.id,
+        data.rotation ?? null,
+      ],
     );
     return { ok: true };
   });

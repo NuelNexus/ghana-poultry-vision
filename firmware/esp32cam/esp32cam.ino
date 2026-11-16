@@ -5,9 +5,17 @@
 //   http://<cam-ip>:81/stream   MJPEG live view (Cameras page)
 //   http://<cam-ip>/capture     one JPEG (the vision worker, Snapshot button)
 //   http://<cam-ip>/            a small page with both
-// plus one thing: every 60 s, and right after it joins the Wi-Fi, it tells the
-// PoultryGrid site its current IP. The site updates the camera's stream URL, so
-// the camera keeps working when the router hands it a new address.
+// plus:
+//  - Auto address: every 60 s, and right after it joins the Wi-Fi, it tells the
+//    PoultryGrid site its current IP. The site updates the camera's stream URL, so
+//    the camera keeps working when the router hands it a new address.
+//  - Low latency, PG-CAM push: it finds the PC relay (edge/cam_relay.py, started by
+//    `npm start`) with a UDP broadcast and pushes every frame the moment it's
+//    captured over one TCP connection with Nagle off. The relay serves all viewers
+//    and the vision worker, so the camera never splits itself between them. With no
+//    relay (PC off) it serves its own /stream as before, and switches back by itself.
+//  - Mounting: the site's "Mounted: upside down" setting flips the picture in the
+//    sensor (saved in flash), so every viewer gets it upright at no cost.
 //
 // Board: "AI Thinker ESP32-CAM" (arduino-esp32 core 2.x or 3.x), PSRAM enabled.
 // Library (Arduino Library Manager): ArduinoJson (v7)
@@ -24,6 +32,8 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <WiFiUdp.h>
+#include <Preferences.h>
 
 // Your Wi-Fi and the site's key: secrets.h (ignored by git). Without one, the values in
 // secrets.example.h are used, so never commit real ones there.
@@ -34,7 +44,7 @@
 #endif
 #include "root_ca.h"
 
-#define FIRMWARE_VERSION "pg-cam 1.0"
+#define FIRMWARE_VERSION "pg-cam 1.1"
 
 // Only for testing against a server with no valid HTTPS certificate.
 #ifndef PG_INSECURE_TLS
@@ -44,6 +54,10 @@
 #define CHECKIN_MS      60000
 #define WIFI_RETRY_MS   15000
 #define HTTP_TIMEOUT_MS 8000
+
+// ---- PG-CAM push (to the PC relay) ----
+#define RELAY_DISCOVER_PORT 5006
+#define RELAY_RETRY_MS      10000   // look for the relay again this often while it's away
 
 // ---- AI Thinker ESP32-CAM pins ----
 #define PWDN_GPIO_NUM  32
@@ -70,6 +84,15 @@ unsigned long nextCheckin = 0;
 unsigned long lastWifiAttempt = 0;
 bool siteOnline = false;
 String lastIp;
+
+Preferences prefs;
+bool flipped = false;                 // mounted upside down: flip in the sensor
+
+// The push task (core 0) owns the relay connection; loop() (core 1) only reads these.
+SemaphoreHandle_t relayLock;
+volatile bool relayUp = false;
+String relayUrl;                      // http://<pc>:5007/cam/<id>.mjpg while pushing
+volatile uint32_t pushedFrames = 0;
 
 // ---- Camera ----
 
@@ -112,7 +135,16 @@ bool startCamera() {
     Serial.printf("Camera init failed: 0x%x\n", err);
     return false;
   }
+  applyFlip(flipped);
   return true;
+}
+
+// Upside down = flip both ways (a 180 degree turn), done by the sensor itself.
+void applyFlip(bool on) {
+  sensor_t* s = esp_camera_sensor_get();
+  if (!s) return;
+  s->set_vflip(s, on ? 1 : 0);
+  s->set_hmirror(s, on ? 1 : 0);
 }
 
 // ---- Web servers ----
@@ -164,6 +196,9 @@ static esp_err_t statusHandler(httpd_req_t* req) {
   doc["rssi"] = WiFi.RSSI();
   doc["site"] = siteOnline;
   doc["uptime_s"] = millis() / 1000;
+  doc["flipped"] = flipped;
+  doc["relay"] = relayUp ? relayUrl : String("");
+  doc["pushed_frames"] = pushedFrames;
   String out;
   serializeJson(doc, out);
   httpd_resp_set_type(req, "application/json");
@@ -238,6 +273,10 @@ void checkinWithSite() {
   doc["stream_port"] = 81;
   doc["firmware"] = FIRMWARE_VERSION;
   doc["rssi"] = WiFi.RSSI();
+  if (relayUp && xSemaphoreTake(relayLock, pdMS_TO_TICKS(100))) {
+    if (relayUp) doc["relay_url"] = relayUrl;
+    xSemaphoreGive(relayLock);
+  }
   String body;
   serializeJson(doc, body);
 
@@ -245,12 +284,112 @@ void checkinWithSite() {
   if (code == 200) {
     if (!siteOnline) Serial.println("Site: online, address sent");
     siteOnline = true;
+    JsonDocument res;
+    if (!deserializeJson(res, http.getString()) && res["flip"].is<bool>()) {
+      bool want = res["flip"].as<bool>();
+      if (want != flipped) {
+        flipped = want;
+        prefs.putBool("flip", flipped);
+        applyFlip(flipped);
+        Serial.printf("Picture %s (set on the site)\n", flipped ? "flipped: mounted upside down" : "upright");
+      }
+    }
   } else {
     siteOnline = false;
     Serial.printf("Site check-in failed: HTTP %d %s\n", code,
                   code < 0 ? http.errorToString(code).c_str() : http.getString().c_str());
   }
   http.end();
+}
+
+// ---- PG-CAM push ----
+
+// Ask the network for the PC relay: "PG-CAM?" -> "PG-CAM <push-port> <http-port>".
+bool discoverRelay(IPAddress& ip, uint16_t& port) {
+  WiFiUDP udp;
+  if (!udp.begin(RELAY_DISCOVER_PORT + 10)) return false;
+  IPAddress bcast = WiFi.localIP();
+  IPAddress mask = WiFi.subnetMask();
+  for (int i = 0; i < 4; i++) bcast[i] = (bcast[i] & mask[i]) | (~mask[i] & 0xFF);
+  bool found = false;
+  for (int attempt = 0; attempt < 2 && !found; attempt++) {
+    udp.beginPacket(bcast, RELAY_DISCOVER_PORT);
+    udp.print("PG-CAM?");
+    udp.endPacket();
+    unsigned long until = millis() + 800;
+    while (millis() < until) {
+      if (udp.parsePacket() > 0) {
+        char buf[48] = {0};
+        udp.read(buf, sizeof(buf) - 1);
+        int p = 0, h = 0;
+        if (sscanf(buf, "PG-CAM %d %d", &p, &h) == 2 && p > 0) {
+          ip = udp.remoteIP();
+          port = p;
+          found = true;
+          break;
+        }
+      }
+      vTaskDelay(pdMS_TO_TICKS(10));
+    }
+  }
+  udp.stop();
+  return found;
+}
+
+void setRelay(bool up, const String& url) {
+  xSemaphoreTake(relayLock, portMAX_DELAY);
+  relayUp = up;
+  relayUrl = url;
+  xSemaphoreGive(relayLock);
+  nextCheckin = 0;  // tell the site which URL to use, now
+}
+
+void pushTask(void*) {
+  WiFiClient relay;
+  unsigned long nextTry = 0;
+  for (;;) {
+    if (WiFi.status() != WL_CONNECTED || (long)(millis() - nextTry) < 0) {
+      vTaskDelay(pdMS_TO_TICKS(200));
+      continue;
+    }
+    IPAddress ip;
+    uint16_t port = 0;
+    nextTry = millis() + RELAY_RETRY_MS;
+    if (!discoverRelay(ip, port) || !relay.connect(ip, port, 3000)) continue;
+    relay.setNoDelay(true);  // send each frame at once, never wait to fill a packet
+    relay.printf("PGCAM/1 %s %s\n", PG_DEVICE_ID, PG_DEVICE_API_KEY);
+    String reply = relay.readStringUntil('\n');  // "OK <camera-id> <url>" or "ERR ..."
+    if (!reply.startsWith("OK ")) {
+      Serial.printf("Relay refused the camera: %s\n", reply.c_str());
+      relay.stop();
+      nextTry = millis() + 60000;
+      continue;
+    }
+    String url = reply.substring(reply.lastIndexOf(' ') + 1);
+    url.trim();
+    Serial.printf("PG-CAM push to %s:%u, viewers on %s\n", ip.toString().c_str(), port, url.c_str());
+    setRelay(true, url);
+
+    while (relay.connected() && WiFi.status() == WL_CONNECTED) {
+      camera_fb_t* fb = esp_camera_fb_get();  // the newest frame (CAMERA_GRAB_LATEST)
+      if (!fb) {
+        vTaskDelay(pdMS_TO_TICKS(5));
+        continue;
+      }
+      uint8_t hdr[4] = {(uint8_t)(fb->len >> 24), (uint8_t)(fb->len >> 16), (uint8_t)(fb->len >> 8),
+                        (uint8_t)fb->len};
+      size_t sent = relay.write(hdr, 4);
+      if (sent == 4) sent += relay.write(fb->buf, fb->len);
+      bool ok = sent == 4 + fb->len;
+      esp_camera_fb_return(fb);
+      if (!ok) break;
+      pushedFrames++;
+    }
+    relay.stop();
+    Serial.println("Relay gone: serving /stream directly");
+    setRelay(false, "");
+    nextTry = millis() + 2000;
+  }
 }
 
 void maintainWifi() {
@@ -266,13 +405,17 @@ void maintainWifi() {
 void setup() {
   Serial.begin(115200);
   Serial.println();
+  relayLock = xSemaphoreCreateMutex();
+  prefs.begin("pgcam", false);
+  flipped = prefs.getBool("flip", false);
   if (!startCamera()) {
     delay(3000);
     ESP.restart();  // a loose ribbon cable or brown-out: try again from scratch
   }
 
   WiFi.mode(WIFI_STA);
-  WiFi.setSleep(false);  // smoother streaming
+  WiFi.setSleep(false);  // no power-save naps between frames: lower, steadier latency
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   lastWifiAttempt = millis();
   Serial.print("Connecting to WiFi");
@@ -283,6 +426,8 @@ void setup() {
   Serial.println();
 
   startServers();
+  // Frames go out from core 0; Wi-Fi, check-ins and the local servers keep core 1.
+  xTaskCreatePinnedToCore(pushTask, "pgcam-push", 8192, NULL, 2, NULL, 0);
 }
 
 void loop() {

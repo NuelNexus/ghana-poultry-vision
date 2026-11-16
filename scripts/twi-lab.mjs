@@ -26,6 +26,13 @@ export const venvPython = path.join(
 );
 
 /** Start the voice and word-helper services. Returns the child processes. */
+// The services the ESP32s connect *to* (brooder AI, camera relay) run on the Python that
+// Windows Firewall already lets receive connections: the system one on PATH, which also
+// has numpy. The .venv-twi copy would need its own firewall permission. PG_LISTEN_PYTHON
+// overrides it.
+const listenPython =
+  process.env.PG_LISTEN_PYTHON || (process.platform === "win32" ? "python" : venvPython);
+
 export function startTwiServices() {
   if (!fs.existsSync(venvPython)) {
     console.error("Missing .venv-twi. Run `npm start` once, or see the steps at the top of scripts/twi-lab.mjs.");
@@ -46,7 +53,23 @@ export function startTwiServices() {
   const site = (process.env.PG_LIVE_URL ?? "https://ghana-poultry-vision.vercel.app").trim();
   if (process.env.PG_BROODER === "off" || !site || site === "off")
     console.log("[brooder AI] off.");
-  else services.push(["brooder AI", ["edge/brooder_server.py"], { PG_API_URL: site.replace(/\/$/, "") }]);
+  else
+    services.push([
+      "brooder AI",
+      ["edge/brooder_server.py"],
+      { PG_API_URL: site.replace(/\/$/, "") },
+      listenPython,
+    ]);
+  // Camera relay (PG-CAM push): the ESP32-CAMs push frames here, viewers and the vision
+  // worker watch them from here (:5006 push, :5007 http).
+  if (process.env.PG_CAM_RELAY === "off") console.log("[camera relay] off.");
+  else if (site && site !== "off")
+    services.push([
+      "camera relay",
+      ["edge/cam_relay.py"],
+      { PG_API_URL: site.replace(/\/$/, "") },
+      listenPython,
+    ]);
   // Camera vision (YOLO11n on the ESP32-CAMs), same device key. PG_VISION=off skips it.
   const yolo = path.join(root, "edge", "models", "yolo11n.onnx");
   if (process.env.PG_VISION === "off") console.log("[vision] off: PG_VISION=off.");
@@ -60,8 +83,8 @@ export function startTwiServices() {
     ? { PG_NLP_MODEL: localModel }
     : {};
 
-  return services.map(([name, args, extraEnv]) => {
-    const child = spawn(venvPython, ["-X", "utf8", "-u", ...args], {
+  return services.map(([name, args, extraEnv, python = venvPython]) => {
+    const child = spawn(python, ["-X", "utf8", "-u", ...args], {
       cwd: root,
       env: {
         ...process.env,
