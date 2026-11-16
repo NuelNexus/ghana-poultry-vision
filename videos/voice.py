@@ -4,17 +4,15 @@
     python videos/voice.py mix < mix.json       # {"out", "duration", "clips": [{"wav", "at"}]} -> one WAV
 
 Lines are cached in videos/build/voice/, so a re-render only speaks lines that changed.
-English lines are spoken by Gemini TTS (GEMINI_API_KEY, from the environment or the repo's
-.env; GEMINI_TTS_MODEL / GEMINI_TTS_VOICE to change model or voice). Twi lines are spoken by
+English lines are spoken by ElevenLabs (ELEVENLABS_API_KEY, from the environment or the
+repo's .env; ELEVENLABS_MODEL / ELEVENLABS_VOICE to change model or voice). Twi lines are spoken by
 NELVIN in mixed mode (numbers read in English), the same way Kofi speaks in the app.
 Run it with .venv-twi's Python.
 """
 
 from __future__ import annotations
 
-import base64
 import hashlib
-import io
 import json
 import os
 import re
@@ -35,65 +33,42 @@ RATE = 22050
 
 sys.path.insert(0, str(ROOT / "edge"))
 
-GEMINI_MODEL = os.environ.get("GEMINI_TTS_MODEL", "gemini-3.8-flash-tts")
-GEMINI_VOICE = os.environ.get("GEMINI_TTS_VOICE", "Charon")
-# Gemini reads only the TRANSCRIPT part; the notes above it set the delivery.
-GEMINI_PROMPT = """# AUDIO PROFILE: Kofi
-A friendly Ghanaian poultry farm advisor narrating a short how-to video for farmers.
-
-### DIRECTOR'S NOTES
-Style: warm, clear and friendly. Accent: Ghanaian English. Pace: calm and steady.
-
-#### TRANSCRIPT
-{text}"""
+ELEVEN_MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2")
+ELEVEN_VOICE = os.environ.get("ELEVENLABS_VOICE", "JBFqnCBsd6RMkjVDRZzb")  # George: warm storyteller
 
 
-def gemini_key() -> str:
-    key = os.environ.get("GEMINI_API_KEY", "")
+def eleven_key() -> str:
+    key = os.environ.get("ELEVENLABS_API_KEY", "")
     env = ROOT / ".env"
     if not key and env.exists():
-        m = re.search(r"^GEMINI_API_KEY=(.+)$", env.read_text(encoding="utf-8"), re.M)
+        m = re.search(r"^ELEVENLABS_API_KEY=(.+)$", env.read_text(encoding="utf-8"), re.M)
         key = m.group(1).strip().strip('"') if m else ""
     if not key:
-        raise SystemExit("No GEMINI_API_KEY (environment or .env) for the English narration")
+        raise SystemExit("No ELEVENLABS_API_KEY (environment or .env) for the English narration")
     return key
 
 
-def gemini_speak(text: str) -> np.ndarray:
-    """One English line from Gemini TTS, as float audio at RATE."""
+def eleven_speak(text: str) -> np.ndarray:
+    """One English line from ElevenLabs, as float audio at RATE (22.05 kHz PCM, no resampling)."""
     body = json.dumps({
-        "contents": [{"parts": [{"text": GEMINI_PROMPT.format(text=text)}]}],
-        "generationConfig": {
-            "responseModalities": ["AUDIO"],
-            "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": GEMINI_VOICE}}},
-        },
+        "text": text,
+        "model_id": ELEVEN_MODEL,
+        "voice_settings": {"stability": 0.55, "similarity_boost": 0.8, "style": 0.15},
     }).encode()
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-    for attempt in range(6):
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVEN_VOICE}?output_format=pcm_{RATE}"
+    for attempt in range(5):
         req = urllib.request.Request(url, data=body, headers={
-            "x-goog-api-key": gemini_key(), "content-type": "application/json"})
+            "xi-api-key": eleven_key(), "content-type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=120) as r:
-                d = json.loads(r.read())
+                raw = r.read()
             break
         except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 503) and attempt < 5:  # rate limit / busy: wait and retry
-                time.sleep(10 * (attempt + 1))
+            if e.code in (429, 500, 503) and attempt < 4:  # busy: wait and retry
+                time.sleep(5 * (attempt + 1))
                 continue
-            raise SystemExit(f"Gemini TTS failed: {e.code} {e.read()[:300]!r}")
-    part = d["candidates"][0]["content"]["parts"][0]["inlineData"]
-    raw = base64.b64decode(part["data"])
-    if raw[:4] == b"RIFF":
-        with wave.open(io.BytesIO(raw)) as w:
-            rate, raw = w.getframerate(), w.readframes(w.getnframes())
-    else:  # raw 16-bit PCM, "audio/L16;codec=pcm;rate=24000"
-        m = re.search(r"rate=(\d+)", part.get("mimeType", ""))
-        rate = int(m.group(1)) if m else 24000
-    a = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32767
-    if rate != RATE:  # resample to the mix rate
-        n = int(len(a) * RATE / rate)
-        a = np.interp(np.linspace(0, len(a) - 1, n), np.arange(len(a)), a).astype(np.float32)
-    return a
+            raise SystemExit(f"ElevenLabs failed: {e.code} {e.read()[:300]!r}")
+    return np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32767
 
 
 def read_wav(p: Path) -> np.ndarray:
@@ -116,11 +91,11 @@ def lines(items: list[dict]) -> dict:
     out = {}
     for it in items:
         text, lang = it.get("say", it["text"]).strip(), it["lang"]
-        engine = f"nelvin|{SPEED}" if lang == "tw" else f"gemini2|{GEMINI_MODEL}|{GEMINI_VOICE}"
+        engine = f"nelvin|{SPEED}" if lang == "tw" else f"eleven|{ELEVEN_MODEL}|{ELEVEN_VOICE}"
         h = hashlib.sha1(f"{engine}|{lang}|{text}".encode()).hexdigest()[:16]
         p = CACHE / f"{h}.wav"
         if not p.exists() and lang != "tw":
-            a = gemini_speak(text)
+            a = eleven_speak(text)
         elif not p.exists():
             if model is None:
                 import twi_tts
