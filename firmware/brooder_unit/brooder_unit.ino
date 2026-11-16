@@ -33,7 +33,13 @@
 #include <ArduinoJson.h>
 #include "DHT.h"
 
+// Your Wi-Fi and this unit's key: secrets.h (ignored by git). Without one, the values in
+// secrets.example.h are used, so never commit real ones there.
+#if __has_include("secrets.h")
 #include "secrets.h"
+#else
+#include "secrets.example.h"
+#endif
 
 #define FIRMWARE_VERSION "brooder-esp32 1.0"
 
@@ -67,6 +73,11 @@ const float DIVIDER_RATIO = 2.0;
 
 float temperature = NAN, humidity = NAN;  // latest good DHT22 reading
 unsigned long lastGoodDht = 0;
+// Good DHT22 reads since the last report. The report sends their average: more accurate
+// than one read, and with real decimals, so a steady room isn't mistaken for a frozen
+// sensor (the AI flags a DHT22 that repeats the exact same value for 5 minutes).
+float sumT = 0, sumH = 0;
+int nTH = 0;
 float mqVoltage = NAN;                    // MQ-135 AO, averaged
 bool fanOn = false;
 
@@ -84,6 +95,9 @@ void readSensors() {
     temperature = t;
     humidity = h;
     lastGoodDht = millis();
+    sumT += t;
+    sumH += h;
+    nTH++;
   }
 
   // analogReadMilliVolts uses the chip's calibration (plain analogRead is off by up to 0.2 V).
@@ -150,8 +164,12 @@ void report() {
 
   JsonDocument doc;
   if (dhtFresh()) {
-    doc["temperature"] = roundf(temperature * 10) / 10;
-    doc["humidity"] = roundf(humidity * 10) / 10;
+    float t = nTH ? sumT / nTH : temperature;
+    float h = nTH ? sumH / nTH : humidity;
+    sumT = sumH = 0;
+    nTH = 0;
+    doc["temperature"] = roundf(t * 100) / 100;
+    doc["humidity"] = roundf(h * 100) / 100;
   } else {
     doc["temperature"] = nullptr;  // the AI treats a dead DHT22 as a sensor fault
     doc["humidity"] = nullptr;
