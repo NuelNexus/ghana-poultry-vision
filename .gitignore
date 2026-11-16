@@ -40,6 +40,7 @@ __pycache__/
 edge/agent.env
 edge/outbox.sqlite3
 edge/outbox-*.sqlite3
+edge/mq135-baseline-*.json
 edge/.venv
 .venv-twi/
 .certs/

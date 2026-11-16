@@ -9,7 +9,6 @@ Dashboard, AI Health, Houses, Alerts and Automation pages work exactly as before
 
     python brooder_server.py                 # listen on :5004 (npm start runs this for you)
     python brooder_server.py --dry-run       # print the payloads instead of sending them
-    python brooder_server.py calibrate       # MQ-135 clean-air baseline from the next readings
 
 The ESP32 signs each reading with its device ID and API key (Devices -> Register
 device -> Unit 1, the same kind of key the Pi used). This PC forwards with those
@@ -22,8 +21,8 @@ Windows asks once to allow Python through the firewall: allow it on private netw
 Settings (environment or agent.env next to this file):
     PG_API_URL                 the app, e.g. https://ghana-poultry-vision.vercel.app
     PG_BROODER_PORT            5004 (HTTP and UDP discovery)
-    PG_ESP_MQ135_BASELINE_V    the MQ-135's AO voltage in clean air (default 0.9 V);
-                               measure with `calibrate`
+    PG_ESP_MQ135_BASELINE_V    only to pin the MQ-135's clean-air voltage by hand; by default
+                               it calibrates itself (AutoBaseline below)
     PG_INTERVAL_S              seconds between the ESP32's reports (default 30; the
                                firmware sends at this rate)
     PG_BATCH_START_DATE / PG_BIRD_AGE_DAYS   fallback flock age (the app's wins)
@@ -39,7 +38,6 @@ import queue
 import re
 import socket
 import sqlite3
-import statistics
 import sys
 import threading
 import time
@@ -57,6 +55,62 @@ DISCOVER = b"PG-BROODER?"
 DEVICE_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
 
 
+class AutoBaseline:
+    """The MQ-135's clean-air voltage, learned from its own readings (automatic baseline
+    correction, as commercial air-quality sensors do): the cleanest air of the last week
+    is taken as clean. Ammonia only ever pushes the voltage *up*, so the low end of the
+    readings is the baseline; it follows the sensor as it warms up, ages and drifts.
+
+    Each hour's 10th percentile is kept (robust to a single low glitch); the baseline is
+    the lowest of the last 7 days' hours and the current hour. Until the first 3 readings
+    (90 s) there is none and the gas level is reported as missing. Saved per unit, so a
+    restart of the PC keeps it.
+    """
+
+    KEEP_H = 7 * 24
+    MIN_V, MAX_V = 0.05, 4.5
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.hours: list[tuple[int, float]] = []  # (hour number, 10th percentile)
+        self.cur_hour = -1
+        self.cur: list[float] = []
+        try:
+            d = json.loads(path.read_text())
+            self.hours = [(int(h), float(v)) for h, v in d.get("hours", [])]
+            self.cur_hour, self.cur = int(d.get("cur_hour", -1)), [float(v) for v in d.get("cur", [])]
+        except (OSError, ValueError, TypeError):
+            pass
+
+    @staticmethod
+    def _p10(vals: list[float]) -> float:
+        v = sorted(vals)
+        return v[int(0.1 * (len(v) - 1))]
+
+    def update(self, v: float, now: float | None = None):
+        if not self.MIN_V <= v <= self.MAX_V:
+            return
+        hour = int((now or time.time()) // 3600)
+        if hour != self.cur_hour:
+            if len(self.cur) >= 10:
+                self.hours.append((self.cur_hour, self._p10(self.cur)))
+            self.hours = [(h, x) for h, x in self.hours if hour - h <= self.KEEP_H]
+            self.cur_hour, self.cur = hour, []
+        self.cur.append(v)
+        try:
+            self.path.write_text(json.dumps({"hours": self.hours, "cur_hour": self.cur_hour,
+                                             "cur": self.cur[-200:]}))
+        except OSError:
+            pass
+
+    @property
+    def value(self) -> float | None:
+        vals = [x for _, x in self.hours]
+        if len(self.cur) >= 3:
+            vals.append(self._p10(self.cur))
+        return min(vals) if vals else None
+
+
 class EspSensors:
     """The 'hardware' the Pi agent reads, fed by the ESP32's last report instead of GPIO.
 
@@ -67,8 +121,8 @@ class EspSensors:
     mode = "esp32"
     not_wired = {"light"}  # the brooding-area unit has no LDR
 
-    def __init__(self, baseline_v: float, min_switch_s: float):
-        self.baseline_v = baseline_v
+    def __init__(self, baseline: AutoBaseline | float, min_switch_s: float):
+        self.baseline = baseline
         self.min_switch_s = min_switch_s
         self.last: dict = {}
         self.want_fan = False
@@ -89,9 +143,16 @@ class EspSensors:
 
     def gas_index(self, v: float | None) -> float | None:
         # Same scale as the Pi on the ADS1115: % above the clean-air voltage.
-        if v is None or self.baseline_v <= 0:
+        if v is None:
             return None
-        return round(max(0.0, (v - self.baseline_v) / self.baseline_v * 100.0), 2)
+        if isinstance(self.baseline, AutoBaseline):
+            self.baseline.update(v)
+            base = self.baseline.value
+        else:
+            base = self.baseline
+        if not base or base <= 0:
+            return None
+        return round(max(0.0, (v - base) / base * 100.0), 2)
 
     def read(self) -> Reading:
         r = self.last
@@ -152,10 +213,10 @@ class Brooders:
     def __init__(self, args):
         self.args = args
         self.cfg = base_config(args)
-        self.baseline = float(os.environ.get("PG_ESP_MQ135_BASELINE_V", "0.9"))
+        fixed = os.environ.get("PG_ESP_MQ135_BASELINE_V")
+        self.fixed_baseline = float(fixed) if fixed else None
         self.agents: dict[str, RemoteAgent] = {}
         self.lock = threading.Lock()
-        self.calibration: list[float] | None = [] if args.command == "calibrate" else None
 
     def agent_for(self, device_id: str, api_key: str) -> RemoteAgent:
         with self.lock:
@@ -165,23 +226,14 @@ class Brooders:
                 cfg.device_id, cfg.api_key = device_id, api_key
                 safe = re.sub(r"[^A-Za-z0-9_-]", "_", device_id)
                 cfg.outbox_path = HERE / f"outbox-{safe}.sqlite3"
-                hw = EspSensors(self.baseline, cfg.relay_min_switch_s)
+                base = self.fixed_baseline or AutoBaseline(HERE / f"mq135-baseline-{safe}.json")
+                hw = EspSensors(base, cfg.relay_min_switch_s)
                 a = RemoteAgent(cfg, hw, self.args.dry_run)
                 self.agents[device_id] = a
                 log.info("ESP32 %s connected (model %s)", device_id, a.model.version)
             return a
 
     def handle(self, device_id: str, api_key: str, body: dict) -> dict:
-        if self.calibration is not None and body.get("mq_voltage") is not None:
-            self.calibration.append(float(body["mq_voltage"]))
-            n = len(self.calibration)
-            med = statistics.median(self.calibration)
-            print(f"  reading {n}: MQ-135 {body['mq_voltage']:.3f} V   median {med:.3f} V", flush=True)
-            if n >= 10:
-                print(f"\nAdd this to edge/agent.env (or the environment):\nPG_ESP_MQ135_BASELINE_V={med:.3f}")
-                threading.Thread(target=lambda: (time.sleep(0.5), os._exit(0)), daemon=True).start()
-            return {"ok": True, "calibrating": True}
-
         a = self.agent_for(device_id, api_key)
         a.hw.last = body
         p = a.tick()
@@ -194,6 +246,9 @@ class Brooders:
             "fan_on": a.hw.want_fan if a.fan_override is None else a.fan_override == "on",
             "target_temp": ai["target_temp"],
             "interval_s": int(a.cfg.interval_s),
+            "gas_baseline_v": (round(a.hw.baseline.value, 3)
+                               if isinstance(a.hw.baseline, AutoBaseline) and a.hw.baseline.value
+                               else a.hw.baseline if isinstance(a.hw.baseline, float) else None),
             "app": "error" if a.last_error else "ok",
         }
 
@@ -280,7 +335,6 @@ def discovery(port: int, stop: threading.Event):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("command", nargs="?", default="run", choices=["run", "calibrate"])
     ap.add_argument("--env", type=Path, default=Path(os.environ.get("PG_ENV_FILE", HERE / "agent.env")))
     ap.add_argument("--port", type=int, default=int(os.environ.get("PG_BROODER_PORT", "5004")))
     ap.add_argument("--dry-run", action="store_true", help="print payloads instead of sending them")
@@ -293,8 +347,6 @@ def main():
     stop = threading.Event()
     threading.Thread(target=discovery, args=(args.port, stop), daemon=True).start()
     httpd = ThreadingHTTPServer(("0.0.0.0", args.port), make_handler(brooders))
-    if args.command == "calibrate":
-        print("Calibrating: keep the MQ-135 in clean air (warmed up). Waiting for 10 readings from the ESP32…")
     log.info("Brooder AI listening on :%d (HTTP and UDP discovery) -> %s%s", args.port,
              brooders.cfg.api_url, " [dry run]" if args.dry_run else "")
     try:

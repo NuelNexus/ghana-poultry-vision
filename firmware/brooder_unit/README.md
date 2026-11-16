@@ -41,17 +41,15 @@ The ESP32 broadcasts `PG-BROODER?` on UDP port 5004 and the PC answers, so it do
 what IP the PC has. After two failed sends it looks again (the PC got a new address, or was
 off). To use a fixed address instead, set `PG_PC_HOST` in `secrets.h`.
 
-## Gas calibration
+## Gas calibration: automatic
 
-The gas level is how far the MQ-135's voltage is above its clean-air voltage (the same scale
-the Pi used). With the sensor warmed up and in clean air, on the PC:
-
-```bash
-python edge/brooder_server.py calibrate
-```
-
-It prints `PG_ESP_MQ135_BASELINE_V=…` after 10 readings (5 minutes); put that line in
-`edge/agent.env`. Until then 0.9 V is assumed.
+Nothing to do. The gas level is how far the MQ-135's voltage is above its clean-air voltage
+(the same scale the Pi used), and the PC learns that clean-air voltage by itself: ammonia only
+ever pushes the voltage up, so the cleanest air of the last 7 days is taken as clean (hourly
+10th percentiles, so one glitch doesn't count). It follows the sensor as it warms up, ages
+and drifts, starts from the first 90 seconds of readings, and is kept per unit in
+`edge/mq135-baseline-<device>.json` across restarts. To pin it by hand instead, set
+`PG_ESP_MQ135_BASELINE_V` in `edge/agent.env`.
 
 ## The fan
 

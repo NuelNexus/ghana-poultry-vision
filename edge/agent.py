@@ -204,7 +204,8 @@ class Agent:
         rows = [rows[0]] * (WINDOW - len(rows)) + rows  # pad until the window fills
         # Raw readings go straight in: the model was trained on failed reads, dead,
         # frozen and garbage sensors, and is told which ones it can trust.
-        cleaned, health = clean_window(rows)
+        # Health from the real readings only: the padding copies would look like a frozen sensor.
+        cleaned, health = clean_window(list(self.window))
         if getattr(self.hw, "mode", None) == "none":  # PG_SENSOR_MODE=none: not wired, not broken
             health["gas_index"] = health["light"] = "not_wired"
         for k in getattr(self.hw, "not_wired", ()):  # e.g. the ESP32 brooder unit has no LDR
