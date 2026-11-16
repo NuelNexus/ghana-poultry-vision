@@ -1,6 +1,8 @@
 POULTRYGRID - SOFTWARE PITCH (YOUR PART, LAST SPEAKER)
 SHS Renewable Energy Challenge, Champion of Champions
-Length: about 3 min 45 s at a calm pace (about 130 words a minute)
+Length: about 3:45 to 4:00 with Ending A, about 4:00 to 4:15 with
+Ending B (calm pace, with pauses and about 15 s for Ama's answer).
+Doing the outro? Make the first cut in Part 4 to stay under 4 minutes.
 Format: Presec Legon's winning style, built from the research below
 
 
@@ -121,17 +123,13 @@ We call them... fiction.
 
 [Let the room laugh. Don't rush it.]
 
-Ask any farmer about the power cut at two in the morning. The data
-bundle that finished yesterday. The sensor a chicken has pecked to
-pieces.
-
 So we asked one question. What if the software was built for the farm
 we *actually* have?
 
 [Pause.]
 
-I'm [your name], and I built the software side of PoultryGrid with my
-team. It has three layers: the *Brain*, the *Dashboard*, and the
+I'm [your name], and I built PoultryGrid's software. It has three
+layers: the *Brain*, the *Dashboard*, and the
 *Voice*.
 
 ----------------------------------------------------------------------
@@ -143,13 +141,11 @@ LAYER ONE: THE BRAIN  (about 0:40 - 1:50)
 Layer one: the Brain.
 
 This small computer lives inside the poultry house. Every thirty
-seconds, it reads the sensors. Then it checks every single reading:
-is it missing? Is it impossible? Is it frozen on the same number?
+seconds, it reads the sensors and checks every reading: is it missing,
+impossible, or stuck on one number?
 
-Then it feeds twenty-six measurements into our own neural network.
-Not just the temperature. The temperature *trend*. The age of the
-flock. How long the fan has been running. And how far it can *trust*
-each sensor.
+Then our own neural network weighs twenty-six measurements, including
+how far it can *trust* each sensor.
 
 The whole model is one hundred and eight kilobytes. That's about the
 size of *one WhatsApp photo*. And it runs with no internet at all.
@@ -192,15 +188,10 @@ There goes the internet.
 
 [Warm the sensor with your hand. Wait for the fan.]
 
-And the fan *still* switches on. The Brain keeps deciding. The
-readings wait on the Pi, and when the network comes back, they arrive
-in order. Nothing is lost.
+And the fan *still* switches on. The readings wait on the Pi and
+arrive, in order, when the network returns. Nothing is lost.
 
 [Plug the cable back in.]
-
-Alerts open and close by themselves. The farmer can follow every egg in
-the hatchery and its hatch rate, watch a live camera, and switch the fan
-from a phone.
 
 Because of time, I'll leave the rest of the pages for your questions.
 
@@ -218,12 +209,11 @@ Let me be the farmer for ten seconds.
 
 [Let Ama answer out loud. Don't talk over her. Then turn to the judges.]
 
-She just answered me in Twi. And she reminded me of something I'd
-forgotten: today is day eight. That means the first Gumboro vaccine,
-in the drinking water, with no chlorine.
+She answered me in Twi, and reminded me that today is day eight:
+the first Gumboro vaccine, in the drinking water, no chlorine.
 
-The whole site works in seven languages: English, Twi, Ga, Ewe,
-Dagbani, Hausa and French. And every button can read itself out loud.
+The whole site speaks seven languages, and every button can read
+itself out loud.
 
 So a farmer who has never read a single word of English can still run
 the *entire* system.
@@ -248,12 +238,7 @@ That's how PoultryGrid *thinks*.
 ENDING B: YOU DO THE OUTRO  (about 3:30 - 4:00)
 ----------------------------------------------------------------------
 
-Remember the three assumptions?
-
-The internet is always on. Sensors never break. Everyone reads
-English.
-
-We didn't build for that fiction.
+Remember those three assumptions? We didn't build for that fiction.
 
 We built for the farm at two in the morning: dark, offline, and
 speaking Twi.
@@ -269,15 +254,15 @@ for questions.]
 
 
 ======================================================================
-PART 4. IF YOU HAVE ONLY 3 MINUTES
+PART 4. IF YOU NEED TO CUT TIME
 ======================================================================
 
-Cut these, in this order, until you fit:
-1. "Ask any farmer about the power cut... pecked to pieces."
-2. "Alerts open and close by themselves... switch the fan from a phone."
+If you do the outro (Ending B) and run over 4 minutes in rehearsal, or
+you only have 3 minutes, cut these in this order until you fit:
+1. "Now, some of you are thinking... What happens when the network
+   goes?" (go straight to pulling the cable).
+2. "The whole model is one hundred and eight kilobytes..." (2 lines).
 3. The smoke-alarm line (keep it if you can; judges remember it).
-4. The list of seven languages (say "seven Ghanaian and world
-   languages" instead).
 
 
 ======================================================================
