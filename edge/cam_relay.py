@@ -23,17 +23,31 @@ camera), so only cameras registered on your account are relayed. The camera then
 the site the relay URL in its check-in, so the Cameras page and the vision worker use it.
 If the PC goes away, the camera falls back to its own /stream within seconds.
 
+HTTPS: the site is served over https, and browsers refuse an http:// video on an https
+page. So the relay also opens a Cloudflare quick tunnel (edge/bin/cloudflared.exe, or
+`cloudflared` on the PATH; no account needed) to its viewer port, which gives it a public
+https://<random>.trycloudflare.com address. The cameras are handed that address instead of
+the http one, so the site plays them from anywhere. The address changes each time the relay
+starts; the cameras reconnect and the site learns the new one by itself. The camera ids in
+the paths are long random UUIDs and the camera list (/) is never served through the
+tunnel. PG_CAM_TUNNEL=0 turns the tunnel off (viewers on this network only).
+
     python cam_relay.py            # npm start runs this for you
 """
 
 from __future__ import annotations
 
 import asyncio
+import atexit
 import json
 import logging
 import os
+import re
+import shutil
 import struct
+import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -48,6 +62,8 @@ HTTP_PORT = int(os.environ.get("PG_CAM_HTTP_PORT", "5007"))
 API_URL = os.environ.get("PG_API_URL", "https://ghana-poultry-vision.vercel.app").rstrip("/")
 MAX_FRAME = 1_500_000
 BOUNDARY = b"pgcamframe"
+TUNNEL = os.environ.get("PG_CAM_TUNNEL", "1") != "0"
+public_url: str | None = None  # https://<random>.trycloudflare.com while the tunnel is up
 
 
 @dataclass
@@ -60,6 +76,7 @@ class Cam:
     fps: float = 0.0
     connected: bool = False
     new_frame: asyncio.Event = field(default_factory=asyncio.Event)
+    writer: asyncio.StreamWriter | None = None
 
 
 cams: dict[str, Cam] = {}
@@ -116,10 +133,12 @@ async def handle_push(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
             log.warning("Refused camera %s from %s", line[1], peer[0])
             return
         local_ip = writer.get_extra_info("sockname")[0]
-        url = f"http://{local_ip}:{HTTP_PORT}/cam/{info['id']}.mjpg"
+        base = public_url or f"http://{local_ip}:{HTTP_PORT}"
+        url = f"{base}/cam/{info['id']}.mjpg"
         cam = cams.get(info["id"]) or Cam(info["id"], info["name"])
         cams[cam.id] = cam
         cam.connected = True
+        cam.writer = writer
         writer.write(f"OK {cam.id} {url}\n".encode())
         await writer.drain()
         log.info("%s connected from %s, pushing frames -> %s", cam.name, peer[0], url)
@@ -141,8 +160,9 @@ async def handle_push(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
         if cam:
             log.info("%s disconnected (%s)", cam.name, type(e).__name__)
     finally:
-        if cam:
+        if cam and cam.writer is writer:
             cam.connected = False
+            cam.writer = None
             cam.new_frame.set()
         try:
             await writer.drain()
@@ -171,10 +191,12 @@ async def handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     try:
         req = (await asyncio.wait_for(reader.readline(), 10)).decode(errors="replace").split()
-        while (await asyncio.wait_for(reader.readline(), 10)) not in (b"\r\n", b"\n", b""):
-            pass
+        via_tunnel = False
+        while (line := await asyncio.wait_for(reader.readline(), 10)) not in (b"\r\n", b"\n", b""):
+            if line.lower().startswith((b"cf-ray:", b"cf-connecting-ip:")):
+                via_tunnel = True
         path = req[1].split("?")[0] if len(req) > 1 else "/"
-        if path in ("/", "/health"):
+        if path in ("/", "/health") and not via_tunnel:  # never list the cameras publicly
             body = json.dumps({
                 "ok": True,
                 "cameras": {c.id: {"name": c.name, "connected": c.connected, "fps": round(c.fps, 1),
@@ -232,9 +254,66 @@ async def _mjpeg(writer, cam: Cam):
         await writer.drain()  # a slow viewer waits here, without holding anyone else up
 
 
+# ---------------------------------------------------------------- https tunnel
+
+
+def _cloudflared() -> str | None:
+    if os.environ.get("PG_CLOUDFLARED"):
+        return os.environ["PG_CLOUDFLARED"]
+    for p in (HERE / "bin" / "cloudflared.exe", HERE / "bin" / "cloudflared"):
+        if p.exists():
+            return str(p)
+    return shutil.which("cloudflared")
+
+
+def _set_public_url(url: str | None):
+    """A new tunnel address: hang up on the cameras so they reconnect and are handed it."""
+    global public_url
+    if url == public_url:
+        return
+    public_url = url
+    log.info("Viewers on %s", f"{url}/cam/<id>.mjpg (https, any network)" if url else "this network only (no tunnel)")
+    for cam in cams.values():
+        if cam.writer:
+            try:
+                cam.writer.close()
+            except (ConnectionError, OSError):
+                pass
+
+
+def run_tunnel(loop: asyncio.AbstractEventLoop):
+    exe = _cloudflared()
+    if not exe:
+        log.warning("cloudflared not found (edge/bin/cloudflared.exe): the https site can't show the "
+                    "cameras, only pages on this network can")
+        return
+    pattern = re.compile(rb"https://[a-z0-9-]+\.trycloudflare\.com")
+    while True:
+        try:
+            proc = subprocess.Popen(
+                [exe, "tunnel", "--no-autoupdate", "--url", f"http://127.0.0.1:{HTTP_PORT}"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except OSError as e:
+            log.warning("Couldn't start cloudflared: %s", e)
+            return
+        atexit.register(proc.terminate)  # don't leave the tunnel running after the relay
+        for line in proc.stderr:
+            m = pattern.search(line)
+            if m:
+                loop.call_soon_threadsafe(_set_public_url, m.group().decode())
+        proc.wait()
+        loop.call_soon_threadsafe(_set_public_url, None)
+        log.warning("The https tunnel closed (exit %s); opening a new one", proc.returncode)
+        time.sleep(5)
+
+
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", stream=sys.stdout)
     loop = asyncio.get_running_loop()
+    if TUNNEL:
+        threading.Thread(target=run_tunnel, args=(loop,), daemon=True).start()
     await loop.create_datagram_endpoint(Discovery, local_addr=("0.0.0.0", PUSH_PORT))
     push = await asyncio.start_server(handle_push, "0.0.0.0", PUSH_PORT)
     http = await asyncio.start_server(handle_http, "0.0.0.0", HTTP_PORT)

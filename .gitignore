@@ -59,3 +59,6 @@ firmware/*/secrets.h
 
 # YOLO weights for fine-tuning (edge/models/yolo11n.onnx is what runs)
 edge/models/*.pt
+
+# cloudflared for the camera relay https tunnel (downloaded, not committed)
+edge/bin/

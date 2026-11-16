@@ -9,6 +9,7 @@ import { query, queryOne } from "@/lib/db.server";
 // Headers: x-device-id, x-api-key   (Cameras -> camera -> "Auto address")
 // Body:    { ip, stream_port?, firmware?, rssi?, relay_url? }
 //   relay_url  set while the camera pushes its frames to the PC relay (edge/cam_relay.py,
+//              http://<pc>:5007/... or its https://<random>.trycloudflare.com tunnel,
 //              the PG-CAM push protocol): viewers and the vision worker then watch the
 //              relay, which fans one camera stream out to everyone with no extra delay
 // Reply:   { ok, stream_url, rotation, flip, next_ms }
@@ -27,7 +28,7 @@ const bodySchema = z.object({
   rssi: z.number().int().optional(),
   relay_url: z
     .string()
-    .regex(/^http:\/\/[\w.-]+:\d{2,5}\/cam\/[\w-]+\.mjpg$/)
+    .regex(/^(http:\/\/[\w.-]+:\d{2,5}|https:\/\/[a-z0-9-]+\.trycloudflare\.com)\/cam\/[\w-]+\.mjpg$/)
     .max(200)
     .optional(),
 });
