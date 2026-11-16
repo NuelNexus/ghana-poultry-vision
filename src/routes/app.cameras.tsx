@@ -283,8 +283,12 @@ function CameraTile({
   onAutoAddress: () => void;
   onRemove: () => void;
 }) {
-  const url = cam.stream_url;
   const auto = !!cam.device_code;
+  // A camera that reports its own address but stopped checking in is offline: its last
+  // address may since have gone to another camera (the hotspot reuses IPs), so it would
+  // show that camera's picture under this one's name. Don't load it.
+  const offline = auto && !!cam.last_seen && !checkedInRecently(cam);
+  const url = offline ? null : cam.stream_url;
   const blocked = !!url && isMixedContent(url);
   const [state, setState] = useState<StreamState>(
     !url ? "none" : blocked ? "blocked" : "connecting",
@@ -296,7 +300,7 @@ function CameraTile({
   const [aiView, setAiView] = useState(false);
   const showAi = aiView && !!vision?.frame;
   const shown: StreamState = paused && url && !blocked ? "paused" : state;
-  const pill = STATE_PILL[shown];
+  const pill = offline ? { status: "offline" as Status, label: "Offline" } : STATE_PILL[shown];
 
   // Reset when the URL changes (after an edit).
   const [lastUrl, setLastUrl] = useState(url);
@@ -358,7 +362,12 @@ function CameraTile({
               <Skeleton className="absolute inset-0 h-full rounded-none" />
             )}
             {shown === "none" &&
-              (auto ? (
+              (offline ? (
+                <TileNote icon={CameraOff} title="Camera offline">
+                  It hasn’t checked in for a few minutes. Check it has power and Wi-Fi; the picture
+                  comes back by itself when it does.
+                </TileNote>
+              ) : auto ? (
                 <TileNote icon={Wifi} title="Waiting for the camera">
                   It hasn’t checked in yet. Flash firmware/esp32cam with this camera’s secrets.h and
                   power it on; its address appears here within a minute.

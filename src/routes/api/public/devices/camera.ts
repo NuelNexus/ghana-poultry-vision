@@ -72,6 +72,14 @@ export const Route = createFileRoute("/api/public/devices/camera")({
           [device.id, streamUrl],
         );
         if (!cam) return json({ error: "No camera is linked to this device" }, 404);
+        // The network hands out IPs again, so another of this owner's cameras that went
+        // offline at this address would otherwise show this camera's picture as its own.
+        await query(
+          `update cameras set stream_url = null, status = 'offline'
+            where owner_id = (select owner_id from cameras where id = $1)
+              and id <> $1 and stream_url like $2`,
+          [cam.id, `http://${b.ip}:%`],
+        );
         return json({
           ok: true,
           camera_id: cam.id,

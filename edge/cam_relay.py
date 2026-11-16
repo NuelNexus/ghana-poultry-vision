@@ -206,7 +206,7 @@ async def handle_http(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
             return await _send(writer, 200, "application/json", body)
         if path.startswith("/cam/") and (path.endswith(".mjpg") or path.endswith(".jpg")):
             cam = cams.get(path[5:].rsplit(".", 1)[0])
-            if not cam or not cam.frame:
+            if not cam or not cam.frame or not cam.connected:  # never an old picture
                 return await _send(writer, 404, "text/plain", b"camera not connected to this relay")
             if path.endswith(".jpg"):
                 return await _send(writer, 200, "image/jpeg", cam.frame)
