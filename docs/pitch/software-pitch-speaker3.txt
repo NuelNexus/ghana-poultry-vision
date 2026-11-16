@@ -1,0 +1,362 @@
+POULTRYGRID - SOFTWARE PITCH (YOUR PART, LAST SPEAKER)
+SHS Renewable Energy Challenge, Champion of Champions
+Length: about 3 min 45 s at a calm pace (about 130 words a minute)
+Format: Presec Legon's winning style, built from the research below
+
+
+======================================================================
+PART 1. WHAT THE RESEARCH SAYS (AND WHERE IT CAME FROM)
+======================================================================
+
+Sources I studied:
+- Presec Legon's winning presentation at the Energy Commission SHS
+  Renewable Energy Challenge finale (YouTube, 1:15:47 to 1:25:34).
+- TED: "TED's secret to great public speaking", Chris Anderson.
+- Y Combinator: "How to Pitch Your Startup", Kevin Hale, and
+  "The secret to better product demos", Pete Koomen.
+- Dominic Colenso: "How to start a speech like a PRO" and
+  "How to start a pitch or presentation".
+- Engineer Man: "Explaining technical information to non-technical people".
+- Judges' write-ups on pitch competitions and hackathon demos, university
+  speaking guides, DECA competition guides, and team-presentation guides.
+
+Reddit and Facebook: my search tools are blocked from both sites, so I
+could not read their posts directly. Where advice "from Reddit" appears
+below, it came second-hand through blogs that summarised those threads.
+Everything else came straight from the sources above.
+
+The 10 rules that kept coming up:
+
+1. Your first 30 seconds have one job: make them listen.
+   No "good morning, my name is, our project is titled". Walk out, stop,
+   breathe, look at the judges, then hit them with a surprise: a number,
+   a question, a short story, or a joke if you're good at jokes.
+   (Colenso)
+
+2. One idea, all the way through. Everything links back to it.
+   (TED) Your through-line: "We built the software for the farm we
+   actually have, not the one in the textbook."
+
+3. Build from what the audience already knows. Use their words and a
+   picture they already have in their heads. "108 kilobytes" means
+   nothing; "the size of one WhatsApp photo" lands instantly.
+   (TED, Engineer Man)
+
+4. Say WHAT it is, with real nouns, before HOW it works. No buzzwords:
+   "AI-powered IoT smart platform" makes judges stop listening. Tell it
+   so your mum would get it. (Y Combinator, Kevin Hale)
+
+5. A demo is a story about a user, not a tour of pages.
+   "This is the login page, this is the dashboard..." is boring.
+   Become the farmer and solve her problem. (Y Combinator, Pete Koomen.
+   Presec did exactly this: the presenter became the patient.)
+
+6. A simple demo that works beats a clever demo that crashes. Keep a
+   backup video. (hackathon judges; Presec's internet failed mid-demo)
+
+7. Numbers must be real and defensible. Judges remember a pitch that
+   overclaims. (pitch-competition judges; your scoring sheet also gives
+   marks for honesty in Q&A)
+
+8. Pause at every change of section. Nervous speakers rush. Pick three
+   spots in the room (left, middle, right) and finish a whole sentence
+   on one before moving. (university speaking guides, DECA)
+
+9. Hand-offs: one-line recap of your part, then name the next person.
+   Rehearse every hand-off with a stopwatch. (team-presentation guides)
+
+10. Respect the clock exactly. Going over costs marks on your sheet
+    (more than 2 minutes over = minus 1 mark).
+
+
+======================================================================
+PART 2. PRESEC'S MOVES, AND WHERE THEY ARE IN YOUR SCRIPT
+======================================================================
+
+Presec move                              Your version
+---------------------------------------  ---------------------------------
+Hard numbers in the first 15 seconds     The three "assumptions" + 49% / 84%
+Sarcastic twist ("take painkillers")     "We call those assumptions... fiction."
+Rhetorical question                      "What if the software was built for
+                                         the farm we actually have?"
+Name it, define it in one sentence       "Three layers: the Brain, the
+                                         Dashboard and the Voice."
+Numbered stages                          Layer one, two, three
+Signpost the best bit                    "This is our key innovation."
+Became the user (the patient)            "Let me be the farmer for ten seconds."
+African-language voice                   Ama answers in Twi
+Stayed calm when the internet failed     You pull the cable ON PURPOSE
+Cut for time, out loud                   "Because of time, I'll leave the rest
+                                         of the pages for your questions."
+Closing list                             "A brain that... An AI that...
+                                         A voice that..."
+Q&A: point at a physical part            See Part 5
+
+
+======================================================================
+PART 3. THE SCRIPT
+======================================================================
+
+Lines in [brackets] are stage directions. Don't say them.
+*Word* = lean on that word.
+
+----------------------------------------------------------------------
+OPENING  (about 0:00 - 0:40)
+----------------------------------------------------------------------
+
+[Take over from the previous speaker. Walk to the centre. STOP.
+Breathe. Look at the judges for two full seconds before you speak.]
+
+Most farm apps are built on three assumptions.
+
+One: the internet is *always* on.
+Two: the sensors *never* break.
+Three: every farmer reads *English*.
+
+[Beat. Slight smile.]
+
+In Ghana, we have a name for those assumptions.
+
+We call them... fiction.
+
+[Let the room laugh. Don't rush it.]
+
+Ask any farmer about the power cut at two in the morning. The data
+bundle that finished yesterday. The sensor a chicken has pecked to
+pieces.
+
+So we asked one question. What if the software was built for the farm
+we *actually* have?
+
+[Pause.]
+
+I'm [your name], and I built the software side of PoultryGrid with my
+team. It has three layers: the *Brain*, the *Dashboard*, and the
+*Voice*.
+
+----------------------------------------------------------------------
+LAYER ONE: THE BRAIN  (about 0:40 - 1:50)
+----------------------------------------------------------------------
+
+[Hold up the Raspberry Pi.]
+
+Layer one: the Brain.
+
+This small computer lives inside the poultry house. Every thirty
+seconds, it reads the sensors. Then it checks every single reading:
+is it missing? Is it impossible? Is it frozen on the same number?
+
+Then it feeds twenty-six measurements into our own neural network.
+Not just the temperature. The temperature *trend*. The age of the
+flock. How long the fan has been running. And how far it can *trust*
+each sensor.
+
+The whole model is one hundred and eight kilobytes. That's about the
+size of *one WhatsApp photo*. And it runs with no internet at all.
+
+[Pause. Step forward.]
+
+And this is our key innovation.
+
+Our AI knows when its own sensors are *lying*.
+
+We trained it on six thousand simulated poultry houses, where we broke
+the sensors *on purpose*. When the temperature sensor sends rubbish,
+our earlier model was right only forty-nine percent of the time.
+That's a coin toss.
+
+The new one? Eighty-four percent.
+
+And false "critical" alarms fell from seventy-four percent... to six.
+
+Because a smoke alarm that rings every day is a smoke alarm everybody
+ignores.
+
+----------------------------------------------------------------------
+LAYER TWO: THE DASHBOARD  (about 1:50 - 2:40)
+----------------------------------------------------------------------
+
+[Turn to the screen. Point.]
+
+Layer two: the Dashboard.
+
+Every reading flows from the Pi to our web app. The farmer sees every
+house, live.
+
+Now, some of you are thinking: "This is Ghana. What happens when the
+network goes?"
+
+[Pull out the network cable slowly so everyone sees it.]
+
+There goes the internet.
+
+[Warm the sensor with your hand. Wait for the fan.]
+
+And the fan *still* switches on. The Brain keeps deciding. The
+readings wait on the Pi, and when the network comes back, they arrive
+in order. Nothing is lost.
+
+[Plug the cable back in.]
+
+Alerts open and close by themselves. The farmer can follow every egg in
+the hatchery and its hatch rate, watch a live camera, and switch the fan
+from a phone.
+
+Because of time, I'll leave the rest of the pages for your questions.
+
+----------------------------------------------------------------------
+LAYER THREE: THE VOICE  (about 2:40 - 3:30)
+----------------------------------------------------------------------
+
+Layer three: the Voice. And this is the part I'm *proudest* of.
+
+Let me be the farmer for ten seconds.
+
+[Tap the microphone on Ama's page.]
+
+"Ama, me nkokɔ no ho te sɛn?"
+
+[Let Ama answer out loud. Don't talk over her. Then turn to the judges.]
+
+She just answered me in Twi. And she reminded me of something I'd
+forgotten: today is day eight. That means the first Gumboro vaccine,
+in the drinking water, with no chlorine.
+
+The whole site works in seven languages: English, Twi, Ga, Ewe,
+Dagbani, Hausa and French. And every button can read itself out loud.
+
+So a farmer who has never read a single word of English can still run
+the *entire* system.
+
+[Slow down. Look left, middle, right, one line each.]
+
+So: a brain that works when the internet doesn't.
+An AI that knows when its own sensors are lying.
+And a voice that speaks the farmer's language.
+
+----------------------------------------------------------------------
+ENDING A: SPEAKER 1 DOES THE OUTRO  (about 3:30 - 3:40)
+----------------------------------------------------------------------
+
+That's how PoultryGrid *thinks*.
+
+[Turn your body toward Speaker 1 as you say the name.]
+
+[Speaker 1's name] will close for us.
+
+----------------------------------------------------------------------
+ENDING B: YOU DO THE OUTRO  (about 3:30 - 4:00)
+----------------------------------------------------------------------
+
+Remember the three assumptions?
+
+The internet is always on. Sensors never break. Everyone reads
+English.
+
+We didn't build for that fiction.
+
+We built for the farm at two in the morning: dark, offline, and
+speaking Twi.
+
+[Pause.]
+
+And at two in the morning... PoultryGrid is still awake.
+
+We are [School]. This is PoultryGrid. Thank you very much.
+
+[Stand still for two seconds. Then the whole team steps forward
+for questions.]
+
+
+======================================================================
+PART 4. IF YOU HAVE ONLY 3 MINUTES
+======================================================================
+
+Cut these, in this order, until you fit:
+1. "Ask any farmer about the power cut... pecked to pieces."
+2. "Alerts open and close by themselves... switch the fan from a phone."
+3. The smoke-alarm line (keep it if you can; judges remember it).
+4. The list of seven languages (say "seven Ghanaian and world
+   languages" instead).
+
+
+======================================================================
+PART 5. DELIVERY CHECKLIST
+======================================================================
+
+Before the day:
+[ ] Every number in the script is real. Say them exactly as written:
+    30 seconds, 26 measurements, 108 KB, 6,000 houses, 49% -> 84%,
+    74% -> 6% false critical alarms, 7 languages.
+[ ] Set the demo house's "Chicks placed on" date to 7 days before the
+    competition, so it is Day 8 (Gumboro day) on stage.
+[ ] Ama needs the internet. Plug the cable back in BEFORE you speak to
+    her.
+[ ] Ask a fluent Twi speaker to check your Twi line and Ama's reply.
+[ ] Keep the backup video ready (promo/stage-demo.mp4, or
+    /stage-demo.html). If the live demo fails twice, say:
+    "Here's the recording from our test run", and play it.
+[ ] Rehearse with a stopwatch until you land within 10 seconds of your
+    target three times in a row.
+[ ] Rehearse the hand-off FROM the previous speaker and TO Speaker 1.
+
+On stage:
+- Walk out, stop, breathe, then speak. Silence first looks confident.
+- Pause at every "Layer one / two / three". Those are your breaths.
+- Finish one sentence on one face. Left, middle, right.
+- No notes in hand. Know the three layer names and the closing list
+  by heart; the rest flows from them.
+- When the internet is pulled, move slowly. The pause IS the drama.
+- If something breaks for real: smile, say what it should do, move on.
+  Presec's internet died and they still won.
+
+
+======================================================================
+PART 6. QUESTIONS YOU SHOULD EXPECT (SHORT ANSWERS)
+======================================================================
+
+Answer first, point at something, stop. Under 45 seconds.
+
+Q: Did you build the AI, or is it ChatGPT?
+A: Two AIs. The farm brain is ours: we built the simulator, trained the
+   model, and it runs on the Pi with no internet. Ama uses OpenAI's GPT
+   models with GhanaNLP's Khaya for Ghanaian languages. We wrote her
+   instructions and connected her to the live farm data and the vaccine
+   schedule.
+
+Q: Was it trained on real farm data?
+A: Honestly, mostly simulated: 6,000 simulated poultry houses, about
+   462,000 readings, built around our exact sensors. We're now
+   collecting real readings to retrain it.
+
+Q: What happens with no internet?
+A: The brain and the fan keep working, and readings are saved on the Pi
+   and sent in order later. The dashboard and Ama need internet; the
+   part that keeps the birds alive doesn't.
+
+Q: What if a sensor breaks?
+A: Every reading is checked first. If the temperature sensor dies, the
+   Pi uses its last good reading and keeps track of how old it is, and
+   the app shows a "sensor problem" warning.
+
+Q: Why not just a thermostat?
+A: A thermostat has one number. Our target moves with the flock's age,
+   from 33 °C on day one down to about 20 °C, and it also weighs gas
+   and humidity. Cold chicks need the fan OFF; a thermostat can't know
+   that.
+
+Q: Is the farm's data safe?
+A: Each account sees only its own farm. Passwords are stored hashed, not
+   as plain text. Each Pi has its own secret key, and the site runs over
+   HTTPS.
+
+Q: How could government roll this out?
+A: Through structures that already exist: kits assembled by
+   TVET-trained technicians, farmers joining through cooperatives with
+   instalments, and Ghana Enterprises Agency advisors and extension
+   officers registering farms. We'd start with one district, 20 farms,
+   six months, and measure bird deaths, power costs and hatch rates.
+
+If you don't know:
+"Good question. We haven't tested that yet. What we have measured is
+[closest fact]."
