@@ -304,6 +304,8 @@ def snapshot_url(stream_url: str) -> str | None:
     u = urllib.parse.urlparse(stream_url)
     if u.port == 81 and u.path.rstrip("/") == "/stream":
         return f"{u.scheme}://{u.hostname}/capture"
+    if u.path.startswith("/cam/") and u.path.endswith(".mjpg"):  # the PC camera relay
+        return stream_url[: -len(".mjpg")] + ".jpg"
     return None
 
 
@@ -341,6 +343,7 @@ class CameraState:
     id: str
     name: str
     url: str
+    rotation: int = 0  # 90/270: turned here (180 is flipped in the camera itself)
     tracker: BirdTracker = field(default_factory=BirdTracker)
     last_report: float = 0.0
     last_event: dict = field(default_factory=dict)  # (kind,label) -> time
@@ -498,6 +501,7 @@ def run(cfg: Config, args):
                         for c in listed}
                 for c in listed:
                     cams[c["id"]].url = c["stream_url"]
+                    cams[c["id"]].rotation = int(c.get("rotation") or 0)
                 log.info("%d camera(s): %s", len(cams), ", ".join(c.name for c in cams.values()) or "none")
             except (urllib.error.URLError, OSError, ValueError) as e:
                 log.warning("Couldn't get the camera list: %s", e)
@@ -509,6 +513,8 @@ def run(cfg: Config, args):
             t = time.time()
             try:
                 img = grab_frame(cam.url)
+                if cam.rotation in (90, 270):  # PIL turns counter-clockwise
+                    img = img.rotate(-cam.rotation, expand=True)
                 cam.failures = 0
             except (urllib.error.URLError, OSError, TimeoutError, ValueError) as e:
                 cam.failures += 1

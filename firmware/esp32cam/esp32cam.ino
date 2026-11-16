@@ -136,6 +136,15 @@ bool startCamera() {
     return false;
   }
   applyFlip(flipped);
+  // Low light: let the sensor turn up its gain before it lengthens the exposure, which
+  // would drop it to ~1 frame a second (a slow, laggy picture). Grainier, but live.
+  sensor_t* s = esp_camera_sensor_get();
+  if (s) {
+    s->set_gainceiling(s, GAINCEILING_128X);
+    s->set_aec2(s, 0);   // the DSP's extra-long night exposure: off
+    s->set_bpc(s, 1);    // hide dead/hot pixels, which show at high gain
+    s->set_wpc(s, 1);
+  }
   return true;
 }
 
@@ -358,7 +367,12 @@ void pushTask(void*) {
     if (!discoverRelay(ip, port) || !relay.connect(ip, port, 3000)) continue;
     relay.setNoDelay(true);  // send each frame at once, never wait to fill a packet
     relay.printf("PGCAM/1 %s %s\n", PG_DEVICE_ID, PG_DEVICE_API_KEY);
-    String reply = relay.readStringUntil('\n');  // "OK <camera-id> <url>" or "ERR ..."
+    // The relay checks the key with the site first, which can take a few seconds.
+    unsigned long waitUntil = millis() + 12000;
+    while (relay.connected() && !relay.available() && (long)(millis() - waitUntil) < 0)
+      vTaskDelay(pdMS_TO_TICKS(20));
+    // "OK <camera-id> <url>" or "ERR <reason>"
+    String reply = relay.available() ? relay.readStringUntil('\n') : String("");
     if (!reply.startsWith("OK ")) {
       Serial.printf("Relay refused the camera: %s\n", reply.c_str());
       relay.stop();
