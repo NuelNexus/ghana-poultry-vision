@@ -1,6 +1,7 @@
 import process from "node:process";
 import { speak, toBase64 } from "./openai.server";
 import { KHAYA_CODES, langName, type SpeechLang } from "./ai-languages";
+import { geminiEnabled, geminiSpeak } from "./gemini-tts.server";
 import { khayaEnabled, khayaSpeak } from "./khaya.server";
 import { twiSpeak } from "./twi-tts.server";
 import { DEFAULT_VOICE, type VoiceChoice } from "./voice-choice";
@@ -12,13 +13,13 @@ import { DEFAULT_VOICE, type VoiceChoice } from "./voice-choice";
 //
 //   Twi            -> stable-twi-tts (Pi or this PC), then Khaya, then OpenAI
 //   Voice: the account's choice in Profile (default NELVIN, our fine-tuned male Twi voice).
-//   Ga, Ewe, Dagbani, Hausa -> Khaya when there is a key, then OpenAI
-//   anything else  -> OpenAI
+//   Ga, Ewe, Dagbani, Hausa -> Khaya when there is a key, then Gemini, then OpenAI
+//   English and anything else -> Gemini TTS (GEMINI_API_KEY), then OpenAI
 
 export type Spoken = {
   audio: string;
   mimeType: string;
-  engine: "twi" | "khaya" | "openai" | "browser";
+  engine: "twi" | "khaya" | "gemini" | "openai" | "browser";
   /** engine "browser": no audio; the browser reads this text with its own voice (offline). */
   text?: string;
 };
@@ -67,6 +68,14 @@ export async function speakIn(
       };
     } catch {
       /* fall back to OpenAI */
+    }
+  }
+  if (!out && lang !== "tw" && geminiEnabled()) {
+    try {
+      const wav = await geminiSpeak(said, voice, lang === "auto" ? undefined : langName(lang));
+      out = { audio: toBase64(wav), mimeType: "audio/wav", engine: "gemini" };
+    } catch (err) {
+      console.warn("[voice] gemini", err instanceof Error ? err.message : err);
     }
   }
   if (!out && process.env.OPENAI_API_KEY) {
