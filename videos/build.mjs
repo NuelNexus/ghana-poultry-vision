@@ -11,7 +11,7 @@
 // videos/shots/ (real screens of the app; rects.json has the boxes the camera
 // moves to). Needs Node 22, FFmpeg and Chrome (`npx hyperframes browser ensure`).
 //
-// Every caption is spoken by NELVIN (videos/voice.py, run with .venv-twi's Python or
+// Every caption is spoken (English: ElevenLabs, Twi: NELVIN; videos/voice.py, run with .venv-twi's Python or
 // PG_TWI_PYTHON); a scene lasts as long as its lines take to say. --silent skips the voice.
 
 import { execFileSync } from "node:child_process";
