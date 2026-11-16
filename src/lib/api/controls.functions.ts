@@ -9,6 +9,8 @@ import {
 } from "../controls";
 import { requireManager, requireUser } from "./middleware";
 import { applyCoopControls } from "../device-commands.server";
+import { sendConveyor } from "../conveyor.server";
+import { conveyorCommandSchema, type ConveyorCommand, type ConveyorState } from "../conveyor";
 import { FRESHNESS_MS } from "./types";
 
 // Remote control of unit 2, the ESP32 coop controller (firmware/coop_unit).
@@ -37,6 +39,13 @@ export interface CoopUnit {
     applied_at: string | null;
     updated_by_name: string | null;
   };
+  /** The feeder belt: the last command sent and what the coop last reported. */
+  conveyor: {
+    command: ConveyorCommand | null;
+    command_at: string | null;
+    state: ConveyorState | null;
+    state_at: string | null;
+  };
   log: {
     id: number;
     version: number;
@@ -49,7 +58,9 @@ export interface CoopUnit {
 export const listCoops = createServerFn({ method: "GET" })
   .middleware([requireUser])
   .handler(async ({ context }) => {
-    const devices = await query<Omit<CoopUnit, "online" | "latest" | "controls" | "log">>(
+    const devices = await query<
+      Omit<CoopUnit, "online" | "latest" | "controls" | "conveyor" | "log">
+    >(
       `select d.id, d.device_id, h.name as house_name, d.firmware_version, d.last_seen, d.last_rssi
          from devices d left join poultry_houses h on h.id = d.house_id
         where d.owner_id = $1 and d.unit = 'coop'
@@ -64,8 +75,10 @@ export const listCoops = createServerFn({ method: "GET" })
               where device_id = $1 order by created_at desc limit 1`,
             [d.id],
           ),
-          queryOne<CoopUnit["controls"]>(
-            `select c.config, c.version, c.applied_version, c.applied_at, u.full_name as updated_by_name
+          queryOne<CoopUnit["controls"] & { conveyor: CoopUnit["conveyor"] }>(
+            `select c.config, c.version, c.applied_version, c.applied_at, u.full_name as updated_by_name,
+                    json_build_object('command', c.conveyor, 'command_at', c.conveyor_at,
+                                      'state', c.conveyor_state, 'state_at', c.conveyor_state_at) as conveyor
                from device_controls c left join users u on u.id = c.updated_by
               where c.device_id = $1`,
             [d.id],
@@ -81,6 +94,12 @@ export const listCoops = createServerFn({ method: "GET" })
           ...d,
           online: !!d.last_seen && Date.now() - new Date(d.last_seen).getTime() < FRESHNESS_MS.live,
           latest,
+          conveyor: controls?.conveyor ?? {
+            command: null,
+            command_at: null,
+            state: null,
+            state_at: null,
+          },
           // Before its first check-in the coop runs its built-in settings.
           controls: controls ?? {
             config: DEFAULT_COOP_CONTROLS,
@@ -94,6 +113,14 @@ export const listCoops = createServerFn({ method: "GET" })
       }),
     );
   });
+
+/** Run the coop's feeder belt left or right for a few seconds, or stop it. */
+export const driveConveyor = createServerFn({ method: "POST" })
+  .middleware([requireManager])
+  .inputValidator(conveyorCommandSchema.extend({ deviceId: z.string().uuid() }))
+  .handler(({ data, context }) =>
+    sendConveyor(context.user.id, data.deviceId, data.dir, data.seconds),
+  );
 
 export const updateCoopControls = createServerFn({ method: "POST" })
   .middleware([requireManager])

@@ -1,9 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Droplets, FlaskConical, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Droplets,
+  FlaskConical,
+  Loader2,
+  RotateCcw,
+  Square,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   deleteCoop,
+  driveConveyor,
   listCoops,
   updateCoopControls,
   type CoopUnit,
@@ -12,6 +23,7 @@ import { useCoopSim } from "@/lib/coop-sim";
 import { useAuth } from "@/lib/auth";
 import { COOP_PRESETS, COOP_PRESET_IDS, type CoopPresetId } from "@/lib/presets";
 import { CoopDrawing, type CoopZoneView } from "@/components/coop-drawing";
+import { CONVEYOR_DEFAULT_S, CONVEYOR_RUN_OPTIONS, type ConveyorDir } from "@/lib/conveyor";
 import {
   COOP_ZONES,
   coopControlsSchema,
@@ -286,6 +298,8 @@ function CoopPanel({
         ))}
       </Grid>
 
+      <FeederBelt coop={coop} canManage={canManage} onSent={onSaved} />
+
       <Grid cols={2}>
         <Card title="Drinking water" description="Turbidity sensor in the drinker">
           <Water coop={coop} />
@@ -353,6 +367,124 @@ function CoopPanel({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The feeder conveyor belt: two motors (one at each end) on an H-bridge. Left / Right run it
+ * for the chosen time, then it stops by itself; Stop stops it at once. The coop polls for
+ * commands every ~2 s.
+ */
+function FeederBelt({
+  coop,
+  canManage,
+  onSent,
+}: {
+  coop: CoopUnit;
+  canManage: boolean;
+  onSent: () => void;
+}) {
+  const [seconds, setSeconds] = useState<number>(CONVEYOR_DEFAULT_S);
+  const [sending, setSending] = useState<ConveyorDir | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const { command, command_at, state, state_at } = coop.conveyor;
+  const stateAge = state_at ? (now - new Date(state_at).getTime()) / 1000 : Infinity;
+  const fresh = stateAge < 8;
+  const remaining = state ? Math.max(0, Math.round(state.remaining_s - stateAge)) : 0;
+  const moving = fresh && state && state.dir !== "stop" && remaining > 0 ? state.dir : null;
+  const waiting =
+    !!command &&
+    !!command_at &&
+    (!state || state.cmd_id < command.id) &&
+    now - new Date(command_at).getTime() < 15_000;
+
+  async function send(dir: ConveyorDir) {
+    setSending(dir);
+    try {
+      const res = await driveConveyor({ data: { deviceId: coop.id, dir, seconds } });
+      toast.success(res.summary, {
+        description: coop.online
+          ? "The coop picks it up within about 2 s."
+          : "The coop is offline, so the belt won't move until it reconnects.",
+      });
+      onSent();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn’t send to the belt");
+    } finally {
+      setSending(null);
+    }
+  }
+
+  const disabled = !canManage || sending !== null;
+  return (
+    <Card
+      title="Feeder belt"
+      description="Conveyor with a motor at each end. It runs for the time you pick, then stops by itself."
+      action={
+        moving ? (
+          <StatusPill status="ok" pulse>
+            Moving {moving} · {remaining} s
+          </StatusPill>
+        ) : waiting ? (
+          <StatusPill status="info">Sending…</StatusPill>
+        ) : (
+          <StatusPill status="neutral">Stopped</StatusPill>
+        )
+      }
+    >
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label="Run for">
+          <Select
+            name="belt-seconds"
+            value={seconds}
+            disabled={disabled}
+            onChange={(e) => setSeconds(Number(e.target.value))}
+          >
+            {CONVEYOR_RUN_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s} seconds
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            icon={ArrowLeft}
+            variant={moving === "left" ? "primary" : "secondary"}
+            loading={sending === "left"}
+            disabled={disabled}
+            onClick={() => void send("left")}
+          >
+            Left
+          </Button>
+          <Button
+            icon={Square}
+            loading={sending === "stop"}
+            disabled={disabled}
+            onClick={() => void send("stop")}
+          >
+            Stop
+          </Button>
+          <Button
+            variant={moving === "right" ? "primary" : "secondary"}
+            loading={sending === "right"}
+            disabled={disabled}
+            onClick={() => void send("right")}
+          >
+            Right
+            <ArrowRight className="ml-1.5 h-4 w-4" aria-hidden />
+          </Button>
+        </div>
+      </div>
+      {!canManage && (
+        <p className="pg-t-caption mt-2">Only admins and farm managers can move the belt.</p>
+      )}
+    </Card>
   );
 }
 

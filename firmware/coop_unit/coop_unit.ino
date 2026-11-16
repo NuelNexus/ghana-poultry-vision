@@ -14,6 +14,10 @@
 //     the last settings it received
 //   - Safety: the lamp is forced off if a zone overheats or its sensor fails,
 //     even in MANUAL; fan and lamp are never on together
+//   - Feeder conveyor belt: two DC motors (one at each end) on an H-bridge
+//     (L298N or similar). The site (or Ama) runs it left or right for a set
+//     time; it always stops by itself. The coop asks for belt commands every
+//     2 s, so a button press moves it within about 2 s.
 //
 // Libraries (Arduino Library Manager):
 //   DHT sensor library (Adafruit), LiquidCrystal I2C, ArduinoJson (v7)
@@ -58,7 +62,7 @@
 
 #include "root_ca.h"
 
-#define FIRMWARE_VERSION "coop-2.0.0"
+#define FIRMWARE_VERSION "coop-2.1.0"
 
 // =========================
 // PINS (unchanged)
@@ -72,9 +76,30 @@
 #define TURBIDITY_PIN 34     // ADC1, safe with WiFi
 #define LCD_ADDRESS 0x27
 
+// Feeder belt H-bridge (L298N: IN1/IN2/ENA = motor A, IN3/IN4/ENB = motor B).
+// Both motors run together. Connect the H-bridge GND to the ESP32 GND, and power the
+// motors from their own supply (not the ESP32's 3.3 V / 5 V pins).
+#define BELT_A_IN1 18        // motor A (left end)  -> IN1
+#define BELT_A_IN2 19        //                     -> IN2
+#define BELT_A_EN  23        // ENA (or leave the L298N's ENA jumper on for full speed)
+#define BELT_B_IN1 32        // motor B (right end) -> IN3
+#define BELT_B_IN2 33        //                     -> IN4
+#define BELT_B_EN  13        // ENB (or leave the ENB jumper on)
+
 // Your relay board is ACTIVE HIGH (HIGH = relay ON).
 // If the relays work backwards after testing, change this to false.
 const bool RELAY_ACTIVE_HIGH = true;
+
+// Feeder belt tuning.
+// If one motor fights the other (the belt stalls or slips), set that motor's INVERT to true.
+// If "Left" on the site moves the belt right, flip BELT_LEFT_IS_FORWARD.
+const bool BELT_A_INVERT = false;
+const bool BELT_B_INVERT = false;
+const bool BELT_LEFT_IS_FORWARD = true;
+const int BELT_SPEED = 255;               // 0-255 PWM on ENA / ENB
+const int BELT_MAX_S = 120;               // longest single run (the site has the same limit)
+const unsigned long BELT_POLL_MS = 2000;  // how often to ask the site for belt commands
+const int BELT_FRESH_S = 30;              // ignore commands older than this (e.g. after a restart)
 
 // =========================
 // SAFETY LIMITS (not changeable from the site)
@@ -195,6 +220,13 @@ unsigned long lastReport = 0;
 unsigned long lastWifiAttempt = 0;
 int displayState = 0;
 
+// Feeder belt
+int beltDir = 0;                  // -1 left, 0 stopped, 1 right
+unsigned long beltUntil = 0;      // millis() when the current run ends
+int beltCmdId = -1;               // last command id seen from the site (-1 = none yet)
+unsigned long lastBeltPoll = 0;
+esp_timer_handle_t beltTimer = nullptr;
+
 bool siteOnline = false;       // last report reached the site
 String lastConfigError = "";   // reported back if the site sends bad settings
 
@@ -204,6 +236,78 @@ String lastConfigError = "";   // reported back if the site sends bad settings
 
 void updateRelay(int relayPin, bool on) {
   digitalWrite(relayPin, (on == RELAY_ACTIVE_HIGH) ? HIGH : LOW);
+}
+
+// =====================================================
+// FEEDER BELT
+// =====================================================
+
+void driveMotor(int in1, int in2, int en, int dir) {
+  // dir: 1 forward, -1 backward, 0 stop (both inputs LOW = coast)
+  digitalWrite(in1, dir > 0 ? HIGH : LOW);
+  digitalWrite(in2, dir < 0 ? HIGH : LOW);
+  analogWrite(en, dir == 0 ? 0 : BELT_SPEED);
+}
+
+void setBeltMotors(int dir) {  // dir: -1 left, 0 stop, 1 right
+  int fwd = BELT_LEFT_IS_FORWARD ? -dir : dir;
+  driveMotor(BELT_A_IN1, BELT_A_IN2, BELT_A_EN, BELT_A_INVERT ? -fwd : fwd);
+  driveMotor(BELT_B_IN1, BELT_B_IN2, BELT_B_EN, BELT_B_INVERT ? -fwd : fwd);
+}
+
+void stopBelt() {
+  if (beltTimer) esp_timer_stop(beltTimer);
+  setBeltMotors(0);
+  if (beltDir != 0) Serial.println("Feeder belt: stopped");
+  beltDir = 0;
+  beltUntil = 0;
+}
+
+// Runs on the esp_timer task, so the belt stops on time even while the loop is busy
+// talking to the site.
+void beltTimerDone(void*) {
+  setBeltMotors(0);
+}
+
+void runBelt(int dir, int seconds) {
+  seconds = constrain(seconds, 1, BELT_MAX_S);
+  if (beltTimer) esp_timer_stop(beltTimer);
+  if (beltDir != 0 && beltDir != dir) {
+    setBeltMotors(0);  // let the motors stop before reversing
+    delay(300);
+  }
+  beltDir = dir;
+  beltUntil = millis() + seconds * 1000UL;
+  setBeltMotors(dir);
+  if (beltTimer) esp_timer_start_once(beltTimer, (uint64_t)seconds * 1000000ULL);
+  Serial.printf("Feeder belt: %s for %d s\n", dir < 0 ? "LEFT" : "RIGHT", seconds);
+}
+
+void beltSetup() {
+  const int pins[] = {BELT_A_IN1, BELT_A_IN2, BELT_A_EN, BELT_B_IN1, BELT_B_IN2, BELT_B_EN};
+  for (int p : pins) {
+    pinMode(p, OUTPUT);
+    digitalWrite(p, LOW);
+  }
+  esp_timer_create_args_t args = {};
+  args.callback = beltTimerDone;
+  args.name = "belt";
+  esp_timer_create(&args, &beltTimer);
+}
+
+// Keep beltDir in step with the timer that stopped the motors.
+void beltTick() {
+  if (beltDir != 0 && (long)(millis() - beltUntil) >= 0) stopBelt();
+}
+
+int beltRemaining() {
+  if (beltDir == 0) return 0;
+  long ms = (long)(beltUntil - millis());
+  return ms > 0 ? (ms + 999) / 1000 : 0;
+}
+
+const char* beltDirName() {
+  return beltDir < 0 ? "left" : beltDir > 0 ? "right" : "stop";
 }
 
 // =====================================================
@@ -369,6 +473,10 @@ String buildReport() {
     o["safety_tripped"] = z.safetyTripped;
   }
 
+  JsonObject belt = doc["conveyor"].to<JsonObject>();
+  belt["dir"] = beltDirName();
+  belt["remaining_s"] = beltRemaining();
+
   JsonObject w = doc["water"].to<JsonObject>();
   w["voltage"] = round(turbidityVoltage * 100) / 100.0;
   w["sensor_ok"] = turbiditySensorOK;
@@ -425,6 +533,55 @@ void reportToSite() {
     Serial.printf("Site report failed: HTTP %d %s\n", code, code < 0 ? http.errorToString(code).c_str() : "");
   }
   http.end();
+}
+
+// Ask the site for the latest belt command and report what the belt is doing.
+// One connection is kept open between polls, so each poll is quick.
+WiFiClientSecure beltSecure;
+WiFiClient beltPlain;
+HTTPClient beltHttp;
+
+void pollBelt() {
+  String url = String(PG_API_URL) + "/api/public/devices/conveyor";
+  bool https = url.startsWith("https://");
+  beltHttp.setReuse(true);
+  beltHttp.setTimeout(4000);
+  bool ok = https ? beltHttp.begin(beltSecure, url) : beltHttp.begin(beltPlain, url);
+  if (!ok) return;
+  beltHttp.addHeader("content-type", "application/json");
+  beltHttp.addHeader("x-device-id", PG_DEVICE_ID);
+  beltHttp.addHeader("x-api-key", PG_DEVICE_API_KEY);
+
+  JsonDocument body;
+  JsonObject st = body["state"].to<JsonObject>();
+  st["dir"] = beltDirName();
+  st["remaining_s"] = beltRemaining();
+  st["cmd_id"] = beltCmdId < 0 ? 0 : beltCmdId;
+  String out;
+  serializeJson(body, out);
+
+  int code = beltHttp.POST(out);
+  if (code == 200) {
+    JsonDocument res;
+    if (!deserializeJson(res, beltHttp.getString())) {
+      int id = res["id"] | 0;
+      int age = res["age_s"] | 0;
+      const char* dir = res["dir"] | "stop";
+      int seconds = res["seconds"] | 10;
+      // A new command runs once, and only while fresh: after a restart the coop never
+      // replays an old run.
+      bool isNew = id > 0 && id != beltCmdId;
+      beltCmdId = id;
+      if (isNew && age <= BELT_FRESH_S) {
+        if (strcmp(dir, "left") == 0) runBelt(-1, seconds);
+        else if (strcmp(dir, "right") == 0) runBelt(1, seconds);
+        else stopBelt();
+      }
+    }
+  } else {
+    Serial.printf("Belt poll failed: HTTP %d\n", code);
+  }
+  beltHttp.end();
 }
 
 void maintainWifi() {
@@ -520,6 +677,7 @@ void setup() {
   pinMode(TURBIDITY_PIN, INPUT);
 
   // Start with EVERYTHING OFF
+  beltSetup();
   for (int i = 0; i < 2; i++) {
     pinMode(zones[i].fanPin, OUTPUT);
     pinMode(zones[i].lampPin, OUTPUT);
@@ -532,6 +690,12 @@ void setup() {
   lcd.backlight();
   showWelcome();
   previousDisplayTime = millis();
+
+#if PG_INSECURE_TLS
+  beltSecure.setInsecure();
+#else
+  beltSecure.setCACert(ROOT_CA_BUNDLE);
+#endif
 
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
@@ -568,11 +732,18 @@ void loop() {
       Serial.printf(" | FAN=%s LAMP=%s | %s%s\n", z.fan ? "ON" : "OFF", z.lamp ? "ON" : "OFF",
                     settings.zone[i].manual ? "MANUAL" : "AUTO", z.safetyTripped ? " | OVERHEAT CUT-OUT" : "");
     }
+    if (beltDir != 0) Serial.printf("BELT: %s, %d s left\n", beltDir < 0 ? "LEFT" : "RIGHT", beltRemaining());
     Serial.printf("WATER: %.2f V | %s\n", turbidityVoltage,
                   !turbiditySensorOK ? "SENSOR ERROR" : (waterGood ? "GOOD" : "BAD"));
   }
 
+  beltTick();
   maintainWifi();
+  if (WiFi.status() == WL_CONNECTED && now - lastBeltPoll >= BELT_POLL_MS) {
+    lastBeltPoll = now;
+    pollBelt();
+    beltTick();
+  }
   if (WiFi.status() == WL_CONNECTED && (now - lastReport >= REPORT_INTERVAL_MS || lastReport == 0)) {
     lastReport = now;
     reportToSite();

@@ -27,6 +27,7 @@ import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppMarketIndexRouteImport } from './routes/app.market.index'
 import { Route as AppMarketListingIdRouteImport } from './routes/app.market.$listingId'
 import { Route as ApiPublicDevicesCameraRouteImport } from './routes/api/public/devices/camera'
+import { Route as ApiPublicDevicesConveyorRouteImport } from './routes/api/public/devices/conveyor'
 import { Route as ApiPublicDevicesIngestRouteImport } from './routes/api/public/devices/ingest'
 import { Route as ApiPublicDevicesRelaysRouteImport } from './routes/api/public/devices/relays'
 import { Route as ApiPublicDevicesTtsRouteImport } from './routes/api/public/devices/tts'
@@ -123,6 +124,12 @@ const ApiPublicDevicesCameraRoute = ApiPublicDevicesCameraRouteImport.update({
   path: '/api/public/devices/camera',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicDevicesConveyorRoute =
+  ApiPublicDevicesConveyorRouteImport.update({
+    id: '/api/public/devices/conveyor',
+    path: '/api/public/devices/conveyor',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicDevicesIngestRoute = ApiPublicDevicesIngestRouteImport.update({
   id: '/api/public/devices/ingest',
   path: '/api/public/devices/ingest',
@@ -169,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/app/market/$listingId': typeof AppMarketListingIdRoute
   '/app/market/': typeof AppMarketIndexRoute
   '/api/public/devices/camera': typeof ApiPublicDevicesCameraRoute
+  '/api/public/devices/conveyor': typeof ApiPublicDevicesConveyorRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
   '/api/public/devices/relays': typeof ApiPublicDevicesRelaysRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
@@ -193,6 +201,7 @@ export interface FileRoutesByTo {
   '/app/market/$listingId': typeof AppMarketListingIdRoute
   '/app/market': typeof AppMarketIndexRoute
   '/api/public/devices/camera': typeof ApiPublicDevicesCameraRoute
+  '/api/public/devices/conveyor': typeof ApiPublicDevicesConveyorRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
   '/api/public/devices/relays': typeof ApiPublicDevicesRelaysRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
@@ -219,6 +228,7 @@ export interface FileRoutesById {
   '/app/market/$listingId': typeof AppMarketListingIdRoute
   '/app/market/': typeof AppMarketIndexRoute
   '/api/public/devices/camera': typeof ApiPublicDevicesCameraRoute
+  '/api/public/devices/conveyor': typeof ApiPublicDevicesConveyorRoute
   '/api/public/devices/ingest': typeof ApiPublicDevicesIngestRoute
   '/api/public/devices/relays': typeof ApiPublicDevicesRelaysRoute
   '/api/public/devices/tts': typeof ApiPublicDevicesTtsRoute
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/app/market/$listingId'
     | '/app/market/'
     | '/api/public/devices/camera'
+    | '/api/public/devices/conveyor'
     | '/api/public/devices/ingest'
     | '/api/public/devices/relays'
     | '/api/public/devices/tts'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/app/market/$listingId'
     | '/app/market'
     | '/api/public/devices/camera'
+    | '/api/public/devices/conveyor'
     | '/api/public/devices/ingest'
     | '/api/public/devices/relays'
     | '/api/public/devices/tts'
@@ -295,6 +307,7 @@ export interface FileRouteTypes {
     | '/app/market/$listingId'
     | '/app/market/'
     | '/api/public/devices/camera'
+    | '/api/public/devices/conveyor'
     | '/api/public/devices/ingest'
     | '/api/public/devices/relays'
     | '/api/public/devices/tts'
@@ -307,6 +320,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiPublicDevicesCameraRoute: typeof ApiPublicDevicesCameraRoute
+  ApiPublicDevicesConveyorRoute: typeof ApiPublicDevicesConveyorRoute
   ApiPublicDevicesIngestRoute: typeof ApiPublicDevicesIngestRoute
   ApiPublicDevicesRelaysRoute: typeof ApiPublicDevicesRelaysRoute
   ApiPublicDevicesTtsRoute: typeof ApiPublicDevicesTtsRoute
@@ -442,6 +456,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDevicesCameraRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/devices/conveyor': {
+      id: '/api/public/devices/conveyor'
+      path: '/api/public/devices/conveyor'
+      fullPath: '/api/public/devices/conveyor'
+      preLoaderRoute: typeof ApiPublicDevicesConveyorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/devices/ingest': {
       id: '/api/public/devices/ingest'
       path: '/api/public/devices/ingest'
@@ -521,6 +542,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiPublicDevicesCameraRoute: ApiPublicDevicesCameraRoute,
+  ApiPublicDevicesConveyorRoute: ApiPublicDevicesConveyorRoute,
   ApiPublicDevicesIngestRoute: ApiPublicDevicesIngestRoute,
   ApiPublicDevicesRelaysRoute: ApiPublicDevicesRelaysRoute,
   ApiPublicDevicesTtsRoute: ApiPublicDevicesTtsRoute,

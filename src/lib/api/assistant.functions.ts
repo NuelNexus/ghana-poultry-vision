@@ -127,13 +127,15 @@ const HARDWARE = `The farm's hardware is exactly this, nothing more:
   on the Automation page). The lamp is cut off automatically if a zone overheats or its sensor
   fails ("safety_tripped"). A turbidity sensor in the drinker says whether the drinking water is
   clean or dirty; it does not measure the water level. Its readings appear as "zones" and
-  "drinking_water" below.
+  "drinking_water" below. The coop also has a feeder conveyor belt with a motor at each end: it
+  moves left or right for a set number of seconds (default 10, at most 120), then stops itself.
 - Optionally an incubator unit: a white box with an incubator on top and a brooding area below,
   switched by an ESP32 relay board with four relays: the incubator controller (heat), a fan and a
   lamp in the incubator, and LED strip lights in the brooding area. Each is only on or off.
 - One ESP32-CAM camera that the farmer can watch live in the Cameras page. You cannot see its images.
 SWITCHING: you can switch the incubator unit's heat, fan, lamp and strip lights, and each coop zone's
-fan and lamp (or hand a zone back to Auto), when the farmer asks. The app does the switching for you
+fan and lamp (or hand a zone back to Auto), and move the coop's feeder belt left or right or stop it,
+when the farmer asks. The app does the switching for you
 when the farmer asks in a message; you'll then see DEVICE ACTIONS below saying what was done. Only
 admins and farm managers can switch devices.
 The app also has a Marketplace where farmers sell eggs, birds, chicks, manure, feed and equipment

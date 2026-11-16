@@ -3,10 +3,13 @@ import { DEFAULT_COOP_CONTROLS, type CoopControls, type CoopZone } from "./contr
 import { relayState, type RelayName, type RelayState } from "./relays";
 import { chatCompletion, localModel } from "./openai.server";
 import type { Role } from "./auth.server";
+import { sendConveyor } from "./conveyor.server";
+import { CONVEYOR_DEFAULT_S, CONVEYOR_MAX_S } from "./conveyor";
 
 // Switching the farm's devices, shared by the Automation page and Ama.
 //   applyCoopControls  new settings for a coop unit (firmware/coop_unit picks them up)
 //   applyRelays        switch relays on an incubator relay board (firmware/relay_board)
+//   sendConveyor       run the coop's feeder belt left / right, or stop it (conveyor.server)
 //   runDeviceCommands  read a farmer's message ("turn on the incubator fan", "dum kanea no")
 //                      and carry out any switching it asks for, for Ama to confirm
 
@@ -99,14 +102,18 @@ export async function applyRelays(userId: string, boardId: string, patch: Partia
 // Twi (bue = open / switch on, dum = switch off, kanea = light, mframa = air / fan)
 // and a few other words for the devices.
 const MAYBE_COMMAND =
-  /\b(on|off|turn|switch|start|stop|open|close|shut|enable|disable|power|bue|dum|kanea|mframa|fan|fans|lamp|lamps|light|lights|heat|heater|strip|led|incubator|brooder|coop|auto|manual|allume|éteins|eteins|ventilateur)\b/i;
+  /\b(on|off|turn|switch|start|stop|open|close|shut|enable|disable|power|bue|dum|kanea|mframa|fan|fans|lamp|lamps|light|lights|heat|heater|strip|led|incubator|brooder|coop|auto|manual|belt|conveyor|feeder|feeders|feed|left|right|move|nkyene|allume|éteins|eteins|ventilateur)\b/i;
 
-type Part = "heat" | "fan" | "lamp" | "strip" | "everything" | "auto";
+type Part = "heat" | "fan" | "lamp" | "strip" | "everything" | "auto" | "belt";
 type Command = {
   unit: "incubator" | "coop" | "unclear";
   part: Part;
   zone: "layers" | "broilers" | "both";
   on: boolean;
+  /** Feeder belt only. */
+  direction: "left" | "right" | "stop" | "none";
+  /** Feeder belt only: how long to run, 0 = the default. */
+  seconds: number;
 };
 
 const commandSchema = {
@@ -121,12 +128,17 @@ const commandSchema = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["unit", "part", "zone", "on"],
+          required: ["unit", "part", "zone", "on", "direction", "seconds"],
           properties: {
             unit: { type: "string", enum: ["incubator", "coop", "unclear"] },
-            part: { type: "string", enum: ["heat", "fan", "lamp", "strip", "everything", "auto"] },
+            part: {
+              type: "string",
+              enum: ["heat", "fan", "lamp", "strip", "everything", "auto", "belt"],
+            },
             zone: { type: "string", enum: ["layers", "broilers", "both"] },
             on: { type: "boolean" },
+            direction: { type: "string", enum: ["left", "right", "stop", "none"] },
+            seconds: { type: "integer" },
           },
         },
       },
@@ -199,7 +211,8 @@ The farm can have two units:
   and a brooding area below. Parts: "heat" (the incubator controller / heater), "fan" (in the incubator),
   "lamp" (the lamp in the incubator), "strip" (LED strip lights in the brooding area).
 - The coop${coops.length ? "" : " (NOT registered on this farm)"}: two zones, "layers" and "broilers". Each zone has a "fan"
-  and a heat "lamp". A zone runs on Auto (its own thermostat) or Manual.
+  and a heat "lamp". A zone runs on Auto (its own thermostat) or Manual. The coop also has a feeder
+  conveyor "belt" (a motor at each end) that moves left or right for some seconds, then stops itself.
 Rules:
 - Only give commands when the farmer clearly asks to switch something on or off now (in any language,
   e.g. Twi "bue" = switch on / open, "dum" = switch off, "kanea" = light / lamp). Questions, advice requests
@@ -209,7 +222,11 @@ Rules:
 - heat and strip exist only on the incubator. If the farmer says incubator, brooder or chicks, use "incubator";
   coop, layers, broilers or hens, use "coop".
 - If the unit isn't said: use the only registered unit that has that part; if both could be meant, "unclear".
-- Coop zone: the one named, else "both". For the incubator use "both".`,
+- Coop zone: the one named, else "both". For the incubator use "both".
+- Feeder belt / conveyor / "move the feed": unit "coop", part "belt", zone "both", on true,
+  "direction" "left", "right" or "stop" (stop it now), "seconds" = how long they asked for
+  (convert minutes), or 0 if they didn't say. If they want it moved but don't say which way, use
+  unit "unclear". For every other part, "direction" is "none" and "seconds" is 0.`,
         },
         { role: "user", content: said },
       ],
@@ -238,8 +255,15 @@ Rules:
     ? structuredClone(coop.config ?? DEFAULT_COOP_CONTROLS)
     : null;
   let coopChanged = false;
+  let belt: { dir: "left" | "right" | "stop"; seconds: number } | null = null;
 
   for (const c of commands) {
+    if (c.unit === "unclear" && c.part === "belt") {
+      problems.push(
+        "The farmer wants the feeder belt moved but didn't say left or right, so it wasn't moved. Ask which way.",
+      );
+      continue;
+    }
     if (c.unit === "unclear") {
       problems.push(
         `Not sure whether "${c.part}" means the incubator or the coop, so nothing was switched for it. Ask which one.`,
@@ -252,6 +276,10 @@ Rules:
         continue;
       }
       if (c.part === "auto") continue;
+      if (c.part === "belt") {
+        problems.push("The feeder belt is on the coop, not the incubator unit.");
+        continue;
+      }
       const names: RelayName[] =
         c.part === "everything" ? ["incubator", "fan", "light", "strip"] : [RELAY_FOR[c.part]];
       for (const n of names) relayPatch[n] = c.on;
@@ -260,6 +288,20 @@ Rules:
     // Coop
     if (!coop || !config) {
       problems.push("No coop unit is registered on this farm.");
+      continue;
+    }
+    if (c.part === "belt") {
+      const dir = c.direction === "none" ? (c.on ? null : "stop") : c.direction;
+      if (!dir) {
+        problems.push("Not sure which way to move the feeder belt. Ask: left or right?");
+        continue;
+      }
+      const secs = c.seconds > 0 ? Math.round(c.seconds) : CONVEYOR_DEFAULT_S;
+      if (secs > CONVEYOR_MAX_S)
+        problems.push(
+          `The belt runs at most ${CONVEYOR_MAX_S} s at a time, so it was set to ${CONVEYOR_MAX_S} s.`,
+        );
+      belt = { dir, seconds: Math.min(secs, CONVEYOR_MAX_S) };
       continue;
     }
     if (c.part === "heat" || c.part === "strip") {
@@ -296,6 +338,17 @@ Rules:
       );
     } catch (e) {
       problems.push(`Couldn't switch the incubator: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  if (coop && belt) {
+    try {
+      const { summary } = await sendConveyor(opts.userId, coop.id, belt.dir, belt.seconds);
+      done.push(
+        `Coop ${coop.device_id}: ${summary}${belt.dir === "stop" ? "" : ", then it stops by itself"}.` +
+          (coop.online ? "" : " The coop is offline, so the belt won't move until it reconnects."),
+      );
+    } catch (e) {
+      problems.push(`Couldn't move the feeder belt: ${e instanceof Error ? e.message : e}`);
     }
   }
   if (coop && config && coopChanged) {
