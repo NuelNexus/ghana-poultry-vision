@@ -25,7 +25,13 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
+// Your Wi-Fi and the site's key: secrets.h (ignored by git). Without one, the values in
+// secrets.example.h are used, so never commit real ones there.
+#if __has_include("secrets.h")
 #include "secrets.h"
+#else
+#include "secrets.example.h"
+#endif
 #include "root_ca.h"
 
 #define FIRMWARE_VERSION "pg-cam 1.0"
